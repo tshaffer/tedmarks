@@ -13,8 +13,8 @@
 | 1 | iOS app | **Native SwiftUI** | ✅ |
 | 2 | Minimum iOS | **iOS 18** (Control Center controls, interactive Live Activities, App Intents) | ✅ |
 | 3 | Backend | **New TypeScript Express + MongoDB API** | ✅ |
-| 3a | Hosting | **MongoDB Atlas** (same cluster as Tedography, new `tedmarks` database). **API on a small cloud host** so phones can reach it from restaurants (Tedography's API runs locally on the Mac, which phones can't reach away from home) | ✅ |
-| 4 | Sign-in | **Sign in with Apple**, allowlisted to Ted's and Lori's Apple IDs. The server verifies Apple's identity token and issues its own session token. | ✅ |
+| 3a | Hosting | **Heroku** app `tedmarks-api` (Eco dyno, same account as memorapp). **MongoDB Atlas** (same cluster as Tedography, new `tedmarks` database). **API on a small cloud host** so phones can reach it from restaurants (Tedography's API runs locally on the Mac, which phones can't reach away from home) | ✅ |
+| 4 | Sign-in | Interim: a shared access key (`X-Tedmarks-Key`) on every request except /health. Then **Sign in with Apple**, allowlisted to Ted's and Lori's Apple IDs. The server verifies Apple's identity token and issues its own session token. | ✅ |
 | 5 | Offline & sync | Each phone keeps a full local copy (SwiftData) plus an outbox queue that syncs when online. Per-person ratings never conflict (stored separately). Shared fields (notes, dish names, order): **latest change wins**. | ✅ (no real choice) |
 | 6 | Data model | Drafted by Claude from the functionality doc, reviewed by Ted | ✅ |
 | 7 | Place data | **Google Places**, called through the API (key never on the phone). Keeps memorapp's Google place IDs. | ✅ |
@@ -87,5 +87,4 @@ and for the web app).
 ## Still open (not blocking)
 
 - AI monthly cost ceiling
-- Cloud host for the API (Heroku like memorapp, Render, or Fly)
 - Web app stack

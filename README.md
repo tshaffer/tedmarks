@@ -37,6 +37,22 @@ pnpm openapi:generate   # after changing a schema in shared/src/schema
 Copy `api/.env.example` to `api/.env` and fill it in. The API runs without a
 database (health check only) when `MONGODB_URI` is unset.
 
+## Deploying the API (Heroku)
+
+The API runs on Heroku as **tedmarks-api** (Eco dyno; sleeps after 30 idle
+minutes, so the first request after a break takes a few seconds):
+https://tedmarks-api-29d4a84bccc7.herokuapp.com/health
+
+```bash
+git push heroku main          # builds with pnpm (pnpm -r build) and starts node api/dist/index.js
+heroku logs -a tedmarks-api --tail
+heroku config -a tedmarks-api # GOOGLE_PLACES_API_KEY, API_ACCESS_KEY, MONGODB_DB
+```
+
+Every request except `/health` needs the `X-Tedmarks-Key` header matching
+`API_ACCESS_KEY` (interim protection until Sign in with Apple). Set config
+values without surrounding quotes.
+
 ## iOS
 
 ```bash
@@ -46,6 +62,10 @@ open Tedmarks.xcodeproj
 ```
 
 - Signing team `SNCCBFHL45` is set in `ios/project.yml`; bundle ID `com.tedshaffer.tedmarks`.
+- **Server URL and access key** come from `ios/Config/Secrets.xcconfig` (git-ignored).
+  Copy `Secrets.example.xcconfig` to create it; it points at Heroku by default, or at
+  `http:/$()/Teds-MacBook-Pro.local:4200` for the dev server on the Mac. Rerun
+  `xcodegen` after creating it.
 - `cd ios/TedmarksKit && swift test` runs the shared-rule tests on the Mac.
 
 ## Keeping Swift and TypeScript in sync

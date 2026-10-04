@@ -45,8 +45,7 @@ xcodegen                # generates Tedmarks.xcodeproj from project.yml (not com
 open Tedmarks.xcodeproj
 ```
 
-- Set your Team ID in `ios/project.yml` (`DEVELOPMENT_TEAM`) to run on a device.
-- Bundle ID is a placeholder (`com.tedshaffer.tedmarks`) until chosen.
+- Signing team `SNCCBFHL45` is set in `ios/project.yml`; bundle ID `com.tedshaffer.tedmarks`.
 - `cd ios/TedmarksKit && swift test` runs the shared-rule tests on the Mac.
 
 ## Keeping Swift and TypeScript in sync

@@ -2,14 +2,14 @@
 # Tedmarks.xcodeproj is generated and not committed.
 name: Tedmarks
 options:
-  bundleIdPrefix: com.tedshaffer          # placeholder — final bundle ID still to choose
+  bundleIdPrefix: com.tedshaffer
   deploymentTarget:
     iOS: "18.0"
   createIntermediateGroups: true
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    DEVELOPMENT_TEAM: ""                  # set your Apple Developer Team ID to run on a device
+    DEVELOPMENT_TEAM: SNCCBFHL45
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
 packages:

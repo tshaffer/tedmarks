@@ -20,7 +20,7 @@
 | 7 | Place data | **Google Places**, called through the API (key never on the phone). Keeps memorapp's Google place IDs. | ✅ |
 | 8 | Photos | **Option A: references to the iPhone Photos library** (no copies). Menu and receipt pages saved to a "Tedmarks" album in Photos. Built to migrate later (see below). | ✅ |
 | 9 | AI | **Claude, called from the API server** (key never on the phone). Speech-to-text on the phone (Apple Speech framework, works offline); the transcript is sent to Claude for structuring. Menu and receipt photos go to Claude directly. Monthly cost ceiling still to set. | ✅ (ceiling open) |
-| 10 | Apple Developer account | Ted already has one. TestFlight for installing on both phones. Bundle ID to choose at project setup. | ✅ |
+| 10 | Apple Developer account | Ted already has one (Team ID `SNCCBFHL45`). TestFlight for installing on both phones. Bundle ID **`com.tedshaffer.tedmarks`** (widgets: `com.tedshaffer.tedmarks.widgets`). | ✅ |
 | 11 | Repo | **`/Users/tedshaffer/src/tedmarks`** is the root for the iOS app, the web app, and the API | ✅ |
 
 ### Proposed repo layout
@@ -89,4 +89,3 @@ and for the web app).
 - AI monthly cost ceiling
 - Cloud host for the API (Heroku like memorapp, Render, or Fly)
 - Web app stack
-- Bundle ID

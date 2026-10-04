@@ -221,7 +221,7 @@ struct StartVisitSheet: View {
                       detail: "Make sure Location Services is on, then try again.")
         case .serverUnreachable:
             retryView("Can't reach the Tedmarks server", systemImage: "wifi.exclamationmark",
-                      detail: "Is the API running (pnpm dev:api) and is this phone on the same Wi-Fi as the Mac?")
+                      detail: "Check your connection and try again.")
         case .server(let message):
             retryView("Couldn't load restaurants", systemImage: "exclamationmark.triangle", detail: message)
         }

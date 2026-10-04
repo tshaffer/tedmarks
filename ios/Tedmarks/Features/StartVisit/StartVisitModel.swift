@@ -37,7 +37,7 @@ final class StartVisitModel {
 
     private(set) var location: CLLocation?
     private var nearby: [NearbyPlace] = []
-    private let api = TedmarksAPI(baseURL: AppConfig.apiBaseURL)
+    private let api = AppConfig.api
 
     var selectedPlace: NearbyPlace? { places.first { $0.googlePlaceId == selectedId } }
 
@@ -148,6 +148,7 @@ final class StartVisitModel {
         case LocationError.denied: .locationDenied
         case LocationError.unavailable: .locationUnavailable
         case TedmarksAPIError.unreachable: .serverUnreachable
+        case TedmarksAPIError.unauthorized: .server("The server rejected this app's access key (check Config/Secrets.xcconfig).")
         case TedmarksAPIError.server(_, let message): .server(message ?? "The server returned an error.")
         default: .server("Something went wrong.")
         }

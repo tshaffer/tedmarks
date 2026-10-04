@@ -48,6 +48,8 @@ public struct PlaceSuggestion: Codable, Hashable, Sendable, Identifiable {
 public enum TedmarksAPIError: Error, Sendable {
     /// The server couldn't be reached (not running, wrong address, no network).
     case unreachable
+    /// The server rejected the access key.
+    case unauthorized
     /// The server answered with an error.
     case server(status: Int, message: String?)
     case badResponse
@@ -57,10 +59,13 @@ public enum TedmarksAPIError: Error, Sendable {
 /// (To be replaced by the client generated from shared/openapi.)
 public struct TedmarksAPI: Sendable {
     public let baseURL: URL
+    private let accessKey: String?
     private let session: URLSession
 
-    public init(baseURL: URL, session: URLSession = .shared) {
+    /// - Parameter accessKey: interim shared key sent as X-Tedmarks-Key (until Sign in with Apple).
+    public init(baseURL: URL, accessKey: String? = nil, session: URLSession = .shared) {
         self.baseURL = baseURL
+        self.accessKey = accessKey
         self.session = session
     }
 
@@ -134,6 +139,7 @@ public struct TedmarksAPI: Sendable {
         components.queryItems = query
         var request = URLRequest(url: components.url!)
         request.timeoutInterval = 15
+        if let accessKey { request.setValue(accessKey, forHTTPHeaderField: "X-Tedmarks-Key") }
 
         let data: Data
         let response: URLResponse
@@ -143,6 +149,7 @@ public struct TedmarksAPI: Sendable {
             throw TedmarksAPIError.unreachable
         }
         guard let http = response as? HTTPURLResponse else { throw TedmarksAPIError.badResponse }
+        if http.statusCode == 401 { throw TedmarksAPIError.unauthorized }
         guard (200..<300).contains(http.statusCode) else {
             let message = try? JSONDecoder().decode(ErrorResponse.self, from: data).message
             throw TedmarksAPIError.server(status: http.statusCode, message: message)

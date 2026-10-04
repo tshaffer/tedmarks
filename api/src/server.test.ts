@@ -52,6 +52,21 @@ test('nearby rejects an out-of-range radius', async () => {
   }
 });
 
+test('access key protects everything except /health', async () => {
+  const server = createApp({ accessKey: 'secret-key' }).listen(0);
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    assert.equal((await fetch(`${base}/health`)).status, 200);
+    assert.equal((await fetch(`${base}/places/nearby?lat=1&lng=1`)).status, 401);
+    assert.equal((await fetch(`${base}/places/nearby?lat=1&lng=1`, { headers: { 'X-Tedmarks-Key': 'wrong' } })).status, 401);
+    // Right key gets past the check (503: Places isn't configured in this test app).
+    assert.equal((await fetch(`${base}/places/nearby?lat=1&lng=1`, { headers: { 'X-Tedmarks-Key': 'secret-key' } })).status, 503);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test('every collection gets id and serverSeq indexes', () => {
   const keys = indexesFor('ratings').map((i) => JSON.stringify(i.key));
   assert.ok(keys.includes('{"id":1}'));

@@ -19,6 +19,7 @@ const server = createApp({
   db,
   places,
   nearbyDefaults: { startMeters: config.nearbyStartMeters, maxMeters: config.nearbyMaxMeters },
+  accessKey: config.accessKey,
 }).listen(config.port, '0.0.0.0', () => {
   console.log(`[tedmarks-api] Listening on port ${config.port}`);
 });

@@ -54,6 +54,8 @@
 	<true/>
 	<key>TedmarksAPIBaseURL</key>
 	<string>$(TEDMARKS_API_BASE_URL)</string>
+	<key>TedmarksAPIKey</key>
+	<string>$(TEDMARKS_API_KEY)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

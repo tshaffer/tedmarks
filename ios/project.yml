@@ -19,6 +19,11 @@ targets:
   Tedmarks:
     type: application
     platform: iOS
+    # API base URL and access key live in Config/Secrets.xcconfig (git-ignored;
+    # copy Config/Secrets.example.xcconfig to create it).
+    configFiles:
+      Debug: Config/Secrets.xcconfig
+      Release: Config/Secrets.xcconfig
     sources:
       - path: Tedmarks
     dependencies:
@@ -32,6 +37,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSSupportsLiveActivities: true
         TedmarksAPIBaseURL: $(TEDMARKS_API_BASE_URL)
+        TedmarksAPIKey: $(TEDMARKS_API_KEY)
         CFBundleURLTypes:
           - CFBundleURLName: com.tedshaffer.tedmarks
             CFBundleURLSchemes: [tedmarks]
@@ -47,9 +53,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tedshaffer.tedmarks
-        # Dev: the API running on Ted's Mac (pnpm dev:api), reachable from the simulator
-        # and from an iPhone on the same Wi-Fi. Switch to the cloud URL once deployed.
-        TEDMARKS_API_BASE_URL: http://Teds-MacBook-Pro.local:4200
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
   TedmarksWidgets:

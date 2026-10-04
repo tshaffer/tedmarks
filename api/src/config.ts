@@ -13,6 +13,8 @@ export interface Config {
   /** Server defaults for the nearby search when the app doesn't send its own. */
   nearbyStartMeters: number;
   nearbyMaxMeters: number;
+  /** Interim shared key required on every request except /health (until Sign in with Apple). */
+  accessKey: string | undefined;
 }
 
 function optional(name: string): string | undefined {
@@ -35,6 +37,7 @@ export function loadConfig(): Config {
     anthropicApiKey: optional('ANTHROPIC_API_KEY'),
     nearbyStartMeters: Number(optional('NEARBY_START_METERS') ?? DEFAULT_NEARBY_START_METERS),
     nearbyMaxMeters: Number(optional('NEARBY_MAX_METERS') ?? DEFAULT_NEARBY_MAX_METERS),
+    accessKey: optional('API_ACCESS_KEY'),
   };
 }
 
@@ -47,5 +50,6 @@ export function missingSettings(config: Config): string[] {
   if (!config.sessionSecret) missing.push('SESSION_SECRET');
   if (!config.googlePlacesApiKey) missing.push('GOOGLE_PLACES_API_KEY');
   if (!config.anthropicApiKey) missing.push('ANTHROPIC_API_KEY');
+  if (!config.accessKey) missing.push('API_ACCESS_KEY (requests are not protected)');
   return missing;
 }

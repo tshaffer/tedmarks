@@ -9,10 +9,14 @@
     "test": "pnpm -r test",
     "dev:api": "pnpm --filter @tedmarks/api dev",
     "indexes:create": "pnpm --filter @tedmarks/api indexes:create",
-    "openapi:generate": "pnpm --filter @tedmarks/shared openapi:generate"
+    "openapi:generate": "pnpm --filter @tedmarks/shared openapi:generate",
+    "start": "node api/dist/index.js"
   },
   "devDependencies": {
     "rimraf": "6.1.3",
     "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

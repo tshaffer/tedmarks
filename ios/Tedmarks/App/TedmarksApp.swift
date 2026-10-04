@@ -11,6 +11,9 @@ struct TedmarksApp: App {
             container = try ModelContainer(for: Schema(tedmarksModelTypes))
             try MainActor.assumeIsolated {
                 try VisitStarter.ensureHousehold(in: container.mainContext)
+                #if DEBUG
+                DebugDemoData.seedIfRequested(in: container.mainContext)
+                #endif
             }
         } catch {
             fatalError("Could not open the Tedmarks database: \(error)")

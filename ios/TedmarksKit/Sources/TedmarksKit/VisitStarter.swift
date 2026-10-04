@@ -78,4 +78,12 @@ public enum VisitStarter {
         context.insert(Person(displayName: "Lori", kind: .household))
         try context.save()
     }
+
+    /// The person who owns this phone (Ted, for now — sign-in will make this explicit).
+    @MainActor
+    public static func devicePerson(in context: ModelContext) throws -> Person? {
+        let household = PersonKind.household.rawValue
+        let people = try context.fetch(FetchDescriptor<Person>(predicate: #Predicate { $0.kindRaw == household }))
+        return people.first { $0.displayName == "Ted" } ?? people.min { $0.createdAt < $1.createdAt }
+    }
 }

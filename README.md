@@ -67,6 +67,10 @@ open Tedmarks.xcodeproj
   `http:/$()/Teds-MacBook-Pro.local:4200` for the dev server on the Mac. Rerun
   `xcodegen` after creating it.
 - `cd ios/TedmarksKit && swift test` runs the shared-rule tests on the Mac.
+- Debug-only simulator launch flags (no tapping needed), e.g.
+  `xcrun simctl launch booted com.tedshaffer.tedmarks -demoVisit -openWrapUp`:
+  `-demoVisit` (in-progress visit at Doppio Zero with 4 dishes), `-openStartVisit`,
+  `-startVisitSearch <text>`, `-openSettings`, `-openWrapUp`, `-openRateDish`.
 
 ## Keeping Swift and TypeScript in sync
 

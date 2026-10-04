@@ -59,6 +59,9 @@ public final class Place {
     @Relationship(deleteRule: .cascade, inverse: \Visit.place)
     public var visits: [Visit] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \PlaceItem.place)
+    public var items: [PlaceItem] = []
+
     public var kind: PlaceKind {
         get { PlaceKind(rawValue: kindRaw) ?? .restaurant }
         set { kindRaw = newValue.rawValue }
@@ -101,9 +104,13 @@ public final class Visit {
     public var participantIds: [UUID]
     public var isFirstVisit: Bool
     public var tags: [String]
+    public var wrapUpCompletedAt: Date?
     public var createdAt: Date
     public var modifiedAt: Date
     public var deletedAt: Date?
+
+    @Relationship(deleteRule: .cascade, inverse: \VisitItem.visit)
+    public var items: [VisitItem] = []
 
     public var status: VisitStatus {
         get { VisitStatus(rawValue: statusRaw) ?? .ended }
@@ -137,4 +144,6 @@ public final class Visit {
 }
 
 /// All SwiftData model types, for building a ModelContainer.
-public let tedmarksModelTypes: [any PersistentModel.Type] = [Person.self, Place.self, Visit.self]
+public let tedmarksModelTypes: [any PersistentModel.Type] = [
+    Person.self, Place.self, Visit.self, PlaceItem.self, VisitItem.self, Rating.self,
+]

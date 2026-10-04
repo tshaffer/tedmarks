@@ -2,7 +2,8 @@ import SwiftData
 import SwiftUI
 import TedmarksKit
 
-/// Home of the Visit tab: "Start visit" when no visit is active; the current visit when one is.
+/// Home of the Visit tab: "Start visit" when no visit is active; during a visit, our order
+/// with ratings plus "Rate a dish" (Figma 04) and "Wrap up" (Figma 05).
 struct VisitHomeView: View {
     @Binding var showStartVisit: Bool
 
@@ -16,6 +17,23 @@ struct VisitHomeView: View {
         sort: \Visit.startedAt, order: .reverse
     ) private var pastVisits: [Visit]
     @Query private var people: [Person]
+    // Re-render when ratings or order lines change.
+    @Query(filter: #Predicate<Rating> { $0.deletedAt == nil }) private var ratings: [Rating]
+    @Query(filter: #Predicate<VisitItem> { $0.deletedAt == nil }) private var visitItems: [VisitItem]
+
+    @State private var sheet: VisitSheet?
+
+    enum VisitSheet: Identifiable {
+        case rateDish(Visit, VisitItem?)
+        case wrapUp(Visit)
+
+        var id: String {
+            switch self {
+            case .rateDish(let visit, let item): "rate-\(visit.id)-\(item?.id.uuidString ?? "new")"
+            case .wrapUp(let visit): "wrap-\(visit.id)"
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -42,12 +60,13 @@ struct VisitHomeView: View {
 
                 if !pastVisits.isEmpty {
                     Section("Recent visits") {
-                        ForEach(pastVisits.prefix(10)) { visit in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(visit.place?.name ?? "Unknown place").font(.headline)
-                                Text("\(visit.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(names(for: visit))")
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                        ForEach(pastVisits.prefix(15)) { visit in
+                            Button {
+                                sheet = .wrapUp(visit)
+                            } label: {
+                                pastVisitRow(visit)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -56,11 +75,33 @@ struct VisitHomeView: View {
             .sheet(isPresented: $showStartVisit) {
                 StartVisitSheet()
             }
+            #if DEBUG
+            // Dev/testing: `-openWrapUp` / `-openRateDish` open the active visit's sheets without a tap.
+            .task {
+                let arguments = ProcessInfo.processInfo.arguments
+                guard let visit = activeVisits.first else { return }
+                if arguments.contains("-openWrapUp") { sheet = .wrapUp(visit) }
+                if arguments.contains("-openRateDish") {
+                    sheet = .rateDish(visit, DishCapture.orderItems(for: visit).first { $0.displayName == "Funghi pizza" })
+                }
+            }
+            #endif
+            .sheet(item: $sheet) { sheet in
+                switch sheet {
+                case .rateDish(let visit, let item): RateDishSheet(visit: visit, preselected: item)
+                case .wrapUp(let visit): WrapUpSheet(visit: visit)
+                }
+            }
         }
     }
 
+    // MARK: - Active visit (in-app version of the Live Activity, Figma 03)
+
     private func activeVisitCard(_ visit: Visit) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let items = DishCapture.orderItems(for: visit)
+        let household = DishCapture.household(for: visit, people: people)
+        let rated = items.filter { emoji(for: $0, household: household) != nil }.count
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text(visit.place?.name ?? "Unknown place").font(.title2.weight(.bold))
                 Spacer()
@@ -73,14 +114,91 @@ struct VisitHomeView: View {
             }
             Text("Started \(visit.startedAt.formatted(date: .omitted, time: .shortened)) · \(names(for: visit))")
                 .font(.subheadline).foregroundStyle(.secondary)
-            Text("Rating dishes and wrap-up are coming next.")
-                .font(.footnote).foregroundStyle(.secondary)
-            Button("End visit", role: .destructive) {
-                try? VisitStarter.endVisit(visit, in: context)
+
+            if !items.isEmpty {
+                Text("OUR ORDER · \(rated) OF \(items.count) RATED")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                FlowLayout(spacing: 6) {
+                    ForEach(items) { item in
+                        let badge = emoji(for: item, household: household)
+                        Button {
+                            sheet = .rateDish(visit, item)
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(item.displayName).lineLimit(1)
+                                if let badge {
+                                    Text(badge).font(.footnote)
+                                } else {
+                                    Text("Rate").font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                                }
+                            }
+                            .font(.subheadline.weight(.medium))
+                            .padding(.horizontal, 11).padding(.vertical, 7)
+                            .background {
+                                if badge == nil {
+                                    Capsule().strokeBorder(Color.orange, lineWidth: 1.5)
+                                } else {
+                                    Capsule().fill(Color(.secondarySystemFill))
+                                }
+                            }
+                            .fixedSize()
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
-            .buttonStyle(.bordered)
+
+            HStack(spacing: 10) {
+                Button {
+                    sheet = .rateDish(visit, nil)
+                } label: {
+                    Label("Rate a dish", systemImage: "plus").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                Button {
+                    sheet = .wrapUp(visit)
+                } label: {
+                    Text("Wrap up").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .controlSize(.large)
         }
         .padding(.vertical, 6)
+    }
+
+    private func pastVisitRow(_ visit: Visit) -> some View {
+        let household = DishCapture.household(for: visit, people: people)
+        let verdict = (try? DishCapture.verdict(for: visit, household: household, in: context)) ?? .none
+        let dishCount = DishCapture.orderItems(for: visit).count
+        return HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(visit.place?.name ?? "Unknown place").font(.headline)
+                Text("\(visit.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(dishCount) dish\(dishCount == 1 ? "" : "es")")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if let text = displayText(verdict, names: personNames) {
+                Text(text).font(.callout)
+            }
+            Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Helpers
+
+    private var personNames: [String: String] {
+        Dictionary(uniqueKeysWithValues: people.map { ($0.id.uuidString, $0.displayName) })
+    }
+
+    private func emoji(for item: VisitItem, household: [UUID]) -> String? {
+        _ = ratings.count + visitItems.count
+        switch (try? DishCapture.display(for: item, household: household, in: context)) ?? .none {
+        case .none: return nil
+        case .joint(let value): return value.emoji
+        case .split(let people): return people.map(\.value.emoji).joined(separator: "/")
+        }
     }
 
     private func names(for visit: Visit) -> String {

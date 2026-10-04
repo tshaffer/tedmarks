@@ -1,0 +1,78 @@
+# XcodeGen spec — generate the Xcode project with:  cd ios && xcodegen
+# Tedmarks.xcodeproj is generated and not committed.
+name: Tedmarks
+options:
+  bundleIdPrefix: com.tedshaffer          # placeholder — final bundle ID still to choose
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""                  # set your Apple Developer Team ID to run on a device
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  TedmarksKit:
+    path: TedmarksKit
+targets:
+  Tedmarks:
+    type: application
+    platform: iOS
+    sources:
+      - path: Tedmarks
+    dependencies:
+      - package: TedmarksKit
+      - target: TedmarksWidgets
+    info:
+      path: Tedmarks/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Tedmarks
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSSupportsLiveActivities: true
+        NSLocationWhenInUseUsageDescription: Tedmarks uses your location to suggest the restaurant you're at when you start a visit.
+        NSPhotoLibraryUsageDescription: Tedmarks attaches photos you took during a visit and suggests visits you forgot to start.
+        NSPhotoLibraryAddUsageDescription: Tedmarks saves menu and receipt pages to a "Tedmarks" album.
+        NSCameraUsageDescription: Tedmarks uses the camera to capture menu and receipt pages.
+        NSMicrophoneUsageDescription: Tedmarks records voice notes about a visit when you hold to talk.
+        NSSpeechRecognitionUsageDescription: Tedmarks transcribes your voice notes on your iPhone.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tedshaffer.tedmarks
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+  TedmarksWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: TedmarksWidgets
+    dependencies:
+      - package: TedmarksKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: TedmarksWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Tedmarks Widgets
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tedshaffer.tedmarks.widgets
+  TedmarksTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: TedmarksTests
+    dependencies:
+      - target: Tedmarks
+      - package: TedmarksKit
+schemes:
+  Tedmarks:
+    build:
+      targets:
+        Tedmarks: all
+    test:
+      targets:
+        - TedmarksTests

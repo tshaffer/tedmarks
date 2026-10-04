@@ -1,0 +1,38 @@
+{
+  "description": "Cases for the 'joint unless we disagree' display rule. Shared by TypeScript (shared/src/rules) and Swift (TedmarksKit) tests.",
+  "household": ["ted", "lori"],
+  "cases": [
+    { "name": "no ratings", "ratings": [], "expected": { "kind": "none" } },
+    { "name": "joint only", "ratings": [{ "scope": "joint", "value": "loved" }], "expected": { "kind": "joint", "value": "loved" } },
+    {
+      "name": "joint plus a differing person rating splits",
+      "ratings": [{ "scope": "joint", "value": "loved" }, { "scope": "person", "personId": "ted", "value": "skip" }],
+      "expected": { "kind": "split", "byPerson": [{ "personId": "ted", "value": "skip" }, { "personId": "lori", "value": "loved" }] }
+    },
+    {
+      "name": "joint plus an agreeing person rating stays joint",
+      "ratings": [{ "scope": "joint", "value": "good" }, { "scope": "person", "personId": "lori", "value": "good" }],
+      "expected": { "kind": "joint", "value": "good" }
+    },
+    {
+      "name": "both people agree",
+      "ratings": [{ "scope": "person", "personId": "ted", "value": "wouldReturn" }, { "scope": "person", "personId": "lori", "value": "wouldReturn" }],
+      "expected": { "kind": "joint", "value": "wouldReturn" }
+    },
+    {
+      "name": "only one person rated",
+      "ratings": [{ "scope": "person", "personId": "ted", "value": "good" }],
+      "expected": { "kind": "joint", "value": "good" }
+    },
+    {
+      "name": "both people disagree",
+      "ratings": [{ "scope": "person", "personId": "ted", "value": "tryAgain" }, { "scope": "person", "personId": "lori", "value": "wouldReturn" }],
+      "expected": { "kind": "split", "byPerson": [{ "personId": "ted", "value": "tryAgain" }, { "personId": "lori", "value": "wouldReturn" }] }
+    },
+    {
+      "name": "guest ratings are ignored",
+      "ratings": [{ "scope": "joint", "value": "good" }, { "scope": "person", "personId": "mike", "value": "skip" }],
+      "expected": { "kind": "joint", "value": "good" }
+    }
+  ]
+}

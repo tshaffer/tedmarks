@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Tedmarks</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Tedmarks uses the camera to capture menu and receipt pages.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Tedmarks uses your location to suggest the restaurant you're at when you start a visit.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Tedmarks records voice notes about a visit when you hold to talk.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Tedmarks saves menu and receipt pages to a "Tedmarks" album.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Tedmarks attaches photos you took during a visit and suggests visits you forgot to start.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Tedmarks transcribes your voice notes on your iPhone.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,10 @@
+{
+  "description": "Cases for the Place page 'What to order' grouping. Shared by TypeScript and Swift tests.",
+  "cases": [
+    { "name": "loved on both visits", "input": { "placeItemId": "burrata", "displays": [{ "kind": "joint", "value": "loved" }, { "kind": "joint", "value": "loved" }] }, "expected": { "group": "orderAgain", "notOnLatestMenu": false, "ratedVisitCount": 2 } },
+    { "name": "split on one visit", "input": { "placeItemId": "arancini", "displays": [{ "kind": "split", "byPerson": [{ "personId": "ted", "value": "skip" }, { "personId": "lori", "value": "loved" }] }] }, "expected": { "group": "disagree", "notOnLatestMenu": false, "ratedVisitCount": 1 } },
+    { "name": "skipped once", "input": { "placeItemId": "caesar", "displays": [{ "kind": "joint", "value": "good" }, { "kind": "joint", "value": "skip" }] }, "expected": { "group": "skip", "notOnLatestMenu": false, "ratedVisitCount": 2 } },
+    { "name": "good but no longer on the menu", "input": { "placeItemId": "funghi", "onLatestMenu": false, "displays": [{ "kind": "joint", "value": "good" }] }, "expected": { "group": "orderAgain", "notOnLatestMenu": true, "ratedVisitCount": 1 } },
+    { "name": "ordered but never rated", "input": { "placeItemId": "tiramisu", "displays": [{ "kind": "none" }] }, "expected": { "group": "unrated", "notOnLatestMenu": false, "ratedVisitCount": 0 } }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@tedmarks/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "tsx --test src/**/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "indexes:create": "tsx src/tools/createIndexes.ts",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@tedmarks/shared": "workspace:*",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "5.2.1",
+    "mongodb": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "5.0.6",
+    "@types/node": "25.3.5",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}

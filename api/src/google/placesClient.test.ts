@@ -35,7 +35,7 @@ test('nearby maps Google places and computes distance', async () => {
       capture,
     ),
   );
-  const places = await client.nearby(origin, { startMeters: 500, maxMeters: 500 });
+  const places = await client.nearby(origin, 1609);
   assert.equal(places.length, 1);
   assert.deepEqual(places[0], {
     googlePlaceId: 'abc',
@@ -52,22 +52,7 @@ test('nearby maps Google places and computes distance', async () => {
   assert.equal(headers['X-Goog-Api-Key'], 'test-key');
   const body = JSON.parse(String(capture.init?.body));
   assert.equal(body.rankPreference, 'DISTANCE');
-});
-
-test('nearby widens the radius when nothing is close', async () => {
-  const radii: number[] = [];
-  const client = new PlacesClient('k', (async (_url: string | URL | Request, init?: RequestInit) => {
-    const body = JSON.parse(String(init?.body));
-    radii.push(body.locationRestriction.circle.radius);
-    const places =
-      radii.length < 3
-        ? []
-        : [{ id: 'far', displayName: { text: 'Far Diner' }, location: { latitude: 37.45, longitude: -122.0786 } }];
-    return new Response(JSON.stringify({ places }));
-  }) as FetchFn);
-  const places = await client.nearby(origin, { startMeters: 402, maxMeters: 8047 });
-  assert.deepEqual(radii, [402, 2010, 8047]);
-  assert.equal(places[0]?.name, 'Far Diner');
+  assert.equal(body.locationRestriction.circle.radius, 1609);
 });
 
 test('search with a blank query does not call Google', async () => {

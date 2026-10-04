@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { DEFAULT_NEARBY_MAX_METERS, DEFAULT_NEARBY_START_METERS } from '@tedmarks/shared';
+import { DEFAULT_NEARBY_RADIUS_METERS } from '@tedmarks/shared';
 
 export interface Config {
   port: number;
@@ -10,9 +10,8 @@ export interface Config {
   sessionSecret: string | undefined;
   googlePlacesApiKey: string | undefined;
   anthropicApiKey: string | undefined;
-  /** Server defaults for the nearby search when the app doesn't send its own. */
-  nearbyStartMeters: number;
-  nearbyMaxMeters: number;
+  /** Server default for the nearby search radius when the app doesn't send one. */
+  nearbyRadiusMeters: number;
   /** Interim shared key required on every request except /health (until Sign in with Apple). */
   accessKey: string | undefined;
 }
@@ -35,8 +34,7 @@ export function loadConfig(): Config {
     sessionSecret: optional('SESSION_SECRET'),
     googlePlacesApiKey: optional('GOOGLE_PLACES_API_KEY'),
     anthropicApiKey: optional('ANTHROPIC_API_KEY'),
-    nearbyStartMeters: Number(optional('NEARBY_START_METERS') ?? DEFAULT_NEARBY_START_METERS),
-    nearbyMaxMeters: Number(optional('NEARBY_MAX_METERS') ?? DEFAULT_NEARBY_MAX_METERS),
+    nearbyRadiusMeters: Number(optional('NEARBY_RADIUS_METERS') ?? DEFAULT_NEARBY_RADIUS_METERS),
     accessKey: optional('API_ACCESS_KEY'),
   };
 }

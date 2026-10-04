@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import type { NearbyPlacesResponse, PlaceDetailsResponse, PlaceSuggestionsResponse } from '@tedmarks/shared';
 import { notImplemented } from '../notImplemented.js';
 import { MAX_SEARCH_RADIUS_METERS } from '@tedmarks/shared';
-import type { LatLng, NearbyRange, PlacesClient } from './placesClient.js';
+import type { LatLng, PlacesClient } from './placesClient.js';
 
 function parseOrigin(req: Request): LatLng | null {
   const latitude = Number(req.query['lat']);
@@ -12,18 +12,12 @@ function parseOrigin(req: Request): LatLng | null {
   return { latitude, longitude };
 }
 
-/** Optional ?radius=&maxRadius= (meters) from the app's settings; falls back to server defaults. */
-function parseRange(req: Request, defaults: NearbyRange): NearbyRange | null {
-  const read = (name: string, fallback: number): number | null => {
-    const raw = req.query[name];
-    if (raw === undefined) return fallback;
-    const value = Number(raw);
-    return Number.isFinite(value) && value >= 50 && value <= MAX_SEARCH_RADIUS_METERS ? value : null;
-  };
-  const startMeters = read('radius', defaults.startMeters);
-  const maxMeters = read('maxRadius', Math.max(defaults.maxMeters, startMeters ?? 0));
-  if (startMeters === null || maxMeters === null) return null;
-  return { startMeters, maxMeters: Math.max(maxMeters, startMeters) };
+/** Optional ?radius= (meters) from the app's settings; falls back to the server default. */
+function parseRadius(req: Request, defaultMeters: number): number | null {
+  const raw = req.query['radius'];
+  if (raw === undefined) return defaultMeters;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 50 && value <= MAX_SEARCH_RADIUS_METERS ? value : null;
 }
 
 function sendError(res: Response, error: unknown): void {
@@ -31,7 +25,7 @@ function sendError(res: Response, error: unknown): void {
   res.status(502).json({ error: 'places_unavailable', message: 'Could not reach Google Places.' });
 }
 
-export function placesRoutes(client: PlacesClient | undefined, defaults: NearbyRange): Router {
+export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMeters: number): Router {
   const router = Router();
 
   router.use((_req, res, next) => {
@@ -41,16 +35,16 @@ export function placesRoutes(client: PlacesClient | undefined, defaults: NearbyR
 
   router.get('/nearby', async (req, res) => {
     const origin = parseOrigin(req);
-    const range = parseRange(req, defaults);
-    if (!origin || !range) {
+    const radius = parseRadius(req, defaultRadiusMeters);
+    if (!origin || radius === null) {
       res.status(400).json({
         error: 'bad_request',
-        message: `lat and lng are required; radius and maxRadius must be 50–${MAX_SEARCH_RADIUS_METERS} meters.`,
+        message: `lat and lng are required; radius must be 50–${MAX_SEARCH_RADIUS_METERS} meters.`,
       });
       return;
     }
     try {
-      const body: NearbyPlacesResponse = { places: await client!.nearby(origin, range) };
+      const body: NearbyPlacesResponse = { places: await client!.nearby(origin, radius) };
       res.json(body);
     } catch (error) {
       sendError(res, error);

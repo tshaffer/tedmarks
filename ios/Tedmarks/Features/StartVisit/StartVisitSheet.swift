@@ -79,7 +79,9 @@ struct StartVisitSheet: View {
             List {
                 Section(model.isShowingSearchResults ? "Results" : "Nearby") {
                     if model.places.isEmpty {
-                        Text(model.isShowingSearchResults ? "No matches." : "No restaurants found nearby. Try searching.")
+                        Text(model.isShowingSearchResults
+                             ? "No matches."
+                             : "No restaurants within your search radius. Search by name, or change the radius in Settings.")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(model.places) { place in

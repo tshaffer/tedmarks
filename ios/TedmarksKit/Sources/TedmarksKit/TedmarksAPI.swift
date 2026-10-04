@@ -69,16 +69,12 @@ public struct TedmarksAPI: Sendable {
         self.session = session
     }
 
-    /// Nearby restaurants. The server starts at `radiusMeters` and widens (×5 steps)
-    /// up to `maxRadiusMeters` until something is found.
-    public func nearbyPlaces(
-        latitude: Double, longitude: Double, radiusMeters: Int, maxRadiusMeters: Int
-    ) async throws -> [NearbyPlace] {
+    /// Restaurants within `radiusMeters`, nearest first.
+    public func nearbyPlaces(latitude: Double, longitude: Double, radiusMeters: Int) async throws -> [NearbyPlace] {
         try await getPlaces(path: "places/nearby", query: [
             URLQueryItem(name: "lat", value: String(latitude)),
             URLQueryItem(name: "lng", value: String(longitude)),
             URLQueryItem(name: "radius", value: String(radiusMeters)),
-            URLQueryItem(name: "maxRadius", value: String(max(maxRadiusMeters, radiusMeters))),
         ])
     }
 

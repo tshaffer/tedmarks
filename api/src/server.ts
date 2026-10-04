@@ -1,18 +1,18 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
 import type { Db } from 'mongodb';
-import { DEFAULT_NEARBY_MAX_METERS, DEFAULT_NEARBY_START_METERS } from '@tedmarks/shared';
+import { DEFAULT_NEARBY_RADIUS_METERS } from '@tedmarks/shared';
 import { aiRoutes } from './ai/aiRoutes.js';
 import { requireAccessKey } from './auth/accessKey.js';
 import { authRoutes } from './auth/authRoutes.js';
-import type { NearbyRange, PlacesClient } from './google/placesClient.js';
+import type { PlacesClient } from './google/placesClient.js';
 import { placesRoutes } from './google/placesRoutes.js';
 import { syncRoutes } from './sync/syncRoutes.js';
 
 export interface AppDeps {
   db?: Db | undefined;
   places?: PlacesClient | undefined;
-  nearbyDefaults?: NearbyRange | undefined;
+  nearbyRadiusMeters?: number | undefined;
   /** Shared key the app must send (X-Tedmarks-Key). Unset = no check (local dev). */
   accessKey?: string | undefined;
 }
@@ -29,10 +29,7 @@ export function createApp(deps: AppDeps = {}): Express {
 
   app.use('/auth', authRoutes());
   app.use('/sync', syncRoutes());
-  app.use(
-    '/places',
-    placesRoutes(deps.places, deps.nearbyDefaults ?? { startMeters: DEFAULT_NEARBY_START_METERS, maxMeters: DEFAULT_NEARBY_MAX_METERS }),
-  );
+  app.use('/places', placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS));
   app.use('/ai', aiRoutes());
 
   return app;

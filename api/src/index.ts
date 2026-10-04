@@ -18,7 +18,7 @@ const places = config.googlePlacesApiKey ? new PlacesClient(config.googlePlacesA
 const server = createApp({
   db,
   places,
-  nearbyDefaults: { startMeters: config.nearbyStartMeters, maxMeters: config.nearbyMaxMeters },
+  nearbyRadiusMeters: config.nearbyRadiusMeters,
   accessKey: config.accessKey,
 }).listen(config.port, '0.0.0.0', () => {
   console.log(`[tedmarks-api] Listening on port ${config.port}`);

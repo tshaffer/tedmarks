@@ -1,4 +1,4 @@
-import { nearbySearchRadii, type NearbyPlace, type PlaceSuggestion } from '@tedmarks/shared';
+import type { NearbyPlace, PlaceSuggestion } from '@tedmarks/shared';
 
 // Server-side wrapper around Google Places API (New). Called only from the API
 // so the key never reaches the phone (decision #7).
@@ -27,7 +27,8 @@ export const RESTAURANT_TYPES = [
 ];
 
 const SEARCH_BIAS_RADIUS_METERS = 50_000;
-const MAX_RESULTS = 10;
+/** Google's maximum per request; the price is per request, not per result. */
+const MAX_RESULTS = 20;
 
 export interface LatLng {
   latitude: number;
@@ -55,33 +56,21 @@ interface GoogleSuggestion {
 
 export type FetchFn = typeof fetch;
 
-export interface NearbyRange {
-  startMeters: number;
-  maxMeters: number;
-}
-
 export class PlacesClient {
   constructor(
     private readonly apiKey: string,
     private readonly fetchFn: FetchFn = fetch,
   ) {}
 
-  /**
-   * Restaurants near a point, nearest first. Starts at range.startMeters and widens
-   * (×5 steps, ending at range.maxMeters) until something is found — e.g. starting a visit from home.
-   */
-  async nearby(origin: LatLng, range: NearbyRange): Promise<NearbyPlace[]> {
-    for (const radius of nearbySearchRadii(range.startMeters, range.maxMeters)) {
-      const places = await this.post('places:searchNearby', {
-        includedTypes: RESTAURANT_TYPES,
-        maxResultCount: MAX_RESULTS,
-        rankPreference: 'DISTANCE',
-        locationRestriction: { circle: { center: origin, radius } },
-      });
-      const found = toNearbyPlaces(places, origin);
-      if (found.length > 0) return found;
-    }
-    return [];
+  /** Restaurants within radiusMeters of a point, nearest first. */
+  async nearby(origin: LatLng, radiusMeters: number): Promise<NearbyPlace[]> {
+    const places = await this.post('places:searchNearby', {
+      includedTypes: RESTAURANT_TYPES,
+      maxResultCount: MAX_RESULTS,
+      rankPreference: 'DISTANCE',
+      locationRestriction: { circle: { center: origin, radius: radiusMeters } },
+    });
+    return toNearbyPlaces(places, origin);
   }
 
   /** Free-text search ("Somewhere else…"), biased toward the user's location, nearest first. */

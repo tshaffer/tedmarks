@@ -47,16 +47,10 @@ final class StartVisitModel {
             let location = try await LocationService.currentLocation()
             self.location = location
             phase = .loading
-            let defaults = UserDefaults.standard
-            let range = NearbySearchSettings.range(
-                startMeters: defaults.object(forKey: NearbySearchSettings.startKey) as? Int ?? NearbySearchSettings.defaultStartMeters,
-                maxMeters: defaults.object(forKey: NearbySearchSettings.maxKey) as? Int ?? NearbySearchSettings.defaultMaxMeters
-            )
             let found = try await api.nearbyPlaces(
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
-                radiusMeters: range.start,
-                maxRadiusMeters: range.max
+                radiusMeters: NearbySearchSettings.radius()
             )
             nearby = PlaceRanking.rank(found, savedStatus: savedStatus)
             show(nearby)

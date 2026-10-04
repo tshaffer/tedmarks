@@ -45,7 +45,7 @@ test('nearby rejects an out-of-range radius', async () => {
   try {
     const bad = await fetch(`http://127.0.0.1:${port}/places/nearby?lat=37.39&lng=-122.08&radius=10`);
     assert.equal(bad.status, 400);
-    const ok = await fetch(`http://127.0.0.1:${port}/places/nearby?lat=37.39&lng=-122.08&radius=402&maxRadius=8047`);
+    const ok = await fetch(`http://127.0.0.1:${port}/places/nearby?lat=37.39&lng=-122.08&radius=8047`);
     assert.equal(ok.status, 200);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

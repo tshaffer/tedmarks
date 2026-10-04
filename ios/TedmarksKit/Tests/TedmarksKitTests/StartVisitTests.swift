@@ -42,13 +42,14 @@ private func place(_ id: String, _ meters: Double) -> NearbyPlace {
     #expect(try VisitStarter.activeVisits(in: context).map(\.id) == [second.id])
 }
 
-@Test func nearbyRangeHandlesDontWidenAndSmallMax() {
-    #expect(NearbySearchSettings.range(startMeters: 402, maxMeters: 0) == (402, 402))
-    #expect(NearbySearchSettings.range(startMeters: 1609, maxMeters: 805) == (1609, 1609))
-    #expect(NearbySearchSettings.range(startMeters: 402, maxMeters: 8047) == (402, 8047))
-}
-
-@Test func defaultsAreAmongTheOptions() {
-    #expect(NearbySearchSettings.startOptions.contains { $0.meters == NearbySearchSettings.defaultStartMeters })
-    #expect(NearbySearchSettings.maxOptions.contains { $0?.meters == NearbySearchSettings.defaultMaxMeters })
+@Test func searchRadiusOptionsAndDefault() {
+    #expect(NearbySearchSettings.options.map(\.label) == ["1 mile", "5 miles", "20 miles"])
+    #expect(NearbySearchSettings.defaultRadiusMeters == 1609)
+    let defaults = UserDefaults(suiteName: "radius-test")!
+    defaults.removePersistentDomain(forName: "radius-test")
+    #expect(NearbySearchSettings.radius(from: defaults) == 1609)
+    defaults.set(32187, forKey: NearbySearchSettings.radiusKey)
+    #expect(NearbySearchSettings.radius(from: defaults) == 32187)
+    defaults.set(402, forKey: NearbySearchSettings.radiusKey)   // old/unknown value → default
+    #expect(NearbySearchSettings.radius(from: defaults) == 1609)
 }

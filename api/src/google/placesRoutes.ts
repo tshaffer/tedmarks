@@ -1,5 +1,11 @@
 import { Router, type Request, type Response } from 'express';
-import type { NearbyPlacesResponse, PlaceDetailsResponse, PlaceSuggestionsResponse } from '@tedmarks/shared';
+import {
+  MorePlacesRequest,
+  type MorePlacesResponse,
+  type NearbyPlacesResponse,
+  type PlaceDetailsResponse,
+  type PlaceSuggestionsResponse,
+} from '@tedmarks/shared';
 import { notImplemented } from '../notImplemented.js';
 import { MAX_SEARCH_RADIUS_METERS } from '@tedmarks/shared';
 import type { LatLng, PlacesClient } from './placesClient.js';
@@ -45,6 +51,26 @@ export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMete
     }
     try {
       const body: NearbyPlacesResponse = { places: await client!.nearby(origin, radius) };
+      res.json(body);
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  router.post('/more', async (req, res) => {
+    const parsed = MorePlacesRequest.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'bad_request', message: 'lat, lng, radiusMeters and excludeIds are required.' });
+      return;
+    }
+    const { lat, lng, radiusMeters, excludeIds, pageToken } = parsed.data;
+    try {
+      const body: MorePlacesResponse = await client!.moreNearby(
+        { latitude: lat, longitude: lng },
+        radiusMeters,
+        new Set(excludeIds),
+        pageToken,
+      );
       res.json(body);
     } catch (error) {
       sendError(res, error);

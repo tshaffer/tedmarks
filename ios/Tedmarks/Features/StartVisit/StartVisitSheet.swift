@@ -43,6 +43,8 @@ struct StartVisitSheet: View {
             }
             await model.load(savedStatus: savedStatus)
             #if DEBUG
+            // Dev/testing: `-showMore` loads one "Show more" batch without a tap.
+            if ProcessInfo.processInfo.arguments.contains("-showMore") { await model.loadMore() }
             // Dev/testing: `simctl launch … -openStartVisit -startVisitSearch dop` pre-fills the search.
             if let text = UserDefaults.standard.string(forKey: "startVisitSearch") {
                 model.isSearchPresented = true
@@ -87,6 +89,18 @@ struct StartVisitSheet: View {
                     ForEach(model.places) { place in
                         placeRow(place)
                     }
+                    // Fewer than a full page (20) means Google already returned everything in range.
+                    if !model.isShowingSearchResults && model.places.count >= 20 && model.morePlaces.isEmpty {
+                        showMoreRow
+                    }
+                }
+                if !model.isShowingSearchResults && !model.morePlaces.isEmpty {
+                    Section("More nearby") {
+                        ForEach(model.morePlaces) { place in
+                            placeRow(place)
+                        }
+                        showMoreRow
+                    }
                 }
                 Section("Who's here") {
                     participantChips.padding(.vertical, 4)
@@ -97,6 +111,34 @@ struct StartVisitSheet: View {
 
     private var isShowingSuggestions: Bool {
         model.phase == .loaded && !model.searchText.isEmpty && !model.isShowingSearchResults
+    }
+
+    @ViewBuilder
+    private var showMoreRow: some View {
+        switch model.moreState {
+        case .available, .failed:
+            Button {
+                Task { await model.loadMore() }
+            } label: {
+                Label(
+                    model.moreState == .failed ? "Couldn't load more — try again" : "Show more restaurants",
+                    systemImage: "chevron.down.circle"
+                )
+            }
+        case .loading:
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Loading more…").foregroundStyle(.secondary)
+            }
+        case .exhausted:
+            Text("That's every restaurant Google lists within \(radiusLabel).")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private var radiusLabel: String {
+        let meters = NearbySearchSettings.radius()
+        return NearbySearchSettings.options.first { $0.meters == meters }?.label ?? "your search radius"
     }
 
     /// Type-ahead suggestions while typing in "Somewhere else…".

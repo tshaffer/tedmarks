@@ -35,14 +35,26 @@ final class StartVisitModel {
     /// One token per search session (keystrokes + the final pick), for Google billing.
     private var sessionToken = UUID()
 
+    /// "Show more": extra nearby places beyond the first 20, nearest first.
+    var morePlaces: [NearbyPlace] = []
+    var moreState: MoreState = .available
+
+    enum MoreState: Equatable { case available, loading, exhausted, failed }
+
+    private var morePageToken: String?
     private(set) var location: CLLocation?
     private var nearby: [NearbyPlace] = []
     private let api = AppConfig.api
 
-    var selectedPlace: NearbyPlace? { places.first { $0.googlePlaceId == selectedId } }
+    var selectedPlace: NearbyPlace? {
+        places.first { $0.googlePlaceId == selectedId } ?? morePlaces.first { $0.googlePlaceId == selectedId }
+    }
 
     func load(savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
         phase = .locating
+        morePlaces = []
+        morePageToken = nil
+        moreState = .available
         do {
             let location = try await LocationService.currentLocation()
             self.location = location
@@ -73,6 +85,27 @@ final class StartVisitModel {
             show(found)
         } catch {
             phase = .failed(Self.failure(for: error))
+        }
+    }
+
+    /// Loads the next batch of nearby restaurants (beyond the first 20).
+    func loadMore() async {
+        guard let location, moreState == .available else { return }
+        moreState = .loading
+        do {
+            let shown = nearby.map(\.googlePlaceId) + morePlaces.map(\.googlePlaceId)
+            let result = try await api.morePlaces(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                radiusMeters: NearbySearchSettings.radius(),
+                excluding: shown,
+                pageToken: morePageToken
+            )
+            morePlaces = (morePlaces + result.places).sorted { $0.distanceMeters < $1.distanceMeters }
+            morePageToken = result.nextPageToken
+            moreState = result.nextPageToken == nil ? .exhausted : .available
+        } catch {
+            moreState = .failed
         }
     }
 

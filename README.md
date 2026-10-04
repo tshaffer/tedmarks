@@ -70,7 +70,7 @@ open Tedmarks.xcodeproj
 - Debug-only simulator launch flags (no tapping needed), e.g.
   `xcrun simctl launch booted com.tedshaffer.tedmarks -demoVisit -openWrapUp`:
   `-demoVisit` (in-progress visit at Doppio Zero with 4 dishes), `-openStartVisit`,
-  `-startVisitSearch <text>`, `-openSettings`, `-openWrapUp`, `-openRateDish`.
+  `-startVisitSearch <text>`, `-showMore`, `-openSettings`, `-openWrapUp`, `-openRateDish`.
 
 ## Keeping Swift and TypeScript in sync
 

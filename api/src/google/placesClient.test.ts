@@ -112,3 +112,41 @@ test('details returns the place with distance and passes the session token', asy
   const headers = capture.init?.headers as Record<string, string>;
   assert.ok(headers['X-Goog-FieldMask']?.startsWith('id,displayName'));
 });
+
+test('moreNearby skips shown places, keeps paging for new ones, and returns the token', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const near = (id: string, lat: number) => ({ id, displayName: { text: id }, location: { latitude: lat, longitude: -122.0786 } });
+  const pages = [
+    { places: [near('a', 37.394), near('b', 37.395)], nextPageToken: 'p2' },
+    { places: [near('c', 37.396), near('far', 37.6)], nextPageToken: 'p3' },
+    { places: [near('d', 37.397)] },
+  ];
+  const client = new PlacesClient('k', (async (_url: string | URL | Request, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    const headers = init?.headers as Record<string, string>;
+    assert.ok(headers['X-Goog-FieldMask']?.endsWith(',nextPageToken'));
+    return new Response(JSON.stringify(pages[bodies.length - 1]));
+  }) as FetchFn);
+
+  const result = await client.moreNearby(origin, 1609, new Set(['a', 'b']));
+  // Page 1 had only already-shown places, page 2 one new (plus one outside the radius), page 3 one more.
+  assert.deepEqual(result.places.map((p) => p.googlePlaceId), ['c', 'd']);
+  assert.equal(result.nextPageToken, undefined);
+  assert.deepEqual(bodies.map((b) => b['pageToken']), [undefined, 'p2', 'p3']);
+  assert.equal(bodies[0]?.['rankPreference'], 'DISTANCE');
+});
+
+test('moreNearby stops once it has enough new places and hands back the token', async () => {
+  const many = Array.from({ length: 12 }, (_, i) => ({
+    id: `n${i}`, displayName: { text: `n${i}` }, location: { latitude: 37.394 + i * 0.0001, longitude: -122.0786 },
+  }));
+  let calls = 0;
+  const client = new PlacesClient('k', (async () => {
+    calls++;
+    return new Response(JSON.stringify({ places: many, nextPageToken: 'next' }));
+  }) as FetchFn);
+  const result = await client.moreNearby(origin, 1609, new Set());
+  assert.equal(calls, 1);
+  assert.equal(result.places.length, 12);
+  assert.equal(result.nextPageToken, 'next');
+});

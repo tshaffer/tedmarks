@@ -1,4 +1,4 @@
-import type { NearbyPlace, PlaceSuggestion } from '@tedmarks/shared';
+import type { MorePlacesResponse, NearbyPlace, PlaceSuggestion } from '@tedmarks/shared';
 
 // Server-side wrapper around Google Places API (New). Called only from the API
 // so the key never reaches the phone (decision #7).
@@ -27,6 +27,10 @@ export const RESTAURANT_TYPES = [
 ];
 
 const SEARCH_BIAS_RADIUS_METERS = 50_000;
+/** "Show more" keeps fetching Text Search pages until it has this many new places (or runs out). */
+const MORE_TARGET_NEW_PLACES = 10;
+/** Google returns at most 3 pages (60 results) per Text Search query. */
+const MAX_TEXT_SEARCH_PAGES = 3;
 /** Google's maximum per request; the price is per request, not per result. */
 const MAX_RESULTS = 20;
 
@@ -71,6 +75,46 @@ export class PlacesClient {
       locationRestriction: { circle: { center: origin, radius: radiusMeters } },
     });
     return toNearbyPlaces(places, origin);
+  }
+
+  /**
+   * "Show more": nearby restaurants beyond the first 20, via Text Search (which pages;
+   * Nearby Search doesn't). Skips excludeIds and places outside the radius, fetching
+   * further pages until it has some new places or Google runs out.
+   */
+  async moreNearby(
+    origin: LatLng,
+    radiusMeters: number,
+    excludeIds: ReadonlySet<string>,
+    pageToken?: string,
+  ): Promise<MorePlacesResponse> {
+    const seen = new Set(excludeIds);
+    const found: NearbyPlace[] = [];
+    let token = pageToken;
+    for (let page = 0; page < MAX_TEXT_SEARCH_PAGES; page++) {
+      const body: Record<string, unknown> = {
+        textQuery: 'restaurants',
+        pageSize: 20,
+        rankPreference: 'DISTANCE',
+        locationRestriction: { rectangle: boundingBox(origin, radiusMeters) },
+      };
+      if (token) body['pageToken'] = token;
+      const response = await this.request('places:searchText', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        fieldMask: `${FIELD_MASK},nextPageToken`,
+      });
+      const payload = (await response.json()) as { places?: GooglePlace[]; nextPageToken?: string };
+      for (const place of toNearbyPlaces(payload.places ?? [], origin)) {
+        if (seen.has(place.googlePlaceId) || place.distanceMeters > radiusMeters) continue;
+        seen.add(place.googlePlaceId);
+        found.push(place);
+      }
+      token = payload.nextPageToken;
+      if (!token || found.length >= MORE_TARGET_NEW_PLACES) break;
+    }
+    found.sort((a, b) => a.distanceMeters - b.distanceMeters);
+    return token ? { places: found, nextPageToken: token } : { places: found };
   }
 
   /** Free-text search ("Somewhere else…"), biased toward the user's location, nearest first. */
@@ -179,6 +223,16 @@ function toNearbyPlaces(places: GooglePlace[], origin: LatLng): NearbyPlace[] {
     result.push(place);
   }
   return result;
+}
+
+/** Rectangle enclosing a circle (Text Search only accepts rectangles as a restriction). */
+export function boundingBox(center: LatLng, radiusMeters: number): { low: LatLng; high: LatLng } {
+  const dLat = radiusMeters / 111_320;
+  const dLng = radiusMeters / (111_320 * Math.cos((center.latitude * Math.PI) / 180));
+  return {
+    low: { latitude: center.latitude - dLat, longitude: center.longitude - dLng },
+    high: { latitude: center.latitude + dLat, longitude: center.longitude + dLng },
+  };
 }
 
 /** Haversine distance in meters. */

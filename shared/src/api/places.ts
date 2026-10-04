@@ -42,3 +42,22 @@ export const PlaceDetailsResponse = z.object({
   place: NearbyPlace,
 });
 export type PlaceDetailsResponse = z.infer<typeof PlaceDetailsResponse>;
+
+/** POST /places/more — the next batch of nearby restaurants beyond the first 20. */
+export const MorePlacesRequest = z.object({
+  lat: z.number(),
+  lng: z.number(),
+  radiusMeters: z.number().min(50).max(50_000),
+  /** googlePlaceIds already shown, so the response only contains new places. */
+  excludeIds: z.array(z.string()).max(200),
+  /** From the previous MorePlacesResponse, to continue where it stopped. */
+  pageToken: z.string().optional(),
+});
+export type MorePlacesRequest = z.infer<typeof MorePlacesRequest>;
+
+export const MorePlacesResponse = z.object({
+  places: z.array(NearbyPlace),
+  /** Absent when Google has no more results for this search. */
+  nextPageToken: z.string().optional(),
+});
+export type MorePlacesResponse = z.infer<typeof MorePlacesResponse>;

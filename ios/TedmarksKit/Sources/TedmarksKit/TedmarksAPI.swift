@@ -113,6 +113,24 @@ public struct TedmarksAPI: Sendable {
         return try decode(DetailsResponse.self, from: data).place
     }
 
+    public struct MorePlaces: Decodable, Sendable {
+        public var places: [NearbyPlace]
+        /// Absent when Google has no more results.
+        public var nextPageToken: String?
+    }
+
+    /// "Show more": the next batch of nearby restaurants, excluding ones already shown.
+    public func morePlaces(
+        latitude: Double, longitude: Double, radiusMeters: Int, excluding shownIds: [String], pageToken: String?
+    ) async throws -> MorePlaces {
+        struct Body: Encodable {
+            var lat: Double, lng: Double, radiusMeters: Int, excludeIds: [String], pageToken: String?
+        }
+        let body = Body(lat: latitude, lng: longitude, radiusMeters: radiusMeters, excludeIds: shownIds, pageToken: pageToken)
+        let data = try await send(path: "places/more", method: "POST", query: [], body: try JSONEncoder().encode(body))
+        return try decode(MorePlaces.self, from: data)
+    }
+
     private struct PlacesResponse: Decodable { var places: [NearbyPlace] }
     private struct SuggestionsResponse: Decodable { var suggestions: [PlaceSuggestion] }
     private struct DetailsResponse: Decodable { var place: NearbyPlace }
@@ -131,10 +149,19 @@ public struct TedmarksAPI: Sendable {
     }
 
     private func get(path: String, query: [URLQueryItem]) async throws -> Data {
+        try await send(path: path, method: "GET", query: query, body: nil)
+    }
+
+    private func send(path: String, method: String, query: [URLQueryItem], body: Data?) async throws -> Data {
         var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
-        components.queryItems = query
+        if !query.isEmpty { components.queryItems = query }
         var request = URLRequest(url: components.url!)
-        request.timeoutInterval = 15
+        request.httpMethod = method
+        request.timeoutInterval = 20
+        if let body {
+            request.httpBody = body
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         if let accessKey { request.setValue(accessKey, forHTTPHeaderField: "X-Tedmarks-Key") }
 
         let data: Data

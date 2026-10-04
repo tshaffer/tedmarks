@@ -1,4 +1,4 @@
-import { nearbySearchRadii, type NearbyPlace } from '@tedmarks/shared';
+import { nearbySearchRadii, type NearbyPlace, type PlaceSuggestion } from '@tedmarks/shared';
 
 // Server-side wrapper around Google Places API (New). Called only from the API
 // so the key never reaches the phone (decision #7).
@@ -42,6 +42,15 @@ interface GooglePlace {
   location?: { latitude?: number; longitude?: number };
   primaryType?: string;
   primaryTypeDisplayName?: { text?: string };
+}
+
+interface GoogleSuggestion {
+  placePrediction?: {
+    placeId?: string;
+    text?: { text?: string };
+    structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
+    distanceMeters?: number;
+  };
 }
 
 export type FetchFn = typeof fetch;
@@ -88,22 +97,74 @@ export class PlacesClient {
     return toNearbyPlaces(places, origin).sort((a, b) => a.distanceMeters - b.distanceMeters);
   }
 
-  private async post(method: string, body: unknown): Promise<GooglePlace[]> {
-    const response = await this.fetchFn(`https://places.googleapis.com/v1/${method}`, {
+  /**
+   * Type-ahead suggestions (like Google Maps). Pass the same sessionToken for every
+   * keystroke and for the final details() call: Google then bills the session as
+   * one Place Details request and the autocomplete requests are free.
+   */
+  async autocomplete(input: string, origin: LatLng, sessionToken: string): Promise<PlaceSuggestion[]> {
+    const text = input.trim();
+    if (!text) return [];
+    const response = await this.request('places:autocomplete', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': this.apiKey,
-        'X-Goog-FieldMask': FIELD_MASK,
-      },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        input: text,
+        sessionToken,
+        origin,
+        locationBias: { circle: { center: origin, radius: SEARCH_BIAS_RADIUS_METERS } },
+        // Businesses only — no bare street addresses.
+        includedPrimaryTypes: ['establishment'],
+      }),
     });
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      throw new Error(`Google Places ${method} failed (${response.status}): ${errorText}`);
+    const payload = (await response.json()) as { suggestions?: GoogleSuggestion[] };
+    const suggestions: PlaceSuggestion[] = [];
+    for (const s of payload.suggestions ?? []) {
+      const p = s.placePrediction;
+      const name = p?.structuredFormat?.mainText?.text ?? p?.text?.text;
+      if (!p?.placeId || !name) continue;
+      const suggestion: PlaceSuggestion = { googlePlaceId: p.placeId, name };
+      const secondary = p.structuredFormat?.secondaryText?.text;
+      if (secondary) suggestion.secondaryText = secondary;
+      if (typeof p.distanceMeters === 'number') suggestion.distanceMeters = p.distanceMeters;
+      suggestions.push(suggestion);
     }
+    return suggestions;
+  }
+
+  /** The place picked from autocomplete (ends the billing session). */
+  async details(googlePlaceId: string, origin: LatLng, sessionToken?: string): Promise<NearbyPlace | undefined> {
+    const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}`);
+    if (sessionToken) url.searchParams.set('sessionToken', sessionToken);
+    const response = await this.request(url, {
+      method: 'GET',
+      fieldMask: FIELD_MASK.split(',').map((f) => f.replace(/^places\./, '')).join(','),
+    });
+    const place = (await response.json()) as GooglePlace;
+    return toNearbyPlaces([place], origin)[0];
+  }
+
+  private async post(method: string, body: unknown): Promise<GooglePlace[]> {
+    const response = await this.request(method, { method: 'POST', body: JSON.stringify(body), fieldMask: FIELD_MASK });
     const payload = (await response.json()) as { places?: GooglePlace[] };
     return payload.places ?? [];
+  }
+
+  private async request(
+    target: string | URL,
+    options: { method: 'GET' | 'POST'; body?: string; fieldMask?: string },
+  ): Promise<Response> {
+    const url = typeof target === 'string' ? `https://places.googleapis.com/v1/${target}` : target;
+    const headers: Record<string, string> = { 'X-Goog-Api-Key': this.apiKey };
+    if (options.body) headers['Content-Type'] = 'application/json';
+    if (options.fieldMask) headers['X-Goog-FieldMask'] = options.fieldMask;
+    const init: RequestInit = { method: options.method, headers };
+    if (options.body) init.body = options.body;
+    const response = await this.fetchFn(url, init);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`Google Places ${String(target)} failed (${response.status}): ${errorText}`);
+    }
+    return response;
   }
 }
 

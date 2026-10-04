@@ -84,3 +84,46 @@ test('distanceMeters is roughly right', () => {
   const d = distanceMeters(origin, { latitude: 37.4037, longitude: -122.0786 });
   assert.ok(d > 1100 && d < 1120, String(d));
 });
+
+test('autocomplete maps predictions and sends the session token', async () => {
+  const capture: { url?: string; init?: RequestInit } = {};
+  const client = new PlacesClient(
+    'k',
+    fakeFetch(
+      {
+        suggestions: [
+          {
+            placePrediction: {
+              placeId: 'dz',
+              text: { text: 'Doppio Zero, Castro Street, Mountain View, CA, USA' },
+              structuredFormat: { mainText: { text: 'Doppio Zero' }, secondaryText: { text: 'Castro Street, Mountain View, CA, USA' } },
+              distanceMeters: 120,
+            },
+          },
+          { queryPrediction: { text: { text: 'doppio pizza' } } },
+        ],
+      },
+      capture,
+    ),
+  );
+  const suggestions = await client.autocomplete('dopp', origin, 'session-1');
+  assert.deepEqual(suggestions, [
+    { googlePlaceId: 'dz', name: 'Doppio Zero', secondaryText: 'Castro Street, Mountain View, CA, USA', distanceMeters: 120 },
+  ]);
+  assert.equal(capture.url, 'https://places.googleapis.com/v1/places:autocomplete');
+  assert.equal(JSON.parse(String(capture.init?.body)).sessionToken, 'session-1');
+});
+
+test('details returns the place with distance and passes the session token', async () => {
+  const capture: { url?: string; init?: RequestInit } = {};
+  const client = new PlacesClient(
+    'k',
+    fakeFetch({ id: 'dz', displayName: { text: 'Doppio Zero' }, location: { latitude: 37.394, longitude: -122.0786 } }, capture),
+  );
+  const place = await client.details('dz', origin, 'session-1');
+  assert.equal(place?.name, 'Doppio Zero');
+  assert.equal(place?.distanceMeters, 33);
+  assert.equal(capture.url, 'https://places.googleapis.com/v1/places/dz?sessionToken=session-1');
+  const headers = capture.init?.headers as Record<string, string>;
+  assert.ok(headers['X-Goog-FieldMask']?.startsWith('id,displayName'));
+});

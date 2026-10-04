@@ -26,18 +26,29 @@ struct StartVisitSheet: View {
                         Button("Cancel") { dismiss() }
                     }
                 }
-                .searchable(text: $model.searchText, prompt: "Somewhere else…")
+                .searchable(text: $model.searchText, isPresented: $model.isSearchPresented, prompt: "Somewhere else…")
                 .onSubmit(of: .search) { Task { await model.search(savedStatus: savedStatus) } }
                 .onChange(of: model.searchText) { _, text in
                     if text.isEmpty { model.clearSearch() }
+                    model.searchTextChanged()
                 }
-                .safeAreaInset(edge: .bottom) { startButton }
+                .safeAreaInset(edge: .bottom) {
+                    // Hidden while picking from suggestions, so it can't start a visit at the wrong place.
+                    if !isShowingSuggestions { startButton }
+                }
         }
         .task {
             if participantIds.isEmpty {
                 participantIds = Set(people.filter { $0.kind == .household }.map(\.id))
             }
             await model.load(savedStatus: savedStatus)
+            #if DEBUG
+            // Dev/testing: `simctl launch … -openStartVisit -startVisitSearch dop` pre-fills the search.
+            if let text = UserDefaults.standard.string(forKey: "startVisitSearch") {
+                model.isSearchPresented = true
+                model.searchText = text
+            }
+            #endif
         }
         .alert("Add a guest", isPresented: $isAddingGuest) {
             TextField("Name", text: $newGuestName)
@@ -62,6 +73,8 @@ struct StartVisitSheet: View {
             ProgressView("Looking for restaurants…").frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed(let failure):
             failureView(failure)
+        case .loaded where isShowingSuggestions:
+            suggestionList
         case .loaded:
             List {
                 Section(model.isShowingSearchResults ? "Results" : "Nearby") {
@@ -78,6 +91,54 @@ struct StartVisitSheet: View {
                 }
             }
         }
+    }
+
+    private var isShowingSuggestions: Bool {
+        model.phase == .loaded && !model.searchText.isEmpty && !model.isShowingSearchResults
+    }
+
+    /// Type-ahead suggestions while typing in "Somewhere else…".
+    private var suggestionList: some View {
+        List {
+            Section {
+                if model.suggestions.isEmpty {
+                    HStack {
+                        Text(model.isLoadingSuggestions ? "Searching…" : "No matches")
+                            .foregroundStyle(.secondary)
+                        if model.isLoadingSuggestions { Spacer(); ProgressView() }
+                    }
+                }
+                ForEach(model.suggestions) { suggestion in
+                    Button {
+                        Task { await model.choose(suggestion) }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.red)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(suggestion.name).font(.headline).foregroundStyle(.primary)
+                                if let secondary = suggestion.secondaryText {
+                                    Text(secondary).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
+                            Spacer(minLength: 8)
+                            if let meters = suggestion.distanceMeters {
+                                Text(Self.distanceText(meters)).font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            } footer: {
+                Text("Press Search on the keyboard to see all matches.")
+            }
+        }
+    }
+
+    static func distanceText(_ meters: Double) -> String {
+        Measurement(value: meters, unit: UnitLength.meters).formatted(.measurement(width: .abbreviated, usage: .road))
     }
 
     private func placeRow(_ place: NearbyPlace) -> some View {
@@ -191,8 +252,7 @@ struct StartVisitSheet: View {
     }
 
     private func subtitle(for place: NearbyPlace) -> String {
-        let distance = Measurement(value: place.distanceMeters, unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .road))
+        let distance = Self.distanceText(place.distanceMeters)
         let street = place.address?.components(separatedBy: ",").first
         return [distance, place.primaryTypeLabel, street].compactMap { $0 }.joined(separator: " · ")
     }

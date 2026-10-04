@@ -25,7 +25,15 @@ final class StartVisitModel {
     var places: [NearbyPlace] = []
     var selectedId: String?
     var searchText = ""
+    var isSearchPresented = false
     var isShowingSearchResults = false
+
+    /// Type-ahead suggestions for the current search text.
+    var suggestions: [PlaceSuggestion] = []
+    var isLoadingSuggestions = false
+    private var suggestionTask: Task<Void, Never>?
+    /// One token per search session (keystrokes + the final pick), for Google billing.
+    private var sessionToken = UUID()
 
     private(set) var location: CLLocation?
     private var nearby: [NearbyPlace] = []
@@ -69,6 +77,55 @@ final class StartVisitModel {
             )
             isShowingSearchResults = true
             show(found)
+        } catch {
+            phase = .failed(Self.failure(for: error))
+        }
+    }
+
+    /// Called on every keystroke: waits briefly, then fetches suggestions.
+    func searchTextChanged() {
+        suggestionTask?.cancel()
+        let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let location else {
+            suggestions = []
+            isLoadingSuggestions = false
+            return
+        }
+        isLoadingSuggestions = true
+        suggestionTask = Task { [weak self, api, sessionToken] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            let found = try? await api.autocomplete(
+                text,
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                sessionToken: sessionToken
+            )
+            guard !Task.isCancelled, let self else { return }
+            self.suggestions = found ?? []
+            self.isLoadingSuggestions = false
+        }
+    }
+
+    /// The user tapped a suggestion: look it up, put it first in the list and select it.
+    func choose(_ suggestion: PlaceSuggestion) async {
+        guard let location else { return }
+        suggestionTask?.cancel()
+        phase = .loading
+        do {
+            let place = try await api.placeDetails(
+                googlePlaceId: suggestion.googlePlaceId,
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                sessionToken: sessionToken
+            )
+            sessionToken = UUID()   // the pick ends this search session
+            suggestions = []
+            searchText = ""
+            isSearchPresented = false
+            isShowingSearchResults = false
+            nearby = [place] + nearby.filter { $0.googlePlaceId != place.googlePlaceId }
+            show(nearby)
         } catch {
             phase = .failed(Self.failure(for: error))
         }

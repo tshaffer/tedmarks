@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import type { NearbyPlacesResponse } from '@tedmarks/shared';
+import type { NearbyPlacesResponse, PlaceDetailsResponse, PlaceSuggestionsResponse } from '@tedmarks/shared';
 import { notImplemented } from '../notImplemented.js';
 import { MAX_SEARCH_RADIUS_METERS } from '@tedmarks/shared';
 import type { LatLng, NearbyRange, PlacesClient } from './placesClient.js';
@@ -66,6 +66,42 @@ export function placesRoutes(client: PlacesClient | undefined, defaults: NearbyR
     }
     try {
       const body: NearbyPlacesResponse = { places: await client!.search(q, origin) };
+      res.json(body);
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  router.get('/autocomplete', async (req, res) => {
+    const origin = parseOrigin(req);
+    const q = typeof req.query['q'] === 'string' ? req.query['q'] : '';
+    const sessionToken = typeof req.query['sessionToken'] === 'string' ? req.query['sessionToken'] : '';
+    if (!origin || !sessionToken) {
+      res.status(400).json({ error: 'bad_request', message: 'q, lat, lng and sessionToken query parameters are required.' });
+      return;
+    }
+    try {
+      const body: PlaceSuggestionsResponse = { suggestions: await client!.autocomplete(q, origin, sessionToken) };
+      res.json(body);
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  router.get('/details/:googlePlaceId', async (req, res) => {
+    const origin = parseOrigin(req);
+    const sessionToken = typeof req.query['sessionToken'] === 'string' ? req.query['sessionToken'] : undefined;
+    if (!origin) {
+      res.status(400).json({ error: 'bad_request', message: 'lat and lng query parameters are required.' });
+      return;
+    }
+    try {
+      const place = await client!.details(req.params.googlePlaceId, origin, sessionToken);
+      if (!place) {
+        res.status(404).json({ error: 'not_found', message: 'Google returned no usable place.' });
+        return;
+      }
+      const body: PlaceDetailsResponse = { place };
       res.json(body);
     } catch (error) {
       sendError(res, error);

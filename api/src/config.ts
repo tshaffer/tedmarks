@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { DEFAULT_NEARBY_MAX_METERS, DEFAULT_NEARBY_START_METERS } from '@tedmarks/shared';
 
 export interface Config {
   port: number;
@@ -9,6 +10,9 @@ export interface Config {
   sessionSecret: string | undefined;
   googlePlacesApiKey: string | undefined;
   anthropicApiKey: string | undefined;
+  /** Server defaults for the nearby search when the app doesn't send its own. */
+  nearbyStartMeters: number;
+  nearbyMaxMeters: number;
 }
 
 function optional(name: string): string | undefined {
@@ -18,7 +22,7 @@ function optional(name: string): string | undefined {
 
 export function loadConfig(): Config {
   return {
-    port: Number(optional('PORT') ?? 4100),
+    port: Number(optional('PORT') ?? 4200),
     mongoUri: optional('MONGODB_URI'),
     mongoDbName: optional('MONGODB_DB') ?? 'tedmarks',
     appleBundleId: optional('APPLE_BUNDLE_ID'),
@@ -29,6 +33,8 @@ export function loadConfig(): Config {
     sessionSecret: optional('SESSION_SECRET'),
     googlePlacesApiKey: optional('GOOGLE_PLACES_API_KEY'),
     anthropicApiKey: optional('ANTHROPIC_API_KEY'),
+    nearbyStartMeters: Number(optional('NEARBY_START_METERS') ?? DEFAULT_NEARBY_START_METERS),
+    nearbyMaxMeters: Number(optional('NEARBY_MAX_METERS') ?? DEFAULT_NEARBY_MAX_METERS),
   };
 }
 

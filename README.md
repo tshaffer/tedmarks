@@ -29,7 +29,7 @@ pnpm install
 pnpm build              # shared must be built before api runs
 pnpm typecheck
 pnpm test
-pnpm dev:api            # http://localhost:4100/health
+pnpm dev:api            # http://localhost:4200/health
 pnpm indexes:create     # create MongoDB indexes (needs api/.env)
 pnpm openapi:generate   # after changing a schema in shared/src/schema
 ```

@@ -428,6 +428,10 @@ interface UserSettings extends SyncedRecord {
   photoDiscoveryEnabled: boolean;        // default true
   eveningNudge?: { enabled: boolean; time: string };   // default off
   defaultRateFor: 'joint' | string;      // 'joint' or a personId; default 'joint'
+  nearbySearch?: {                       // Start visit search; default ≈ ¼ mi widening up to ≈ 5 mi
+    startMeters: number;                 // first radius
+    maxMeters: number;                   // widen ×5 per step up to this (= startMeters: don't widen)
+  };
 }
 ```
 

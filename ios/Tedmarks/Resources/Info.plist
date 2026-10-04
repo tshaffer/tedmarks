@@ -18,10 +18,28 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.tedshaffer.tedmarks</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tedmarks</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Tedmarks uses the camera to capture menu and receipt pages.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Tedmarks connects to its development server on your Mac over your Wi-Fi.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Tedmarks uses your location to suggest the restaurant you're at when you start a visit.</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -34,6 +52,8 @@
 	<string>Tedmarks transcribes your voice notes on your iPhone.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>TedmarksAPIBaseURL</key>
+	<string>$(TEDMARKS_API_BASE_URL)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

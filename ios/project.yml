@@ -31,6 +31,13 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSSupportsLiveActivities: true
+        TedmarksAPIBaseURL: $(TEDMARKS_API_BASE_URL)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.tedshaffer.tedmarks
+            CFBundleURLSchemes: [tedmarks]
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Tedmarks connects to its development server on your Mac over your Wi-Fi.
         NSLocationWhenInUseUsageDescription: Tedmarks uses your location to suggest the restaurant you're at when you start a visit.
         NSPhotoLibraryUsageDescription: Tedmarks attaches photos you took during a visit and suggests visits you forgot to start.
         NSPhotoLibraryAddUsageDescription: Tedmarks saves menu and receipt pages to a "Tedmarks" album.
@@ -40,6 +47,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tedshaffer.tedmarks
+        # Dev: the API running on Ted's Mac (pnpm dev:api), reachable from the simulator
+        # and from an iPhone on the same Wi-Fi. Switch to the cloud URL once deployed.
+        TEDMARKS_API_BASE_URL: http://Teds-MacBook-Pro.local:4200
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
   TedmarksWidgets:

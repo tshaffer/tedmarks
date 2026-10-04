@@ -8,7 +8,7 @@ struct TedmarksWidgetsBundle: WidgetBundle {
     }
 }
 
-/// Figma 01 · Lock Screen "Start visit" widget. Placeholder: tapping opens the app.
+/// Figma 01 · Lock Screen "Start visit" widget. Tapping opens the app's Start visit sheet.
 /// Later: Control Center control and the Live Activity live in this extension too.
 struct StartVisitWidget: Widget {
     var body: some WidgetConfiguration {
@@ -22,6 +22,7 @@ struct StartVisitWidget: Widget {
                 }
             }
             .containerBackground(.clear, for: .widget)
+            .widgetURL(URL(string: "tedmarks://start-visit"))
         }
         .configurationDisplayName("Start visit")
         .description("One tap to start a visit.")

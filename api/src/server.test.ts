@@ -30,6 +30,28 @@ test('designed-but-unbuilt endpoints return 501', async () => {
   });
 });
 
+test('places endpoints report not configured without a key', async () => {
+  await withServer(async (base) => {
+    const res = await fetch(`${base}/places/nearby?lat=37.39&lng=-122.08`);
+    assert.equal(res.status, 503);
+  });
+});
+
+test('nearby rejects an out-of-range radius', async () => {
+  const fakePlaces = { nearby: async () => [], search: async () => [] } as unknown as import('./google/placesClient.js').PlacesClient;
+  const server = createApp({ places: fakePlaces }).listen(0);
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const { port } = server.address() as AddressInfo;
+  try {
+    const bad = await fetch(`http://127.0.0.1:${port}/places/nearby?lat=37.39&lng=-122.08&radius=10`);
+    assert.equal(bad.status, 400);
+    const ok = await fetch(`http://127.0.0.1:${port}/places/nearby?lat=37.39&lng=-122.08&radius=402&maxRadius=8047`);
+    assert.equal(ok.status, 200);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test('every collection gets id and serverSeq indexes', () => {
   const keys = indexesFor('ratings').map((i) => JSON.stringify(i.key));
   assert.ok(keys.includes('{"id":1}'));

@@ -49,6 +49,7 @@ public enum VisitStarter {
         }
 
         try context.save()
+        VisitSideEffects.reconcile(in: context)
         return visit
     }
 
@@ -66,6 +67,7 @@ public enum VisitStarter {
         visit.endedAt = now
         visit.modifiedAt = now
         try context.save()
+        VisitSideEffects.reconcile(in: context)
     }
 
     /// Makes sure Ted and Lori exist as household people (first launch).

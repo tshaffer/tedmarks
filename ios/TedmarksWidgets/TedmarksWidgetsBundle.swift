@@ -5,6 +5,7 @@ import WidgetKit
 struct TedmarksWidgetsBundle: WidgetBundle {
     var body: some Widget {
         StartVisitWidget()
+        VisitLiveActivity()
     }
 }
 

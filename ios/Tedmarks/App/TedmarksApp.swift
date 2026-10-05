@@ -1,22 +1,20 @@
+import AppIntents
 import SwiftData
 import SwiftUI
 import TedmarksKit
 
 @main
 struct TedmarksApp: App {
-    let container: ModelContainer
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        do {
-            container = try ModelContainer(for: Schema(tedmarksModelTypes))
-            try MainActor.assumeIsolated {
-                try VisitStarter.ensureHousehold(in: container.mainContext)
-                #if DEBUG
-                DebugDemoData.seedIfRequested(in: container.mainContext)
-                #endif
-            }
-        } catch {
-            fatalError("Could not open the Tedmarks database: \(error)")
+        MainActor.assumeIsolated {
+            #if DEBUG
+            ActionLog.record("App launched (\(UIApplication.shared.applicationState == .background ? "background" : "foreground"))")
+            DebugDemoData.seedIfRequested(in: TedmarksStore.context)
+            DebugPromptLog.logIfRequested()
+            #endif
         }
     }
 
@@ -24,6 +22,10 @@ struct TedmarksApp: App {
         WindowGroup {
             RootTabView()
         }
-        .modelContainer(container)
+        .modelContainer(TedmarksStore.container)
+        .onChange(of: scenePhase) { _, phase in
+            // Catch up the Live Activity and prompt (e.g. after changes made elsewhere).
+            if phase == .active { VisitSideEffects.reconcile(in: TedmarksStore.context) }
+        }
     }
 }

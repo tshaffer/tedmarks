@@ -10,6 +10,26 @@ public enum ItemRatingValue: String, Codable, Sendable, CaseIterable {
     case skip, good, loved
 }
 
+extension VerdictValue {
+    public var emoji: String {
+        switch self {
+        case .wontReturn: "👎"
+        case .tryAgain: "👌"
+        case .wouldReturn: "👍"
+        }
+    }
+}
+
+extension ItemRatingValue {
+    public var emoji: String {
+        switch self {
+        case .loved: "😍"
+        case .good: "👍"
+        case .skip: "👎"
+        }
+    }
+}
+
 public enum RatingScope: String, Codable, Sendable {
     case joint, person
 }

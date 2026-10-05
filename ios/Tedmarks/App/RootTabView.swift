@@ -24,11 +24,16 @@ struct RootTabView: View {
             if arguments.contains("-openSettings") { selectedTab = .settings }
         }
         #endif
-        // tedmarks://start-visit — from the Lock Screen widget (Figma 01).
-        .onOpenURL { url in
-            guard url.scheme == "tedmarks", url.host() == "start-visit" else { return }
+        // Deep links from the Lock Screen widget (01), Live Activity (03) and notifications (06).
+        .onOpenURL { url in AppRouter.shared.handle(url) }
+        .onChange(of: AppRouter.shared.request) { _, request in
+            guard let request else { return }
             selectedTab = .visit
-            showStartVisit = true
+            if request == .startVisit {
+                showStartVisit = true
+                AppRouter.shared.request = nil
+            }
+            // rate-dish / wrap-up are opened by VisitHomeView.
         }
     }
 }

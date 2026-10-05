@@ -11,13 +11,6 @@ protocol RatingStyle: RawRepresentable, CaseIterable, Hashable, Sendable where R
 extension ItemRatingValue: RatingStyle {
     /// Display order on buttons: 😍 👍 👎
     static var buttonOrder: [ItemRatingValue] { [.loved, .good, .skip] }
-    var emoji: String {
-        switch self {
-        case .loved: "😍"
-        case .good: "👍"
-        case .skip: "👎"
-        }
-    }
     var label: String {
         switch self {
         case .loved: "Loved"
@@ -37,13 +30,6 @@ extension ItemRatingValue: RatingStyle {
 extension VerdictValue: RatingStyle {
     /// Display order on buttons: 👎 👌 👍
     static var buttonOrder: [VerdictValue] { [.wontReturn, .tryAgain, .wouldReturn] }
-    var emoji: String {
-        switch self {
-        case .wontReturn: "👎"
-        case .tryAgain: "👌"
-        case .wouldReturn: "👍"
-        }
-    }
     var label: String {
         switch self {
         case .wontReturn: "Won't return"

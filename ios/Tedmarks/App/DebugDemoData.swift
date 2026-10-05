@@ -38,3 +38,53 @@ enum DebugDemoData {
     }
 }
 #endif
+
+#if DEBUG
+import SwiftUI
+import UserNotifications
+
+/// Dev/testing: `-previewLiveActivity` shows the Lock Screen Live Activity view for the active
+/// visit inside the app (the simulator can't be locked from a script).
+struct DebugLiveActivityPreview: View {
+    let visit: Visit
+    let people: [Person]
+    @Environment(\.modelContext) private var context
+
+    var body: some View {
+        let attributes = VisitActivityAttributes(
+            visitId: visit.id.uuidString, placeName: visit.place?.name ?? "Visit",
+            participants: "Ted and Lori", startedAt: visit.startedAt
+        )
+        VStack(spacing: 24) {
+            Text("Lock Screen Live Activity (debug preview)").font(.caption).foregroundStyle(.secondary)
+            LockScreenVisitView(attributes: attributes, state: VisitSideEffects.content(for: visit, people: people, context: context))
+                .padding(16)
+                .background(Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 24))
+            Text("…and once every dish is rated").font(.caption).foregroundStyle(.secondary)
+            LockScreenVisitView(attributes: attributes, state: VisitActivityContent(
+                dishes: [.init(id: "1", name: "Burrata", badge: "😍"), .init(id: "2", name: "Pizza", badge: "👍")],
+                ratedCount: 2, verdictEmoji: nil
+            ))
+                .padding(16)
+                .background(Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 24))
+            Spacer()
+        }
+        .padding()
+        .background(LinearGradient(colors: [.orange, .pink, .purple], startPoint: .top, endPoint: .bottom).ignoresSafeArea())
+    }
+}
+
+enum DebugPromptLog {
+    /// `-logPendingPrompts`: prints scheduled visit prompts to the console.
+    static func logIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("-logPendingPrompts") else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            for request in await UNUserNotificationCenter.current().pendingNotificationRequests() {
+                let fire = (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate()
+                print("PENDING \(request.identifier) | \(request.content.title) | \(request.content.body) | fires \(fire.map { "\($0)" } ?? "?") | category \(request.content.categoryIdentifier)")
+            }
+        }
+    }
+}
+#endif

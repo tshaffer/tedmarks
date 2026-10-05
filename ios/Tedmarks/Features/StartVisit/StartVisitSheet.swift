@@ -320,6 +320,8 @@ struct StartVisitSheet: View {
         let ordered = chipPeople.map(\.id).filter { participantIds.contains($0) }
         do {
             try VisitStarter.startVisit(at: place, participantIds: ordered, in: context)
+            // Ask once (iOS remembers): needed for the "How was it?" prompt.
+            Task { await VisitPrompt.requestAuthorization() }
             dismiss()
         } catch {
             saveError = error.localizedDescription

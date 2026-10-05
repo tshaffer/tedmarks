@@ -22,6 +22,9 @@ struct VisitHomeView: View {
     @Query(filter: #Predicate<VisitItem> { $0.deletedAt == nil }) private var visitItems: [VisitItem]
 
     @State private var sheet: VisitSheet?
+    #if DEBUG
+    @State private var debugPreviewVisit: Visit?
+    #endif
 
     enum VisitSheet: Identifiable {
         case rateDish(Visit, VisitItem?)
@@ -81,9 +84,18 @@ struct VisitHomeView: View {
                 let arguments = ProcessInfo.processInfo.arguments
                 guard let visit = activeVisits.first else { return }
                 if arguments.contains("-openWrapUp") { sheet = .wrapUp(visit) }
+                if arguments.contains("-previewLiveActivity") { debugPreviewVisit = visit }
                 if arguments.contains("-openRateDish") {
                     sheet = .rateDish(visit, DishCapture.orderItems(for: visit).first { $0.displayName == "Funghi pizza" })
                 }
+            }
+            #endif
+            .onChange(of: AppRouter.shared.request, initial: true) { _, request in
+                openRequested(request)
+            }
+            #if DEBUG
+            .fullScreenCover(item: $debugPreviewVisit) { visit in
+                DebugLiveActivityPreview(visit: visit, people: people)
             }
             #endif
             .sheet(item: $sheet) { sheet in
@@ -187,6 +199,24 @@ struct VisitHomeView: View {
     }
 
     // MARK: - Helpers
+
+    private func openRequested(_ request: AppRouter.Request?) {
+        let visitId: UUID
+        let itemId: UUID?
+        let wrapUp: Bool
+        switch request {
+        case .rateDish(let v, let i): (visitId, itemId, wrapUp) = (v, i, false)
+        case .wrapUp(let v): (visitId, itemId, wrapUp) = (v, nil, true)
+        case .startVisit, nil: return
+        }
+        AppRouter.shared.request = nil
+        guard let visit = (activeVisits + pastVisits).first(where: { $0.id == visitId }) else { return }
+        if wrapUp {
+            sheet = .wrapUp(visit)
+        } else {
+            sheet = .rateDish(visit, DishCapture.orderItems(for: visit).first { $0.id == itemId })
+        }
+    }
 
     private var personNames: [String: String] {
         Dictionary(uniqueKeysWithValues: people.map { ($0.id.uuidString, $0.displayName) })

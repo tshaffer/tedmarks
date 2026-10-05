@@ -42,6 +42,7 @@ public enum DishCapture {
         context.insert(item)
         visit.modifiedAt = now
         try context.save()
+        VisitSideEffects.reconcile(in: context)
         return item
     }
 
@@ -53,6 +54,7 @@ public enum DishCapture {
         context.insert(item)
         visit.modifiedAt = now
         try context.save()
+        VisitSideEffects.reconcile(in: context)
         return item
     }
 
@@ -65,6 +67,7 @@ public enum DishCapture {
             rating.modifiedAt = now
         }
         try context.save()
+        VisitSideEffects.reconcile(in: context)
     }
 
     /// Dishes ordered on earlier visits to this place that aren't in this visit's order yet,
@@ -96,6 +99,7 @@ public enum DishCapture {
         )
         item.modifiedAt = now
         try context.save()
+        VisitSideEffects.reconcile(in: context)
     }
 
     public static func setVerdict(
@@ -109,6 +113,7 @@ public enum DishCapture {
         )
         visit.modifiedAt = now
         try context.save()
+        VisitSideEffects.reconcile(in: context)
     }
 
     /// Live ratings for one subject (a visit or a visit item).

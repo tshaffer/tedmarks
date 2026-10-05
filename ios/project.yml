@@ -26,9 +26,14 @@ targets:
       Release: Config/Secrets.xcconfig
     sources:
       - path: Tedmarks
+      - path: Shared    # Live Activity views + button intents (also in TedmarksWidgets)
     dependencies:
       - package: TedmarksKit
       - target: TedmarksWidgets
+    entitlements:
+      path: Tedmarks/Resources/Tedmarks.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.tedshaffer.tedmarks]
     info:
       path: Tedmarks/Resources/Info.plist
       properties:
@@ -60,10 +65,15 @@ targets:
     platform: iOS
     sources:
       - path: TedmarksWidgets
+      - path: Shared    # Live Activity views + button intents (also in Tedmarks)
     dependencies:
       - package: TedmarksKit
       - sdk: WidgetKit.framework
       - sdk: SwiftUI.framework
+    entitlements:
+      path: TedmarksWidgets/TedmarksWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.tedshaffer.tedmarks]
     info:
       path: TedmarksWidgets/Info.plist
       properties:

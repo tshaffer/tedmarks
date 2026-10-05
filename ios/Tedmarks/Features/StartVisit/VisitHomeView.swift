@@ -27,11 +27,13 @@ struct VisitHomeView: View {
     #endif
 
     enum VisitSheet: Identifiable {
+        case addToOrder(Visit)
         case rateDish(Visit, VisitItem?)
         case wrapUp(Visit)
 
         var id: String {
             switch self {
+            case .addToOrder(let visit): "order-\(visit.id)"
             case .rateDish(let visit, let item): "rate-\(visit.id)-\(item?.id.uuidString ?? "new")"
             case .wrapUp(let visit): "wrap-\(visit.id)"
             }
@@ -84,6 +86,7 @@ struct VisitHomeView: View {
                 let arguments = ProcessInfo.processInfo.arguments
                 guard let visit = activeVisits.first else { return }
                 if arguments.contains("-openWrapUp") { sheet = .wrapUp(visit) }
+                if arguments.contains("-openAddToOrder") { sheet = .addToOrder(visit) }
                 if arguments.contains("-previewLiveActivity") { debugPreviewVisit = visit }
                 if arguments.contains("-openRateDish") {
                     sheet = .rateDish(visit, DishCapture.orderItems(for: visit).first { $0.displayName == "Funghi pizza" })
@@ -100,6 +103,7 @@ struct VisitHomeView: View {
             #endif
             .sheet(item: $sheet) { sheet in
                 switch sheet {
+                case .addToOrder(let visit): AddToOrderSheet(visit: visit)
                 case .rateDish(let visit, let item): RateDishSheet(visit: visit, preselected: item)
                 case .wrapUp(let visit): WrapUpSheet(visit: visit)
                 }
@@ -162,18 +166,26 @@ struct VisitHomeView: View {
 
             HStack(spacing: 10) {
                 Button {
+                    sheet = .addToOrder(visit)
+                } label: {
+                    Label("Add dish", systemImage: "plus").frame(maxWidth: .infinity)
+                }
+                Button {
                     sheet = .rateDish(visit, nil)
                 } label: {
-                    Label("Rate a dish", systemImage: "plus").frame(maxWidth: .infinity)
+                    Label("Rate dish", systemImage: "star").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                Button {
-                    sheet = .wrapUp(visit)
-                } label: {
-                    Text("Wrap up").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
             }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            Button {
+                sheet = .wrapUp(visit)
+            } label: {
+                Text("Wrap up").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
             .controlSize(.large)
         }
         .padding(.vertical, 6)

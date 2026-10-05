@@ -13,6 +13,7 @@ struct TedmarksApp: App {
             #if DEBUG
             ActionLog.record("App launched (\(UIApplication.shared.applicationState == .background ? "background" : "foreground"))")
             DebugDemoData.seedIfRequested(in: TedmarksStore.context)
+            DebugDemoData.seedPastVisitsIfRequested(in: TedmarksStore.context)
             DebugPromptLog.logIfRequested()
             #endif
         }

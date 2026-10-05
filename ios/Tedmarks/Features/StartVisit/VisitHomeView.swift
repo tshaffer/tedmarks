@@ -2,11 +2,10 @@ import SwiftData
 import SwiftUI
 import TedmarksKit
 
-/// Home of the Visit tab: "Start visit" when no visit is active; during a visit, our order
-/// with ratings plus "Rate a dish" (Figma 04) and "Wrap up" (Figma 05).
+/// The Visit tab: Start a visit (Figma 02) when no visit is in progress; otherwise the current
+/// visit — our order with ratings, Add dish, Rate dish (04) and Wrap up (05). Past visits is
+/// one tap away from either.
 struct VisitHomeView: View {
-    @Binding var showStartVisit: Bool
-
     @Environment(\.modelContext) private var context
     @Query(
         filter: #Predicate<Visit> { $0.statusRaw == "inProgress" && $0.deletedAt == nil },
@@ -22,6 +21,10 @@ struct VisitHomeView: View {
     @Query(filter: #Predicate<VisitItem> { $0.deletedAt == nil }) private var visitItems: [VisitItem]
 
     @State private var sheet: VisitSheet?
+    @State private var path: [Route] = []
+    @State private var discardError: String?
+
+    enum Route: Hashable { case pastVisits }
     #if DEBUG
     @State private var debugPreviewVisit: Visit?
     #endif
@@ -41,49 +44,36 @@ struct VisitHomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
+        NavigationStack(path: $path) {
+            Group {
                 if let visit = activeVisits.first {
-                    Section("Now") { activeVisitCard(visit) }
+                    List {
+                        Section { activeVisitCard(visit) }
+                    }
+                    .navigationTitle("Current visit")
+                    .toolbar {
+                        // Started by mistake: removes the visit, its dishes and ratings, and the Lock Screen card.
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Discard", role: .destructive) { discard(visit) }
+                                .tint(.red)
+                        }
+                    }
                 } else {
-                    Section {
-                        Button {
-                            showStartVisit = true
-                        } label: {
-                            Label("Start visit", systemImage: "fork.knife.circle.fill")
-                                .font(.title3.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                    } footer: {
-                        Text("Picks the restaurant you're at from your location.")
-                    }
-                }
-
-                if !pastVisits.isEmpty {
-                    Section("Recent visits") {
-                        ForEach(pastVisits.prefix(15)) { visit in
-                            Button {
-                                sheet = .wrapUp(visit)
-                            } label: {
-                                pastVisitRow(visit)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    StartVisitSheet(embedded: true)
                 }
             }
-            .navigationTitle("Visit")
-            .sheet(isPresented: $showStartVisit) {
-                StartVisitSheet()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink("Past visits", value: Route.pastVisits)
+                }
             }
+            .navigationDestination(for: Route.self) { _ in PastVisitsView() }
             #if DEBUG
-            // Dev/testing: `-openWrapUp` / `-openRateDish` open the active visit's sheets without a tap.
+            // Dev/testing: `-openWrapUp` / `-openRateDish` / `-openAddToOrder` open the active visit's sheets
+            // without a tap; `-openPastVisits` opens Past visits (add `-pastVisits.sort name|distance`).
             .task {
                 let arguments = ProcessInfo.processInfo.arguments
+                if arguments.contains("-openPastVisits") { path = [.pastVisits] }
                 guard let visit = activeVisits.first else { return }
                 if arguments.contains("-openWrapUp") { sheet = .wrapUp(visit) }
                 if arguments.contains("-openAddToOrder") { sheet = .addToOrder(visit) }
@@ -101,6 +91,9 @@ struct VisitHomeView: View {
                 DebugLiveActivityPreview(visit: visit, people: people)
             }
             #endif
+            .alert("Couldn't discard the visit", isPresented: .constant(discardError != nil)) {
+                Button("OK") { discardError = nil }
+            } message: { Text(discardError ?? "") }
             .sheet(item: $sheet) { sheet in
                 switch sheet {
                 case .addToOrder(let visit): AddToOrderSheet(visit: visit)
@@ -191,25 +184,6 @@ struct VisitHomeView: View {
         .padding(.vertical, 6)
     }
 
-    private func pastVisitRow(_ visit: Visit) -> some View {
-        let household = DishCapture.household(for: visit, people: people)
-        let verdict = (try? DishCapture.verdict(for: visit, household: household, in: context)) ?? .none
-        let dishCount = DishCapture.orderItems(for: visit).count
-        return HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(visit.place?.name ?? "Unknown place").font(.headline)
-                Text("\(visit.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(dishCount) dish\(dishCount == 1 ? "" : "es")")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if let text = displayText(verdict, names: personNames) {
-                Text(text).font(.callout)
-            }
-            Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.tertiary)
-        }
-        .contentShape(Rectangle())
-    }
-
     // MARK: - Helpers
 
     private func openRequested(_ request: AppRouter.Request?) {
@@ -230,8 +204,12 @@ struct VisitHomeView: View {
         }
     }
 
-    private var personNames: [String: String] {
-        Dictionary(uniqueKeysWithValues: people.map { ($0.id.uuidString, $0.displayName) })
+    private func discard(_ visit: Visit) {
+        do {
+            try PastVisits.delete(visit, in: context)
+        } catch {
+            discardError = error.localizedDescription
+        }
     }
 
     private func emoji(for item: VisitItem, household: [UUID]) -> String? {

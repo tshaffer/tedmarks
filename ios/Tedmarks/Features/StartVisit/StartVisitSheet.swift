@@ -2,8 +2,11 @@ import SwiftData
 import SwiftUI
 import TedmarksKit
 
-/// Figma 02 · Start visit — pick the place and who's here.
+/// Figma 02 · Start visit — pick the place and who's here. The Visit tab's landing screen
+/// when no visit is in progress (`embedded`, inside that tab's navigation stack), or a sheet.
 struct StartVisitSheet: View {
+    var embedded = false
+
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -18,49 +21,58 @@ struct StartVisitSheet: View {
     @State private var saveError: String?
 
     var body: some View {
-        NavigationStack {
-            content
-                .navigationTitle("Start a visit")
-                .toolbar {
+        if embedded {
+            screen
+        } else {
+            NavigationStack {
+                screen.toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") { dismiss() }
                     }
                 }
-                .searchable(text: $model.searchText, isPresented: $model.isSearchPresented, prompt: "Somewhere else…")
-                .onSubmit(of: .search) { Task { await model.search(savedStatus: savedStatus) } }
-                .onChange(of: model.searchText) { _, text in
-                    if text.isEmpty { model.clearSearch() }
-                    model.searchTextChanged()
-                }
-                .safeAreaInset(edge: .bottom) {
-                    // Hidden while picking from suggestions, so it can't start a visit at the wrong place.
-                    if !isShowingSuggestions { startButton }
-                }
+            }
         }
+    }
+
+    private var screen: some View {
+        content
+            .navigationTitle("Start a visit")
+            .searchable(text: $model.searchText, isPresented: $model.isSearchPresented, prompt: "Somewhere else…")
+            .onSubmit(of: .search) { Task { await model.search(savedStatus: savedStatus) } }
+            .onChange(of: model.searchText) { _, text in
+                if text.isEmpty { model.clearSearch() }
+                model.searchTextChanged()
+            }
+            .safeAreaInset(edge: .bottom) {
+                // Hidden while picking from suggestions, so it can't start a visit at the wrong place.
+                if !isShowingSuggestions { startButton }
+            }
         .task {
-            if participantIds.isEmpty {
-                participantIds = Set(people.filter { $0.kind == .household }.map(\.id))
-            }
-            await model.load(savedStatus: savedStatus)
-            #if DEBUG
-            // Dev/testing: `-showMore` loads one "Show more" batch without a tap.
-            if ProcessInfo.processInfo.arguments.contains("-showMore") { await model.loadMore() }
-            // Dev/testing: `simctl launch … -openStartVisit -startVisitSearch dop` pre-fills the search.
-            if let text = UserDefaults.standard.string(forKey: "startVisitSearch") {
-                model.isSearchPresented = true
-                model.searchText = text
-            }
-            #endif
+        if participantIds.isEmpty {
+            participantIds = Set(people.filter { $0.kind == .household }.map(\.id))
+        }
+        // Coming back to the tab keeps the list; pull down to refresh it.
+        guard model.phase != .loaded else { return }
+        await model.load(savedStatus: savedStatus)
+        #if DEBUG
+        // Dev/testing: `-showMore` loads one "Show more" batch without a tap.
+        if ProcessInfo.processInfo.arguments.contains("-showMore") { await model.loadMore() }
+        // Dev/testing: `simctl launch … -startVisitSearch dop` pre-fills the search.
+        if let text = UserDefaults.standard.string(forKey: "startVisitSearch") {
+            model.isSearchPresented = true
+            model.searchText = text
+        }
+        #endif
         }
         .alert("Add a guest", isPresented: $isAddingGuest) {
-            TextField("Name", text: $newGuestName)
-            Button("Add") { addGuest() }
-            Button("Cancel", role: .cancel) { newGuestName = "" }
+        TextField("Name", text: $newGuestName)
+        Button("Add") { addGuest() }
+        Button("Cancel", role: .cancel) { newGuestName = "" }
         }
         .alert("Couldn't start the visit", isPresented: .constant(saveError != nil)) {
-            Button("OK") { saveError = nil }
+        Button("OK") { saveError = nil }
         } message: {
-            Text(saveError ?? "")
+        Text(saveError ?? "")
         }
     }
 
@@ -106,6 +118,7 @@ struct StartVisitSheet: View {
                     participantChips.padding(.vertical, 4)
                 }
             }
+            .refreshable { await model.load(savedStatus: savedStatus) }
         }
     }
 

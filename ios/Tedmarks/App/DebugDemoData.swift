@@ -36,6 +36,32 @@ enum DebugDemoData {
             print("Demo data failed: \(error)")
         }
     }
+
+    /// `-demoPastVisits` ends any visit in progress and, if there are no past visits yet, adds
+    /// three at different places and dates (for checking the Past visits sorts).
+    static func seedPastVisitsIfRequested(in context: ModelContext) {
+        guard ProcessInfo.processInfo.arguments.contains("-demoPastVisits") else { return }
+        do {
+            for visit in try VisitStarter.activeVisits(in: context) { try VisitStarter.endVisit(visit, in: context) }
+            let ended = VisitStatus.ended.rawValue
+            let past = try context.fetchCount(FetchDescriptor<Visit>(predicate: #Predicate { $0.statusRaw == ended && $0.deletedAt == nil }))
+            guard past < 2 else { return }
+            let places: [(String, Double, Double, Double, VerdictValue)] = [
+                ("Tamarine", 37.4446, -122.1617, 9, .wouldReturn),     // Palo Alto
+                ("Bistro Vida", 37.4530, -122.1817, 30, .tryAgain),    // Menlo Park
+                ("Alexander's Steakhouse", 37.3236, -122.0103, 2, .wontReturn), // Cupertino
+            ]
+            for (name, lat, lng, daysAgo, verdict) in places {
+                let picked = NearbyPlace(googlePlaceId: "demo-\(name)", name: name, latitude: lat, longitude: lng, distanceMeters: 0)
+                let visit = try VisitStarter.startVisit(at: picked, participantIds: [], in: context, now: .now.addingTimeInterval(-daysAgo * 86_400))
+                try DishCapture.addItem(named: "House special", to: visit, addedVia: .order, in: context)
+                try DishCapture.setVerdict(visit, verdict, for: .us, enteredBy: nil, in: context)
+                try VisitStarter.endVisit(visit, in: context)
+            }
+        } catch {
+            print("Demo past visits failed: \(error)")
+        }
+    }
 }
 #endif
 

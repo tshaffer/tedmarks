@@ -12,6 +12,8 @@ public final class PlaceItem {
     public var name: String
     public var normalizedName: String
     public var section: String?
+    /// As printed on the latest menu ("18", "$14.50").
+    public var price: String?
     /// PlaceItemSource raw values: menu, order, receipt, voice, manual, imported.
     public var sources: [String]
     public var onLatestMenu: Bool?

@@ -260,3 +260,66 @@ private let doppio = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", a
     await engine.sync()
     #expect(await server.pushedCount == 0)
 }
+
+@MainActor
+@Test func menusAndTheirPhotosSyncToAnotherPhone() async throws {
+    let server = FakeServer()
+    let ted = try Phone(server: server)
+    let visit = try VisitStarter.startVisit(at: doppio, participantIds: [Household.tedId], in: ted.context)
+    let place = try #require(visit.place)
+    let page = Photo(placeId: place.id, role: .menuPage, localIdentifier: "asset-1", cloudIdentifier: "cloud-1", capturedAt: .now, capturedBy: Household.tedId)
+    ted.context.insert(page)
+    let menu = try MenuReading.startMenu(place: place, visit: visit, pages: [page], in: ted.context)
+    try MenuReading.apply([MenuItem(section: "Pizza", name: "Margherita", price: "18"), MenuItem(section: nil, name: "Tiramisu", price: nil)],
+                          to: menu, in: ted.context)
+    await ted.engine.sync()
+    #expect(ted.engine.rejected.isEmpty)
+
+    let other = try Phone(server: server)
+    await other.engine.sync()
+    let copy = try #require(try other.context.fetch(FetchDescriptor<Place>()).first)
+    #expect(copy.latestMenuId == menu.id)
+    let sections = try MenuReading.sections(for: copy, in: other.context)
+    #expect(sections.map(\.title) == ["Pizza", nil])
+    #expect(sections[0].items.first?.price == "18")
+    let photo = try #require(try other.context.fetch(FetchDescriptor<Photo>()).first)
+    #expect(photo.role == .menuPage && photo.cloudIdentifier == "cloud-1" && photo.menuId == menu.id)
+}
+
+@MainActor
+@Test func twoPhonesSavingTheSamePlaceEndUpWithOneRecord() async throws {
+    let server = FakeServer()
+    let ted = try Phone(server: server)
+    let lori = try Phone(server: server)
+    // Both start a visit at a new restaurant before either has synced.
+    let tedVisit = try VisitStarter.startVisit(at: doppio, participantIds: [Household.tedId], in: ted.context, now: .now.addingTimeInterval(-60))
+    let burrata = try #require(try DishCapture.addItem(named: "Burrata", to: tedVisit, addedVia: .order, in: ted.context))
+    try DishCapture.rate(burrata, .loved, for: .us, enteredBy: nil, in: ted.context)
+    let loriVisit = try VisitStarter.startVisit(at: doppio, participantIds: [Household.loriId], in: lori.context)
+    try DishCapture.addItem(named: "burrata", to: loriVisit, addedVia: .order, in: lori.context)
+    await ted.engine.sync()
+    await lori.engine.sync()
+    await ted.engine.sync()
+
+    for phone in [ted, lori] {
+        let live = try phone.context.fetch(FetchDescriptor<Place>()).filter { $0.deletedAt == nil }
+        #expect(live.count == 1)
+        let place = try #require(live.first)
+        #expect(PlaceInsights.visits(at: place).count == 2, "both visits on the surviving place")
+        #expect(place.items.filter { $0.deletedAt == nil }.map(\.name) == ["Burrata"], "dishes merged by name")
+    }
+}
+
+@MainActor
+@Test func startingAVisitAtADeletedPlaceBringsItBack() throws {
+    let container = try ModelContainer(for: Schema(tedmarksModelTypes), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let context = container.mainContext
+    try VisitStarter.ensureHousehold(in: context)
+    let first = try VisitStarter.startVisit(at: doppio, participantIds: [], in: context)
+    let place = try #require(first.place)
+    try PlaceEditing.delete(place, in: context)
+    let again = try VisitStarter.startVisit(at: doppio, participantIds: [], in: context)
+    #expect(again.place?.id == place.id)
+    #expect(place.deletedAt == nil)
+    #expect(try context.fetch(FetchDescriptor<Place>()).count == 1)
+}

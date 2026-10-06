@@ -21,6 +21,8 @@ struct AddToOrderSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    if let place = visit.place { MenuPanel(place: place, visit: visit) }
+
                     HStack(spacing: 8) {
                         TextField("Dish name", text: $dishName)
                             .textFieldStyle(.roundedBorder)
@@ -37,6 +39,12 @@ struct AddToOrderSheet: View {
                             ForEach(suggestions) { placeItem in
                                 chip(placeItem.name, systemImage: "plus") { add(placeItem) }
                             }
+                        }
+                    }
+
+                    if let place = visit.place {
+                        MenuChipSections(place: place, exclude: shownElsewhere, filter: trimmedName) { placeItem in
+                            chip(placeItem.name, systemImage: "plus") { add(placeItem) }
                         }
                     }
 
@@ -124,6 +132,11 @@ struct AddToOrderSheet: View {
     }
 
     /// Dishes from earlier visits, narrowed to those matching what's typed.
+    /// Dishes already in our order or under "Ordered before" (not repeated under the menu).
+    private var shownElsewhere: Set<UUID> {
+        Set(orderItems.compactMap { $0.placeItem?.id } + suggestions.map(\.id))
+    }
+
     private var suggestions: [PlaceItem] {
         _ = visitItems.count
         let previous = visit.place.map { DishCapture.orderedBefore(at: $0, excluding: visit) } ?? []

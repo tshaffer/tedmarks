@@ -55,6 +55,15 @@ struct RateDishSheet: View {
                         }
                     }
 
+                    if let place = visit.place {
+                        let shown = Set(orderItems.compactMap { $0.placeItem?.id } + previous.map(\.id))
+                        MenuChipSections(place: place, exclude: shown, filter: "") { placeItem in
+                            dishChip(placeItem.name, badge: nil, selected: selection == .previous(placeItem)) {
+                                select(.previous(placeItem))
+                            }
+                        }
+                    }
+
                     chipSection("Something else?") {
                         dishChip("+ Unnamed dish", badge: nil, selected: selection == .unnamed, tint: .accentColor) {
                             select(.unnamed)

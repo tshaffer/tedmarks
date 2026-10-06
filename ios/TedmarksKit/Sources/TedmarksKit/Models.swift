@@ -69,6 +69,8 @@ public final class Place {
     public var interestLevelRaw: String?
     public var interestWhy: String?
     public var interestSavedAt: Date?
+    /// The most recently read menu (its dishes are the "On the menu" choices).
+    public var latestMenuId: UUID?
 
     public var interestLevel: InterestLevel? {
         get { interestLevelRaw.flatMap(InterestLevel.init) }
@@ -169,5 +171,5 @@ public final class Visit {
 /// All SwiftData model types, for building a ModelContainer.
 public let tedmarksModelTypes: [any PersistentModel.Type] = [
     Person.self, Place.self, Visit.self, PlaceItem.self, VisitItem.self, Rating.self, SyncRecordState.self,
-    Note.self, PlaceSubtype.self, VoiceNote.self, Draft.self,
+    Note.self, PlaceSubtype.self, VoiceNote.self, Draft.self, Photo.self, PlaceMenu.self,
 ]

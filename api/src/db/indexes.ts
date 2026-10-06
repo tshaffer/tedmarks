@@ -3,8 +3,10 @@ import { collectionNames, type CollectionName } from '@tedmarks/shared';
 
 /** Indexes from docs/tedmarks-data-model.md §15. Every collection also gets id + serverSeq. */
 const specificIndexes: Partial<Record<CollectionName, IndexDescription[]>> = {
+  // One live place per Google place is enforced by sync (SyncStore), not a unique index:
+  // a deleted place keeps its Google id, and the index would count it.
   places: [
-    { key: { 'google.placeId': 1 }, unique: true, sparse: true },
+    { key: { 'google.placeId': 1 } },
     { key: { location: '2dsphere' } },
     { key: { status: 1 } },
   ],
@@ -34,6 +36,7 @@ export function indexesFor(name: CollectionName): IndexDescription[] {
 /** Indexes from earlier versions that conflict with the current definitions. */
 const retiredIndexes: Partial<Record<CollectionName, string[]>> = {
   ratings: ['subjectType_1_subjectId_1_scope_1_personId_1'], // was unique
+  places: ['google.placeId_1'], // was unique
 };
 
 export async function ensureIndexes(db: Db): Promise<Record<string, string[]>> {

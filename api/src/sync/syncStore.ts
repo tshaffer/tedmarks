@@ -1,4 +1,4 @@
-import type { AnyBulkWriteOperation, Db } from 'mongodb';
+import { MongoBulkWriteError, type AnyBulkWriteOperation, type Db } from 'mongodb';
 import {
   collectionNames,
   type CollectionName,
@@ -56,6 +56,19 @@ export class SyncStore {
         continue;
       }
       let record = decision.record;
+      // Another device made its own record for the same Google place: keep the one we have
+      // and send it back; the phone merges its copy into it.
+      const googleId = (record.google as { placeId?: string } | undefined)?.placeId;
+      if (collection === 'places' && !record.deletedAt && googleId) {
+        const other = await store.findOne(
+          { 'google.placeId': googleId, id: { $ne: record.id }, deletedAt: { $exists: false } },
+          { projection: { _id: 0 } },
+        );
+        if (other) {
+          newer.push(other);
+          continue;
+        }
+      }
       if (collection === 'ratings' && !record.deletedAt) {
         const other = await store.findOne(
           { ...ratingKey(record), id: { $ne: record.id }, deletedAt: { $exists: false } },
@@ -77,13 +90,22 @@ export class SyncStore {
         record.serverSeq = first + index;
         return { replaceOne: { filter: { id: record.id }, replacement: record, upsert: true } };
       });
-      await store.bulkWrite(operations, { ordered: true });
-      const requested = new Set(patches.map((p) => p.id));
-      for (const record of toSave) {
-        if (requested.has(record.id) && !newer.includes(record)) {
-          response.accepted.push({ collection, id: record.id, serverSeq: record.serverSeq! });
-        }
+      // One bad record mustn't fail the batch: report it and keep the rest.
+      const failed = new Map<number, string>();
+      try {
+        await store.bulkWrite(operations, { ordered: false });
+      } catch (error) {
+        if (!(error instanceof MongoBulkWriteError)) throw error;
+        const writeErrors = Array.isArray(error.writeErrors) ? error.writeErrors : [error.writeErrors];
+        for (const writeError of writeErrors) failed.set(writeError.index, writeError.errmsg ?? 'Could not save');
       }
+      const requested = new Set(patches.map((p) => p.id));
+      toSave.forEach((record, index) => {
+        if (!requested.has(record.id) || newer.includes(record)) return;
+        const reason = failed.get(index);
+        if (reason) response.rejected.push({ collection, id: record.id, reason });
+        else response.accepted.push({ collection, id: record.id, serverSeq: record.serverSeq! });
+      });
     }
     if (newer.length > 0) response.newer[collection] = newer;
   }

@@ -13,13 +13,14 @@ public enum VisitStarter {
         now: Date = .now
     ) throws -> Visit {
         let googleId = picked.googlePlaceId
-        let existing = try context.fetch(
-            FetchDescriptor<Place>(predicate: #Predicate { $0.googlePlaceId == googleId && $0.deletedAt == nil })
-        ).first
+        // Prefer a live record; a deleted one comes back rather than making a second record.
+        let matches = try context.fetch(FetchDescriptor<Place>(predicate: #Predicate { $0.googlePlaceId == googleId }))
+        let existing = matches.first { $0.deletedAt == nil } ?? matches.max { $0.modifiedAt < $1.modifiedAt }
 
         let place: Place
         if let existing {
             place = existing
+            place.deletedAt = nil
         } else {
             place = Place(status: .beenThere, name: picked.name, latitude: picked.latitude, longitude: picked.longitude, now: now)
             context.insert(place)

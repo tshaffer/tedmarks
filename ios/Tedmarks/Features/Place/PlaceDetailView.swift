@@ -19,6 +19,8 @@ struct PlaceDetailView: View {
     @State private var wrapUpVisit: Visit?
     @State private var errorMessage: String?
     @State private var isEditing = false
+    @State private var showingMenu: PlaceMenu?
+    @Query(filter: #Predicate<PlaceMenu> { $0.deletedAt == nil }) private var menus: [PlaceMenu]
 
     var body: some View {
         let _ = refreshKey
@@ -60,6 +62,7 @@ struct PlaceDetailView: View {
         .safeAreaInset(edge: .bottom) { startVisitButton }
         .sheet(item: $wrapUpVisit) { WrapUpSheet(visit: $0) }
         .sheet(isPresented: $isEditing) { EditPlaceSheet(place: place) }
+        .sheet(item: $showingMenu) { MenuPagesView(menu: $0) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) { Button("Edit") { isEditing = true } }
         }
@@ -207,6 +210,12 @@ struct PlaceDetailView: View {
                 } label: {
                     Label(hours.first { $0.hasPrefix(todayName) } ?? "Hours", systemImage: "clock")
                         .lineLimit(1)
+                }
+            }
+            if let menuId = place.latestMenuId, let menu = menus.first(where: { $0.id == menuId }), !menu.pagePhotoIds.isEmpty {
+                Button { showingMenu = menu } label: {
+                    Label("Menu · \(menu.pagePhotoIds.count) page\(menu.pagePhotoIds.count == 1 ? "" : "s") · \(menu.capturedAt.formatted(date: .abbreviated, time: .omitted))",
+                          systemImage: "menucard")
                 }
             }
             if let website = place.googleWebsite, let url = URL(string: website) {

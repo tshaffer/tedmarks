@@ -462,7 +462,7 @@ interface UserSettings extends SyncedRecord {
 | `GET /places/nearby?lat&lng` | Google Nearby Search proxy (Start visit) |
 | `GET /places/search?q&lat&lng` | Google text search proxy ("Somewhere else…") |
 | `POST /places/:id/refresh` | Re-fetch the Google snapshot |
-| `POST /ai/menu` | Menu page images → extracted items (images not kept) |
+| `POST /ai/menu` | Menu page images (JPEG, base64) → dishes with sections and prices, via Claude vision; images not kept (built 2026-10-06) |
 | `POST /ai/receipt` | Receipt image → items, date, place hint (image not kept) |
 | `POST /ai/voice` | Transcript + visit context (place, people, our order, dishes ordered before) → proposed changes; the phone stores them as a pending Draft (built 2026-10-06, Claude Opus 5.5 at low effort with server-side refusal fallback) |
 
@@ -481,6 +481,10 @@ interface UserSettings extends SyncedRecord {
 - **Ted and Lori have fixed person ids** (`…000000000001` / `…000000000002`) on every
   install, so reinstalls and a second phone don't create duplicates.
 - Until Sign in with Apple, `createdBy`/`modifiedBy` are Ted's person id.
+- **One live place per Google place** is enforced by sync, not a unique index (a deleted
+  place keeps its Google id). A push that would create a second is answered with the
+  existing place in `newer`; phones merge duplicates into the oldest record (ties: lowest
+  id), moving visits, dishes, ratings, notes, photos and menus.
 
 ---
 

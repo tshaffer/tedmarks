@@ -112,6 +112,80 @@ public enum PlaceEditing {
         return place
     }
 
+    /// Two records for one Google place (made on different phones before they synced, say):
+    /// everything moves to the older one and the other is deleted. Every phone picks the same
+    /// survivor (oldest, then lowest id), so they converge. Returns true if anything merged.
+    @discardableResult
+    public static func mergeDuplicates(in context: ModelContext, now: Date = .now) throws -> Bool {
+        let places = try context.fetch(FetchDescriptor<Place>(predicate: #Predicate { $0.deletedAt == nil && $0.googlePlaceId != nil }))
+        var merged = false
+        for group in Dictionary(grouping: places, by: { $0.googlePlaceId! }).values where group.count > 1 {
+            let ordered = group.sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) }
+            for duplicate in ordered.dropFirst() {
+                try merge(duplicate, into: ordered[0], in: context, now: now)
+                merged = true
+            }
+        }
+        if merged { try context.save() }
+        return merged
+    }
+
+    static func merge(_ source: Place, into target: Place, in context: ModelContext, now: Date) throws {
+        let sourceId = source.id, targetId = target.id
+        for visit in source.visits {
+            visit.place = target
+            visit.modifiedAt = now
+        }
+        var targetItems = Dictionary(target.items.filter { $0.deletedAt == nil }.map { ($0.normalizedName, $0) }) { first, _ in first }
+        let lines = try context.fetch(FetchDescriptor<VisitItem>())
+        for item in source.items where item.deletedAt == nil {
+            if let same = targetItems[item.normalizedName] {
+                for line in lines where line.placeItem?.id == item.id {
+                    line.placeItem = same
+                    line.modifiedAt = now
+                }
+                for added in item.sources where !same.sources.contains(added) { same.sources.append(added) }
+                same.modifiedAt = now
+                item.deletedAt = now
+            } else {
+                item.place = target
+                targetItems[item.normalizedName] = item
+            }
+            item.modifiedAt = now
+        }
+        for rating in try context.fetch(FetchDescriptor<Rating>(predicate: #Predicate { $0.placeId == sourceId })) {
+            rating.placeId = targetId
+            rating.modifiedAt = now
+        }
+        for note in try context.fetch(FetchDescriptor<Note>(predicate: #Predicate { $0.placeId == sourceId })) {
+            note.placeId = targetId
+            note.modifiedAt = now
+        }
+        for photo in try context.fetch(FetchDescriptor<Photo>(predicate: #Predicate { $0.placeId == sourceId })) {
+            photo.placeId = targetId
+            photo.modifiedAt = now
+        }
+        for menu in try context.fetch(FetchDescriptor<PlaceMenu>(predicate: #Predicate { $0.placeId == sourceId })) {
+            menu.placeId = targetId
+            menu.modifiedAt = now
+        }
+        for draft in try context.fetch(FetchDescriptor<Draft>(predicate: #Predicate { $0.placeId == sourceId })) {
+            draft.placeId = targetId
+            draft.modifiedAt = now
+        }
+        if source.status == .beenThere { target.status = .beenThere }
+        target.review = target.review ?? source.review
+        target.latestMenuId = target.latestMenuId ?? source.latestMenuId
+        if target.interestLevel == nil {
+            target.interestLevel = source.interestLevel
+            target.interestWhy = source.interestWhy
+            target.interestSavedAt = source.interestSavedAt
+        }
+        target.modifiedAt = now
+        source.deletedAt = now
+        source.modifiedAt = now
+    }
+
     /// The Edit place screen's fields.
     public struct Changes: Sendable {
         public var name: String

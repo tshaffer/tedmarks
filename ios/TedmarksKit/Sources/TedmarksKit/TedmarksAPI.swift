@@ -140,6 +140,18 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         return try decode(Response.self, from: data).changes
     }
 
+    // MARK: - Menus
+
+    /// Claude reads dishes from menu pages (JPEG data, in order). Pages aren't kept on the server.
+    public func readMenu(placeName: String, pages: [Data]) async throws -> [MenuItem] {
+        struct Page: Encodable { var mediaType = "image/jpeg"; var data: String }
+        struct Body: Encodable { var placeName: String; var pages: [Page] }
+        struct Response: Decodable { var items: [MenuItem] }
+        let body = Body(placeName: placeName, pages: pages.map { Page(data: $0.base64EncodedString()) })
+        let data = try await send(path: "ai/menu", method: "POST", query: [], body: try JSONEncoder().encode(body))
+        return try decode(Response.self, from: data).items
+    }
+
     // MARK: - Sync
 
     public func syncPush(_ changes: [String: [SyncRecord]]) async throws -> SyncPushResult {
@@ -181,7 +193,7 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         if !query.isEmpty { components.queryItems = query }
         var request = URLRequest(url: components.url!)
         request.httpMethod = method
-        request.timeoutInterval = path.hasPrefix("ai/") ? 60 : 20
+        request.timeoutInterval = path == "ai/menu" ? 180 : path.hasPrefix("ai/") ? 60 : 20
         if let body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

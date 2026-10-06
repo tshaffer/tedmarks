@@ -25,7 +25,7 @@ test('GET /health reports ok without a database', async () => {
 
 test('designed-but-unbuilt endpoints return 501', async () => {
   await withServer(async (base) => {
-    const res = await fetch(`${base}/ai/menu`, { method: 'POST' });
+    const res = await fetch(`${base}/ai/receipt`, { method: 'POST' });
     assert.equal(res.status, 501);
   });
 });

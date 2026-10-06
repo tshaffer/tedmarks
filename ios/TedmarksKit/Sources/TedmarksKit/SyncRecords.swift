@@ -48,7 +48,7 @@ public typealias SyncRecord = [String: JSONValue]
 
 /// The collections this app syncs, in the order they must be applied (parents first).
 public enum SyncCollection: String, CaseIterable, Sendable {
-    case placeSubtypes, people, places, placeItems, visits, visitItems, ratings, notes, voiceNotes, drafts
+    case placeSubtypes, people, places, placeItems, visits, visitItems, ratings, notes, voiceNotes, drafts, photos, menus
 
     /// Received but never sent: the phone doesn't edit these yet.
     var isReadOnly: Bool { self == .placeSubtypes }
@@ -145,6 +145,7 @@ enum SyncEncoder {
                 "tags": SyncValue.strings(place.tags),
                 "google": google,
                 "subtypeId": SyncValue.id(place.subtypeId),
+                "latestMenuId": SyncValue.id(place.latestMenuId),
                 "review": SyncValue.string(place.review),
                 "interest": place.interestLevel.map { level in
                     .object([
@@ -164,6 +165,7 @@ enum SyncEncoder {
                 "name": .string(item.name),
                 "normalizedName": .string(item.normalizedName),
                 "section": SyncValue.string(item.section),
+                "price": SyncValue.string(item.price),
                 "sources": SyncValue.strings(item.sources),
                 "onLatestMenu": SyncValue.bool(item.onLatestMenu),
             ]) { $1 }
@@ -249,6 +251,47 @@ enum SyncEncoder {
             ]) { $1 }
     }
 
+    static func record(_ photo: Photo) -> SyncRecord {
+        base(id: photo.id, createdAt: photo.createdAt, modifiedAt: photo.modifiedAt, deletedAt: photo.deletedAt)
+            .merging([
+                "placeId": SyncValue.id(photo.placeId),
+                "visitId": SyncValue.id(photo.visitId),
+                "menuId": SyncValue.id(photo.menuId),
+                "role": .string(photo.roleRaw),
+                "storage": .string("photosLibrary"),
+                "localIdentifier": SyncValue.string(photo.localIdentifier),
+                "cloudIdentifier": SyncValue.string(photo.cloudIdentifier),
+                "capturedAt": SyncValue.date(photo.capturedAt),
+                "pixelWidth": SyncValue.int(photo.pixelWidth),
+                "pixelHeight": SyncValue.int(photo.pixelHeight),
+                "capturedByPersonId": SyncValue.id(photo.capturedByPersonId),
+                "taggedVisitItemIds": .array(photo.taggedVisitItemIds.map { SyncValue.id($0) }),
+                "availability": .string(photo.availabilityRaw),
+            ]) { $1 }
+    }
+
+    static func record(_ menu: PlaceMenu) -> SyncRecord {
+        // Inside an array, leave absent fields out (null only clears top-level/nested fields).
+        let extracted: JSONValue = menu.extracted.map { items in
+            .array(items.map { item in
+                var object: [String: JSONValue] = ["name": .string(item.name)]
+                if let section = item.section { object["section"] = .string(section) }
+                if let price = item.price { object["price"] = .string(price) }
+                return .object(object)
+            })
+        } ?? .null
+        return base(id: menu.id, createdAt: menu.createdAt, modifiedAt: menu.modifiedAt, deletedAt: menu.deletedAt)
+            .merging([
+                "placeId": SyncValue.id(menu.placeId),
+                "visitId": SyncValue.id(menu.visitId),
+                "capturedAt": SyncValue.date(menu.capturedAt),
+                "pagePhotoIds": .array(menu.pagePhotoIds.map { SyncValue.id($0) }),
+                "readStatus": .string(menu.readStatusRaw),
+                "readAt": SyncValue.date(menu.readAt),
+                "extracted": extracted,
+            ]) { $1 }
+    }
+
     static func record(_ rating: Rating) -> SyncRecord {
         base(id: rating.id, createdAt: rating.createdAt, modifiedAt: rating.modifiedAt, deletedAt: rating.deletedAt)
             .merging([
@@ -282,6 +325,8 @@ struct LocalRecords {
     var notes: [UUID: Note] = [:]
     var voiceNotes: [UUID: VoiceNote] = [:]
     var drafts: [UUID: Draft] = [:]
+    var photos: [UUID: Photo] = [:]
+    var menus: [UUID: PlaceMenu] = [:]
 
     init(context: ModelContext) throws {
         func byId<T: PersistentModel>(_ type: T.Type, _ id: (T) -> UUID) throws -> [UUID: T] {
@@ -297,6 +342,8 @@ struct LocalRecords {
         notes = try byId(Note.self) { $0.id }
         voiceNotes = try byId(VoiceNote.self) { $0.id }
         drafts = try byId(Draft.self) { $0.id }
+        photos = try byId(Photo.self) { $0.id }
+        menus = try byId(PlaceMenu.self) { $0.id }
     }
 
     /// Each local record as it would be sent (records whose parent is missing are skipped),
@@ -312,6 +359,8 @@ struct LocalRecords {
         case .notes: notes.values.map { n in (n.id, SyncEncoder.record(n), n.modifiedAt, { n.modifiedAt = $0 }) }
         case .voiceNotes: voiceNotes.values.map { v in (v.id, SyncEncoder.record(v), v.modifiedAt, { v.modifiedAt = $0 }) }
         case .drafts: drafts.values.map { d in (d.id, SyncEncoder.record(d), d.modifiedAt, { d.modifiedAt = $0 }) }
+        case .photos: photos.values.map { p in (p.id, SyncEncoder.record(p), p.modifiedAt, { p.modifiedAt = $0 }) }
+        case .menus: menus.values.map { m in (m.id, SyncEncoder.record(m), m.modifiedAt, { m.modifiedAt = $0 }) }
         case .placeSubtypes: []
         }
     }
@@ -328,6 +377,8 @@ struct LocalRecords {
         case .notes: notes[id].map(SyncEncoder.record)
         case .voiceNotes: voiceNotes[id].map(SyncEncoder.record)
         case .drafts: drafts[id].map(SyncEncoder.record)
+        case .photos: photos[id].map(SyncEncoder.record)
+        case .menus: menus[id].map(SyncEncoder.record)
         case .placeSubtypes: nil
         }
     }
@@ -344,6 +395,8 @@ struct LocalRecords {
         case .notes: notes[id]?.modifiedAt
         case .voiceNotes: voiceNotes[id]?.modifiedAt
         case .drafts: drafts[id]?.modifiedAt
+        case .photos: photos[id]?.modifiedAt
+        case .menus: menus[id]?.modifiedAt
         }
     }
 }
@@ -412,6 +465,7 @@ enum SyncDecoder {
             place.interestLevelRaw = interest?["level"]?.string
             place.interestWhy = interest?["why"]?.string
             place.interestSavedAt = SyncValue.parseDate(interest?["savedAt"])
+            place.latestMenuId = SyncValue.parseId(record["latestMenuId"])
             place.createdAt = createdAt
             place.modifiedAt = modifiedAt
             place.deletedAt = deletedAt
@@ -428,6 +482,7 @@ enum SyncDecoder {
             item.name = string("name") ?? item.name
             item.normalizedName = string("normalizedName") ?? normalizeItemName(item.name)
             item.section = string("section")
+            item.price = string("price")
             item.sources = record["sources"]?.array?.compactMap(\.string) ?? []
             item.onLatestMenu = record["onLatestMenu"]?.bool
             item.createdAt = createdAt
@@ -590,6 +645,56 @@ enum SyncDecoder {
             draft.createdAt = createdAt
             draft.modifiedAt = modifiedAt
             draft.deletedAt = deletedAt
+
+        case .photos:
+            guard let placeId = SyncValue.parseId(record["placeId"]),
+                  let capturedBy = SyncValue.parseId(record["capturedByPersonId"]) else { return false }
+            let photo = local.photos[id] ?? {
+                let new = Photo(id: id, placeId: placeId, role: .visit, localIdentifier: nil, cloudIdentifier: nil,
+                                capturedAt: createdAt, capturedBy: capturedBy, now: createdAt)
+                context.insert(new)
+                local.photos[id] = new
+                return new
+            }()
+            photo.placeId = placeId
+            photo.visitId = SyncValue.parseId(record["visitId"])
+            photo.menuId = SyncValue.parseId(record["menuId"])
+            photo.roleRaw = string("role") ?? photo.roleRaw
+            photo.localIdentifier = string("localIdentifier")
+            photo.cloudIdentifier = string("cloudIdentifier")
+            photo.capturedAt = SyncValue.parseDate(record["capturedAt"]) ?? createdAt
+            photo.pixelWidth = record["pixelWidth"]?.number.map { Int($0) }
+            photo.pixelHeight = record["pixelHeight"]?.number.map { Int($0) }
+            photo.capturedByPersonId = capturedBy
+            photo.taggedVisitItemIds = record["taggedVisitItemIds"]?.array?.compactMap { SyncValue.parseId($0) } ?? []
+            photo.availabilityRaw = string("availability") ?? "ok"
+            photo.createdAt = createdAt
+            photo.modifiedAt = modifiedAt
+            photo.deletedAt = deletedAt
+
+        case .menus:
+            guard let placeId = SyncValue.parseId(record["placeId"]) else { return false }
+            let menu = local.menus[id] ?? {
+                let new = PlaceMenu(id: id, placeId: placeId, visitId: nil, pagePhotoIds: [], now: createdAt)
+                context.insert(new)
+                local.menus[id] = new
+                return new
+            }()
+            menu.placeId = placeId
+            menu.visitId = SyncValue.parseId(record["visitId"])
+            menu.capturedAt = SyncValue.parseDate(record["capturedAt"]) ?? createdAt
+            menu.pagePhotoIds = record["pagePhotoIds"]?.array?.compactMap { SyncValue.parseId($0) } ?? []
+            menu.readStatusRaw = string("readStatus") ?? menu.readStatusRaw
+            menu.readAt = SyncValue.parseDate(record["readAt"])
+            menu.extracted = record["extracted"]?.array.map { items in
+                items.compactMap { value in
+                    guard let object = value.object, let name = object["name"]?.string else { return nil }
+                    return MenuItem(section: object["section"]?.string, name: name, price: object["price"]?.string)
+                }
+            }
+            menu.createdAt = createdAt
+            menu.modifiedAt = modifiedAt
+            menu.deletedAt = deletedAt
         }
         return true
     }

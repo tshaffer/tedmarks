@@ -57,9 +57,9 @@ public final class SyncEngine {
     /// Bumped when the phone starts keeping more of what the server has; the next sync then
     /// re-reads everything once (v2: place details, notes and subtypes from the memorapp import;
     /// v3: notes become two-way, plus voice notes and drafts; v4: place review, interest,
-    /// status and type become editable on the phone).
+    /// status and type become editable on the phone; v5: dish prices, latest menu, photos, menus).
     private static let formatKey = "sync.format"
-    private static let format = 4
+    private static let format = 5
     private static let lastSyncedKey = "sync.lastSyncedAt"
     private static let pushBatchSize = 200
 
@@ -117,6 +117,7 @@ public final class SyncEngine {
     // MARK: - Push
 
     private func push(transport: SyncTransport, context: ModelContext) async throws {
+        try PlaceEditing.mergeDuplicates(in: context)
         let local = try LocalRecords(context: context)
         let states = try syncStates(context)
         let now = Date.now
@@ -211,6 +212,8 @@ public final class SyncEngine {
                 remember(applied, hash: SyncValue.hash(applied), key: key, states: states, context: context)
             }
         }
+        // A place from another phone may be one we also saved; fold ours into it.
+        if changes["places"] != nil { try PlaceEditing.mergeDuplicates(in: context) }
     }
 
     // MARK: - Bookkeeping

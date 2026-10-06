@@ -3,6 +3,7 @@ import express, { type Express } from 'express';
 import type { Db } from 'mongodb';
 import { DEFAULT_NEARBY_RADIUS_METERS } from '@tedmarks/shared';
 import { aiRoutes } from './ai/aiRoutes.js';
+import type { MenuReader } from './ai/menuReader.js';
 import type { VoiceStructurer } from './ai/voiceStructurer.js';
 import { requireAccessKey } from './auth/accessKey.js';
 import { authRoutes } from './auth/authRoutes.js';
@@ -19,6 +20,8 @@ export interface AppDeps {
   accessKey?: string | undefined;
   /** Claude for voice notes. Unset = /ai/voice reports not configured. */
   voice?: VoiceStructurer | undefined;
+  /** Claude for menu photos. Unset = /ai/menu reports not configured. */
+  menu?: MenuReader | undefined;
 }
 
 export function createApp(deps: AppDeps = {}): Express {
@@ -34,7 +37,7 @@ export function createApp(deps: AppDeps = {}): Express {
   app.use('/auth', authRoutes());
   app.use('/sync', syncRoutes(deps.db ? new SyncStore(deps.db) : undefined));
   app.use('/places', placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS));
-  app.use('/ai', aiRoutes(deps.voice));
+  app.use('/ai', aiRoutes(deps.voice, deps.menu));
 
   return app;
 }

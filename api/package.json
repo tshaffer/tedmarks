@@ -10,7 +10,8 @@
     "test": "tsx --test 'src/**/*.test.ts'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "indexes:create": "tsx src/tools/createIndexes.ts",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "migrate:memorapp": "tsx src/tools/migrateMemorapp.ts"
   },
   "dependencies": {
     "@tedmarks/shared": "workspace:*",

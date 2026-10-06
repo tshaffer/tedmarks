@@ -1,6 +1,7 @@
 import { loadConfig, missingSettings } from './config.js';
 import { ensureIndexes } from './db/indexes.js';
 import { closeMongo, connectMongo } from './db/mongo.js';
+import { ClaudeVoiceStructurer } from './ai/voiceStructurer.js';
 import { PlacesClient } from './google/placesClient.js';
 import { createApp } from './server.js';
 
@@ -25,6 +26,7 @@ const server = createApp({
   places,
   nearbyRadiusMeters: config.nearbyRadiusMeters,
   accessKey: config.accessKey,
+  voice: config.anthropicApiKey ? new ClaudeVoiceStructurer(config.anthropicApiKey) : undefined,
 }).listen(config.port, '0.0.0.0', () => {
   console.log(`[tedmarks-api] Listening on port ${config.port}`);
 });

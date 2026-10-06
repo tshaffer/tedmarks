@@ -30,6 +30,37 @@ test('designed-but-unbuilt endpoints return 501', async () => {
   });
 });
 
+test('voice notes: not configured without a key; validated; structured by the injected Claude', async () => {
+  const request = {
+    transcript: 'The burrata was amazing, Lori thought the pizza was soggy. Definitely coming back.',
+    placeName: 'Doppio Zero',
+    participants: [{ id: 'ted', name: 'Ted' }, { id: 'lori', name: 'Lori' }],
+    dishes: [{ id: 'vi-1', name: 'Burrata' }],
+    orderedBefore: [],
+  };
+  await withServer(async (base) => {
+    const res = await fetch(`${base}/ai/voice`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) });
+    assert.equal(res.status, 503);
+  });
+  const voice = {
+    structure: async () => [
+      { kind: 'itemRating' as const, dishId: 'vi-1', dishName: 'Burrata', personId: null, value: 'loved', text: null, evidence: 'burrata was amazing' },
+    ],
+  };
+  const server = createApp({ voice }).listen(0);
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const bad = await fetch(`${base}/ai/voice`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...request, transcript: '' }) });
+    assert.equal(bad.status, 400);
+    const ok = await fetch(`${base}/ai/voice`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) });
+    assert.equal(ok.status, 200);
+    assert.equal(((await ok.json()) as { changes: unknown[] }).changes.length, 1);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test('sync reports not configured without a database', async () => {
   await withServer(async (base) => {
     assert.equal((await fetch(`${base}/sync/pull?since=0`)).status, 503);

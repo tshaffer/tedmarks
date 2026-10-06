@@ -162,5 +162,5 @@ public final class Visit {
 /// All SwiftData model types, for building a ModelContainer.
 public let tedmarksModelTypes: [any PersistentModel.Type] = [
     Person.self, Place.self, Visit.self, PlaceItem.self, VisitItem.self, Rating.self, SyncRecordState.self,
-    Note.self, PlaceSubtype.self,
+    Note.self, PlaceSubtype.self, VoiceNote.self, Draft.self,
 ]

@@ -26,7 +26,12 @@ public enum DishCapture {
     ) throws -> VisitItem? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let place = visit.place else { return nil }
-        let placeItem = placeItem(named: trimmed, at: place, source: addedVia == .order ? "order" : "manual", in: context, now: now)
+        let source = switch addedVia {
+        case .order: "order"
+        case .voice: "voice"
+        default: "manual"
+        }
+        let placeItem = placeItem(named: trimmed, at: place, source: source, in: context, now: now)
         return try addItem(placeItem, to: visit, addedVia: addedVia, in: context, now: now)
     }
 
@@ -90,12 +95,12 @@ public enum DishCapture {
 
     public static func rate(
         _ item: VisitItem, _ value: ItemRatingValue, for rateFor: RateFor,
-        enteredBy: UUID?, in context: ModelContext, now: Date = .now
+        enteredBy: UUID?, origin: RatingOrigin = .tap, in context: ModelContext, now: Date = .now
     ) throws {
         guard let visit = item.visit, let place = visit.place else { return }
         try upsertRating(
             subjectType: .visitItem, subjectId: item.id, visitId: visit.id, placeId: place.id,
-            valueRaw: value.rawValue, for: rateFor, enteredBy: enteredBy, in: context, now: now
+            valueRaw: value.rawValue, for: rateFor, enteredBy: enteredBy, origin: origin, in: context, now: now
         )
         item.modifiedAt = now
         try context.save()
@@ -104,12 +109,12 @@ public enum DishCapture {
 
     public static func setVerdict(
         _ visit: Visit, _ value: VerdictValue, for rateFor: RateFor,
-        enteredBy: UUID?, in context: ModelContext, now: Date = .now
+        enteredBy: UUID?, origin: RatingOrigin = .tap, in context: ModelContext, now: Date = .now
     ) throws {
         guard let place = visit.place else { return }
         try upsertRating(
             subjectType: .visit, subjectId: visit.id, visitId: visit.id, placeId: place.id,
-            valueRaw: value.rawValue, for: rateFor, enteredBy: enteredBy, in: context, now: now
+            valueRaw: value.rawValue, for: rateFor, enteredBy: enteredBy, origin: origin, in: context, now: now
         )
         visit.modifiedAt = now
         try context.save()
@@ -178,13 +183,14 @@ public enum DishCapture {
 
     private static func upsertRating(
         subjectType: RatingSubjectType, subjectId: UUID, visitId: UUID, placeId: UUID,
-        valueRaw: String, for rateFor: RateFor, enteredBy: UUID?, in context: ModelContext, now: Date
+        valueRaw: String, for rateFor: RateFor, enteredBy: UUID?, origin: RatingOrigin, in context: ModelContext, now: Date
     ) throws {
         // Include tombstoned ratings so a re-rating revives the same record (unique per scope).
         let all = try context.fetch(FetchDescriptor<Rating>(predicate: #Predicate { $0.subjectId == subjectId }))
         if let existing = all.first(where: { matches($0, rateFor) }) {
             existing.valueRaw = valueRaw
             existing.enteredByPersonId = enteredBy
+            existing.originRaw = origin.rawValue
             existing.deletedAt = nil
             existing.modifiedAt = now
             return
@@ -193,7 +199,7 @@ public enum DishCapture {
         context.insert(Rating(
             subjectType: subjectType, subjectId: subjectId, visitId: visitId, placeId: placeId,
             scope: personId == nil ? .joint : .person, personId: personId, valueRaw: valueRaw,
-            enteredByPersonId: enteredBy, now: now
+            enteredByPersonId: enteredBy, origin: origin, now: now
         ))
     }
 

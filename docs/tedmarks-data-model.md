@@ -464,7 +464,7 @@ interface UserSettings extends SyncedRecord {
 | `POST /places/:id/refresh` | Re-fetch the Google snapshot |
 | `POST /ai/menu` | Menu page images → extracted items (images not kept) |
 | `POST /ai/receipt` | Receipt image → items, date, place hint (image not kept) |
-| `POST /ai/voice` | Transcript + visit context → proposed changes (Draft) |
+| `POST /ai/voice` | Transcript + visit context (place, people, our order, dishes ordered before) → proposed changes; the phone stores them as a pending Draft (built 2026-10-06, Claude Opus 5.5 at low effort with server-side refusal fallback) |
 
 **How sync works (built 2026-10-05):**
 - **Push is a patch.** A client sends the fields it keeps; fields it leaves out are kept as

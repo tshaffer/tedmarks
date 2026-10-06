@@ -55,9 +55,10 @@ public final class SyncEngine {
     private let defaults: UserDefaults
     private static let cursorKey = "sync.serverSeq"
     /// Bumped when the phone starts keeping more of what the server has; the next sync then
-    /// re-reads everything once (v2: place details, notes and subtypes from the memorapp import).
+    /// re-reads everything once (v2: place details, notes and subtypes from the memorapp import;
+    /// v3: notes become two-way, plus voice notes and drafts).
     private static let formatKey = "sync.format"
-    private static let format = 2
+    private static let format = 3
     private static let lastSyncedKey = "sync.lastSyncedAt"
     private static let pushBatchSize = 200
 
@@ -95,6 +96,11 @@ public final class SyncEngine {
         repeat {
             syncAgain = false
             do {
+                // After an upgrade, read everything first so records this phone only just started
+                // sending (notes) are known as-is and aren't sent straight back.
+                if defaults.integer(forKey: Self.formatKey) < Self.format {
+                    try await pull(transport: transport, context: context)
+                }
                 try await push(transport: transport, context: context)
                 try await pull(transport: transport, context: context)
                 lastSyncedAt = .now

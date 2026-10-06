@@ -7,7 +7,7 @@ import SwiftData
 // the app doesn't know about (e.g. a review written on the web) are left alone.
 
 /// Any JSON value. Records are built by hand so nil can be sent as an explicit `null`.
-public enum JSONValue: Codable, Equatable, Sendable {
+public enum JSONValue: Codable, Hashable, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)
@@ -48,10 +48,10 @@ public typealias SyncRecord = [String: JSONValue]
 
 /// The collections this app syncs, in the order they must be applied (parents first).
 public enum SyncCollection: String, CaseIterable, Sendable {
-    case placeSubtypes, people, places, placeItems, visits, visitItems, ratings, notes
+    case placeSubtypes, people, places, placeItems, visits, visitItems, ratings, notes, voiceNotes, drafts
 
     /// Received but never sent: the phone doesn't edit these yet.
-    var isReadOnly: Bool { self == .placeSubtypes || self == .notes }
+    var isReadOnly: Bool { self == .placeSubtypes }
 }
 
 /// What was last sent to or received from the server for one record, so local edits can be
@@ -189,6 +189,57 @@ enum SyncEncoder {
             ]) { $1 }
     }
 
+    static func record(_ note: Note) -> SyncRecord {
+        base(id: note.id, createdAt: note.createdAt, modifiedAt: note.modifiedAt, deletedAt: note.deletedAt)
+            .merging([
+                "placeId": SyncValue.id(note.placeId),
+                "visitId": SyncValue.id(note.visitId),
+                "visitItemId": SyncValue.id(note.visitItemId),
+                "personId": SyncValue.id(note.personId),
+                "text": .string(note.text),
+                "origin": .string(note.originRaw),
+            ]) { $1 }
+    }
+
+    static func record(_ note: VoiceNote) -> SyncRecord {
+        base(id: note.id, createdAt: note.createdAt, modifiedAt: note.modifiedAt, deletedAt: note.deletedAt)
+            .merging([
+                "visitId": SyncValue.id(note.visitId),
+                "personId": SyncValue.id(note.personId),
+                "recordedAt": SyncValue.date(note.recordedAt),
+                "durationSec": .number(note.durationSec),
+                "transcript": .string(note.transcript),
+                "audioLocalPath": SyncValue.string(note.audioFileName),
+                "structuredAt": SyncValue.date(note.structuredAt),
+                "draftId": SyncValue.id(note.draftId),
+            ]) { $1 }
+    }
+
+    static func record(_ draft: Draft) -> SyncRecord {
+        // Inside an array, leave absent fields out (null only clears top-level/nested fields).
+        let changes: [JSONValue] = draft.changes.map { change in
+            var object: [String: JSONValue] = [
+                "id": SyncValue.id(change.id),
+                "kind": .string(change.kind),
+                "keep": .bool(change.keep),
+                "payload": .object(change.payload),
+            ]
+            if let evidence = change.evidence { object["evidence"] = .string(evidence) }
+            if let personId = change.personId { object["personId"] = SyncValue.id(personId) }
+            return .object(object)
+        }
+        return base(id: draft.id, createdAt: draft.createdAt, modifiedAt: draft.modifiedAt, deletedAt: draft.deletedAt)
+            .merging([
+                "visitId": SyncValue.id(draft.visitId),
+                "placeId": SyncValue.id(draft.placeId),
+                "sourceType": .string(draft.sourceTypeRaw),
+                "sourceId": SyncValue.id(draft.sourceId),
+                "status": .string(draft.statusRaw),
+                "changes": .array(changes),
+                "confirmedAt": SyncValue.date(draft.confirmedAt),
+            ]) { $1 }
+    }
+
     static func record(_ rating: Rating) -> SyncRecord {
         base(id: rating.id, createdAt: rating.createdAt, modifiedAt: rating.modifiedAt, deletedAt: rating.deletedAt)
             .merging([
@@ -220,6 +271,8 @@ struct LocalRecords {
     var ratings: [UUID: Rating] = [:]
     var placeSubtypes: [UUID: PlaceSubtype] = [:]
     var notes: [UUID: Note] = [:]
+    var voiceNotes: [UUID: VoiceNote] = [:]
+    var drafts: [UUID: Draft] = [:]
 
     init(context: ModelContext) throws {
         func byId<T: PersistentModel>(_ type: T.Type, _ id: (T) -> UUID) throws -> [UUID: T] {
@@ -233,6 +286,8 @@ struct LocalRecords {
         ratings = try byId(Rating.self) { $0.id }
         placeSubtypes = try byId(PlaceSubtype.self) { $0.id }
         notes = try byId(Note.self) { $0.id }
+        voiceNotes = try byId(VoiceNote.self) { $0.id }
+        drafts = try byId(Draft.self) { $0.id }
     }
 
     /// Each local record as it would be sent (records whose parent is missing are skipped),
@@ -245,7 +300,10 @@ struct LocalRecords {
         case .visits: visits.values.compactMap { v in SyncEncoder.record(v).map { (v.id, $0, v.modifiedAt, { v.modifiedAt = $0 }) } }
         case .visitItems: visitItems.values.compactMap { i in SyncEncoder.record(i).map { (i.id, $0, i.modifiedAt, { i.modifiedAt = $0 }) } }
         case .ratings: ratings.values.map { r in (r.id, SyncEncoder.record(r), r.modifiedAt, { r.modifiedAt = $0 }) }
-        case .placeSubtypes, .notes: []
+        case .notes: notes.values.map { n in (n.id, SyncEncoder.record(n), n.modifiedAt, { n.modifiedAt = $0 }) }
+        case .voiceNotes: voiceNotes.values.map { v in (v.id, SyncEncoder.record(v), v.modifiedAt, { v.modifiedAt = $0 }) }
+        case .drafts: drafts.values.map { d in (d.id, SyncEncoder.record(d), d.modifiedAt, { d.modifiedAt = $0 }) }
+        case .placeSubtypes: []
         }
     }
 
@@ -258,7 +316,10 @@ struct LocalRecords {
         case .visits: visits[id].flatMap(SyncEncoder.record)
         case .visitItems: visitItems[id].flatMap(SyncEncoder.record)
         case .ratings: ratings[id].map(SyncEncoder.record)
-        case .placeSubtypes, .notes: nil
+        case .notes: notes[id].map(SyncEncoder.record)
+        case .voiceNotes: voiceNotes[id].map(SyncEncoder.record)
+        case .drafts: drafts[id].map(SyncEncoder.record)
+        case .placeSubtypes: nil
         }
     }
 
@@ -272,6 +333,8 @@ struct LocalRecords {
         case .ratings: ratings[id]?.modifiedAt
         case .placeSubtypes: placeSubtypes[id]?.modifiedAt
         case .notes: notes[id]?.modifiedAt
+        case .voiceNotes: voiceNotes[id]?.modifiedAt
+        case .drafts: drafts[id]?.modifiedAt
         }
     }
 }
@@ -466,6 +529,57 @@ enum SyncDecoder {
             note.createdAt = createdAt
             note.modifiedAt = modifiedAt
             note.deletedAt = deletedAt
+
+        case .voiceNotes:
+            guard let visitId = SyncValue.parseId(record["visitId"]),
+                  let personId = SyncValue.parseId(record["personId"]) else { return false }
+            let recordedAt = SyncValue.parseDate(record["recordedAt"]) ?? createdAt
+            let voice = local.voiceNotes[id] ?? {
+                let new = VoiceNote(id: id, visitId: visitId, personId: personId, recordedAt: recordedAt,
+                                    durationSec: 0, transcript: "", audioFileName: nil)
+                context.insert(new)
+                local.voiceNotes[id] = new
+                return new
+            }()
+            voice.visitId = visitId
+            voice.personId = personId
+            voice.recordedAt = recordedAt
+            voice.durationSec = record["durationSec"]?.number ?? 0
+            voice.transcript = string("transcript") ?? ""
+            voice.audioFileName = string("audioLocalPath")
+            voice.structuredAt = SyncValue.parseDate(record["structuredAt"])
+            voice.draftId = SyncValue.parseId(record["draftId"])
+            voice.createdAt = createdAt
+            voice.modifiedAt = modifiedAt
+            voice.deletedAt = deletedAt
+
+        case .drafts:
+            guard let visitId = SyncValue.parseId(record["visitId"]),
+                  let placeId = SyncValue.parseId(record["placeId"]),
+                  let sourceId = SyncValue.parseId(record["sourceId"]) else { return false }
+            let changes: [ProposedChange] = (record["changes"]?.array ?? []).compactMap { value in
+                guard let object = value.object, let changeId = SyncValue.parseId(object["id"]),
+                      let kind = object["kind"]?.string else { return nil }
+                return ProposedChange(id: changeId, kind: kind, keep: object["keep"]?.bool ?? true,
+                                      evidence: object["evidence"]?.string, personId: SyncValue.parseId(object["personId"]),
+                                      payload: object["payload"]?.object ?? [:])
+            }
+            let draft = local.drafts[id] ?? {
+                let new = Draft(id: id, visitId: visitId, placeId: placeId, sourceId: sourceId, changes: [], now: createdAt)
+                context.insert(new)
+                local.drafts[id] = new
+                return new
+            }()
+            draft.visitId = visitId
+            draft.placeId = placeId
+            draft.sourceTypeRaw = string("sourceType") ?? draft.sourceTypeRaw
+            draft.sourceId = sourceId
+            draft.statusRaw = string("status") ?? draft.statusRaw
+            draft.changes = changes
+            draft.confirmedAt = SyncValue.parseDate(record["confirmedAt"])
+            draft.createdAt = createdAt
+            draft.modifiedAt = modifiedAt
+            draft.deletedAt = deletedAt
         }
         return true
     }

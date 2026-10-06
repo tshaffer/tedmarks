@@ -1,10 +1,14 @@
+import SwiftData
 import SwiftUI
+import TedmarksKit
 
 enum AppTab: Hashable { case visit, inbox, places, settings }
 
 /// Tab bar from the Figma designs (10 · Inbox): Visit · Inbox · Places · Settings.
 struct RootTabView: View {
     @State private var selectedTab: AppTab = .visit
+    @Query(filter: #Predicate<Draft> { $0.statusRaw == "pending" && $0.deletedAt == nil }) private var pendingDrafts: [Draft]
+    @Query(filter: #Predicate<VoiceNote> { $0.draftId == nil && $0.deletedAt == nil }) private var unprocessedNotes: [VoiceNote]
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -12,15 +16,17 @@ struct RootTabView: View {
                 VisitHomeView()
             }
             Tab("Inbox", systemImage: "tray", value: .inbox) { InboxView() }
+                .badge(pendingDrafts.count + unprocessedNotes.count)
             Tab("Places", systemImage: "map", value: .places) { PlacesView() }
             Tab("Settings", systemImage: "gearshape", value: .settings) { SettingsView() }
         }
         #if DEBUG
-        // Dev/testing: `simctl launch … -openSettings` / `-openPlaces` / `-openPlace <name>` skip taps.
+        // Dev/testing: `simctl launch … -openSettings` / `-openPlaces` / `-openPlace <name>` / `-openInbox` skip taps.
         .onAppear {
             let arguments = ProcessInfo.processInfo.arguments
             if arguments.contains("-openSettings") { selectedTab = .settings }
             if arguments.contains("-openPlaces") || arguments.contains("-openPlace") { selectedTab = .places }
+            if arguments.contains("-openInbox") { selectedTab = .inbox }
         }
         #endif
         // Deep links from the Lock Screen widget (01), Live Activity (03) and notifications (06).

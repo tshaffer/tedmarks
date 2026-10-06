@@ -131,6 +131,15 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         return try decode(MorePlaces.self, from: data)
     }
 
+    // MARK: - Voice notes
+
+    /// Claude's proposed changes for a voice-note transcript (never applied without confirmation).
+    public func structureVoice(_ request: VoiceStructureRequest) async throws -> [VoiceChange] {
+        struct Response: Decodable { var changes: [VoiceChange] }
+        let data = try await send(path: "ai/voice", method: "POST", query: [], body: try JSONEncoder().encode(request))
+        return try decode(Response.self, from: data).changes
+    }
+
     // MARK: - Sync
 
     public func syncPush(_ changes: [String: [SyncRecord]]) async throws -> SyncPushResult {
@@ -172,7 +181,7 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         if !query.isEmpty { components.queryItems = query }
         var request = URLRequest(url: components.url!)
         request.httpMethod = method
-        request.timeoutInterval = 20
+        request.timeoutInterval = path.hasPrefix("ai/") ? 60 : 20
         if let body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

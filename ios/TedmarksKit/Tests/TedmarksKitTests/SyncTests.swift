@@ -192,3 +192,28 @@ private let doppio = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", a
     await phone.engine.sync()
     #expect(await server.pushedCount == 0)
 }
+
+@MainActor
+@Test func voiceNotesDraftsAndNotesSyncToAnotherPhone() async throws {
+    let server = FakeServer()
+    let ted = try Phone(server: server)
+    let visit = try VisitStarter.startVisit(at: doppio, participantIds: [Household.tedId], in: ted.context)
+    let voice = try VoiceDrafts.saveNote(transcript: "Burrata was amazing", durationSec: 4, audioFileName: "a.m4a", visit: visit, in: ted.context)
+    let draft = try VoiceDrafts.makeDraft(from: [
+        VoiceChange(kind: "itemRating", dishName: "Burrata", value: "loved", evidence: "Burrata was amazing"),
+        VoiceChange(kind: "visitNote", text: "Great patio"),
+    ], for: voice, visit: visit, in: ted.context)
+    try VoiceDrafts.confirm(draft, in: ted.context)
+    await ted.engine.sync()
+    #expect(ted.engine.lastError == nil)
+    #expect(ted.engine.rejected.isEmpty)
+
+    let other = try Phone(server: server)
+    await other.engine.sync()
+    let copy = try #require(try other.context.fetch(FetchDescriptor<Draft>()).first)
+    #expect(copy.status == .confirmed)
+    #expect(copy.changes.map(\.kind) == ["itemRating", "visitNote"])
+    #expect(copy.changes.first?.evidence == "Burrata was amazing")
+    #expect(try other.context.fetch(FetchDescriptor<VoiceNote>()).first?.transcript == "Burrata was amazing")
+    #expect(try other.context.fetch(FetchDescriptor<Note>()).map(\.text) == ["Great patio"])
+}

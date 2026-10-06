@@ -23,6 +23,8 @@ struct VisitHomeView: View {
     @State private var sheet: VisitSheet?
     @State private var path: [Route] = []
     @State private var discardError: String?
+    @State private var voice = VoiceCapture()
+    @State private var reviewingDraft: Draft?
 
     enum Route: Hashable { case pastVisits }
     #if DEBUG
@@ -75,6 +77,10 @@ struct VisitHomeView: View {
                 let arguments = ProcessInfo.processInfo.arguments
                 if arguments.contains("-openPastVisits") { path = [.pastVisits] }
                 guard let visit = activeVisits.first else { return }
+                // `-voiceTranscript "…"` runs a voice note through Claude without recording.
+                if let transcript = UserDefaults.standard.string(forKey: "voiceTranscript") {
+                    await voice.save(transcript: transcript, durationSec: 5, audioFileName: nil, visit: visit, in: context)
+                }
                 if arguments.contains("-openWrapUp") { sheet = .wrapUp(visit) }
                 if arguments.contains("-openAddToOrder") { sheet = .addToOrder(visit) }
                 if arguments.contains("-previewLiveActivity") { debugPreviewVisit = visit }
@@ -91,6 +97,20 @@ struct VisitHomeView: View {
                 DebugLiveActivityPreview(visit: visit, people: people)
             }
             #endif
+            .overlay(alignment: .bottom) {
+                if voice.recorder.state != .idle || voice.isProcessing {
+                    VoiceStatusBanner(transcript: voice.recorder.transcript, isRecording: voice.recorder.state == .recording)
+                        .padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .sheet(item: $reviewingDraft) { DraftReviewSheet(draft: $0) }
+            .onChange(of: voice.draftToReview) { _, draft in
+                if let draft { reviewingDraft = draft; voice.draftToReview = nil }
+            }
+            .alert("Voice note", isPresented: .constant(voice.message != nil)) {
+                Button("OK") { voice.message = nil }
+            } message: { Text(voice.message ?? "") }
             .alert("Couldn't discard the visit", isPresented: .constant(discardError != nil)) {
                 Button("OK") { discardError = nil }
             } message: { Text(discardError ?? "") }
@@ -173,6 +193,12 @@ struct VisitHomeView: View {
             .controlSize(.large)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
+            HoldToTalkButton(
+                isRecording: voice.recorder.state == .recording,
+                isBusy: voice.isProcessing || voice.recorder.state == .finishing,
+                onPress: { Task { await voice.begin() } },
+                onRelease: { Task { await voice.end(visit: visit, in: context) } }
+            )
             Button {
                 sheet = .wrapUp(visit)
             } label: {

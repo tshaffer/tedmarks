@@ -12,12 +12,6 @@ public enum VisitStarter {
         in context: ModelContext,
         now: Date = .now
     ) throws -> Visit {
-        for active in try activeVisits(in: context) {
-            active.status = .ended
-            active.endedAt = now
-            active.modifiedAt = now
-        }
-
         let googleId = picked.googlePlaceId
         let existing = try context.fetch(
             FetchDescriptor<Place>(predicate: #Predicate { $0.googlePlaceId == googleId && $0.deletedAt == nil })
@@ -35,6 +29,23 @@ public enum VisitStarter {
         place.googlePrimaryType = picked.primaryType ?? place.googlePrimaryType
         place.googlePrimaryTypeLabel = picked.primaryTypeLabel ?? place.googlePrimaryTypeLabel
         place.googleFetchedAt = now
+        return try startVisit(at: place, participantIds: participantIds, in: context, now: now)
+    }
+
+    /// Starts a visit at a place already saved (e.g. "Start a visit here" on its Place page).
+    @MainActor
+    @discardableResult
+    public static func startVisit(
+        at place: Place,
+        participantIds: [UUID],
+        in context: ModelContext,
+        now: Date = .now
+    ) throws -> Visit {
+        for active in try activeVisits(in: context) {
+            active.status = .ended
+            active.endedAt = now
+            active.modifiedAt = now
+        }
 
         let isFirstVisit = !place.visits.contains { $0.deletedAt == nil }
         place.status = .beenThere

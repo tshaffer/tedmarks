@@ -205,17 +205,20 @@ export function mapMemorapp(
       const visitKey = idText(visit._id ?? `${idText(place._id)}-${visitIndex}`);
       const visitId = importId('visit', visitKey);
       const date = visit.dateOfVisit!;
+      // memorapp stored the date entered as midnight UTC, which is the evening before in the
+      // US. Midday UTC shows the same calendar date from Hawaii to New Zealand.
+      const midday = new Date(date.getTime() + 12 * 3600 * 1000).toISOString();
       visitIds.push({ id: visitId, date });
       add('visits', {
         ...meta(visitId, date),
         placeId,
-        startedAt: date.toISOString(),
-        endedAt: date.toISOString(),
+        startedAt: midday,
+        endedAt: midday,
         status: 'ended',
         origin: 'imported',
         participantIds: [TED, LORI],
         isFirstVisit: visitIndex === 0 && !prior,
-        wrapUpCompletedAt: date.toISOString(),
+        wrapUpCompletedAt: midday,
         tags: [],
       });
 

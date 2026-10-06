@@ -10,6 +10,8 @@ final class AppRouter {
 
     enum Request: Equatable {
         case startVisit
+        /// Show the Visit tab (e.g. after starting a visit from a Place page).
+        case currentVisit
         case rateDish(visitId: UUID, itemId: UUID?)
         case wrapUp(visitId: UUID)
     }

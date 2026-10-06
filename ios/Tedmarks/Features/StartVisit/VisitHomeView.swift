@@ -193,7 +193,7 @@ struct VisitHomeView: View {
         switch request {
         case .rateDish(let v, let i): (visitId, itemId, wrapUp) = (v, i, false)
         case .wrapUp(let v): (visitId, itemId, wrapUp) = (v, nil, true)
-        case .startVisit, nil: return
+        case .startVisit, .currentVisit, nil: return
         }
         AppRouter.shared.request = nil
         guard let visit = (activeVisits + pastVisits).first(where: { $0.id == visitId }) else { return }

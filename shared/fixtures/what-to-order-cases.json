@@ -1,10 +1,157 @@
 {
-  "description": "Cases for the Place page 'What to order' grouping. Shared by TypeScript and Swift tests.",
+  "description": "Cases for the Place page 'What to order' grouping. Shared by TypeScript and Swift tests. displays are newest visit first; the most recent rating decides.",
   "cases": [
-    { "name": "loved on both visits", "input": { "placeItemId": "burrata", "displays": [{ "kind": "joint", "value": "loved" }, { "kind": "joint", "value": "loved" }] }, "expected": { "group": "orderAgain", "notOnLatestMenu": false, "ratedVisitCount": 2 } },
-    { "name": "split on one visit", "input": { "placeItemId": "arancini", "displays": [{ "kind": "split", "byPerson": [{ "personId": "ted", "value": "skip" }, { "personId": "lori", "value": "loved" }] }] }, "expected": { "group": "disagree", "notOnLatestMenu": false, "ratedVisitCount": 1 } },
-    { "name": "skipped once", "input": { "placeItemId": "caesar", "displays": [{ "kind": "joint", "value": "good" }, { "kind": "joint", "value": "skip" }] }, "expected": { "group": "skip", "notOnLatestMenu": false, "ratedVisitCount": 2 } },
-    { "name": "good but no longer on the menu", "input": { "placeItemId": "funghi", "onLatestMenu": false, "displays": [{ "kind": "joint", "value": "good" }] }, "expected": { "group": "orderAgain", "notOnLatestMenu": true, "ratedVisitCount": 1 } },
-    { "name": "ordered but never rated", "input": { "placeItemId": "tiramisu", "displays": [{ "kind": "none" }] }, "expected": { "group": "unrated", "notOnLatestMenu": false, "ratedVisitCount": 0 } }
+    {
+      "name": "loved on both visits",
+      "input": {
+        "placeItemId": "burrata",
+        "displays": [
+          {
+            "kind": "joint",
+            "value": "loved"
+          },
+          {
+            "kind": "joint",
+            "value": "loved"
+          }
+        ]
+      },
+      "expected": {
+        "group": "orderAgain",
+        "notOnLatestMenu": false,
+        "ratedVisitCount": 2
+      }
+    },
+    {
+      "name": "we disagreed last time",
+      "input": {
+        "placeItemId": "arancini",
+        "displays": [
+          {
+            "kind": "split",
+            "byPerson": [
+              {
+                "personId": "ted",
+                "value": "skip"
+              },
+              {
+                "personId": "lori",
+                "value": "loved"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "group": "disagree",
+        "notOnLatestMenu": false,
+        "ratedVisitCount": 1
+      }
+    },
+    {
+      "name": "skipped last time, good before",
+      "input": {
+        "placeItemId": "caesar",
+        "displays": [
+          {
+            "kind": "joint",
+            "value": "skip"
+          },
+          {
+            "kind": "joint",
+            "value": "good"
+          }
+        ]
+      },
+      "expected": {
+        "group": "skip",
+        "notOnLatestMenu": false,
+        "ratedVisitCount": 2
+      }
+    },
+    {
+      "name": "loved last time after a bad first try",
+      "input": {
+        "placeItemId": "grandma-pie",
+        "displays": [
+          {
+            "kind": "joint",
+            "value": "loved"
+          },
+          {
+            "kind": "joint",
+            "value": "skip"
+          }
+        ]
+      },
+      "expected": {
+        "group": "orderAgain",
+        "notOnLatestMenu": false,
+        "ratedVisitCount": 2
+      }
+    },
+    {
+      "name": "latest visit unrated: the last rating still decides",
+      "input": {
+        "placeItemId": "fries",
+        "displays": [
+          {
+            "kind": "none"
+          },
+          {
+            "kind": "split",
+            "byPerson": [
+              {
+                "personId": "ted",
+                "value": "skip"
+              },
+              {
+                "personId": "lori",
+                "value": "loved"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "group": "disagree",
+        "notOnLatestMenu": false,
+        "ratedVisitCount": 1
+      }
+    },
+    {
+      "name": "good but no longer on the menu",
+      "input": {
+        "placeItemId": "funghi",
+        "onLatestMenu": false,
+        "displays": [
+          {
+            "kind": "joint",
+            "value": "good"
+          }
+        ]
+      },
+      "expected": {
+        "group": "orderAgain",
+        "notOnLatestMenu": true,
+        "ratedVisitCount": 1
+      }
+    },
+    {
+      "name": "ordered but never rated",
+      "input": {
+        "placeItemId": "tiramisu",
+        "displays": [
+          {
+            "kind": "none"
+          }
+        ]
+      },
+      "expected": {
+        "group": "unrated",
+        "notOnLatestMenu": false,
+        "ratedVisitCount": 0
+      }
+    }
   ]
 }

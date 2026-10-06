@@ -409,7 +409,7 @@ tags) with `origin: 'draft'`.
 | **Inbox** | Drafts with `status = pending` · photo-based visit suggestions (on device) · ended Visits with no verdict |
 | **Place "been there" verdict** | Latest Visit's verdict (display rule §8) |
 | **Visit count / status chip** | Visits per place |
-| **What to order** (Place page) | Per PlaceItem across visits: *Order again* = every rating 😍/👍 · *We disagree* = any split · *Skip* = any 👎 · greyed if `onLatestMenu = false` |
+| **What to order** (Place page) | Per PlaceItem, the most recent rating decides: *Order again* = 😍/👍 · *We disagree* = split · *Skip* = 👎 · greyed if `onLatestMenu = false` |
 | **"2 of 4 rated"** | VisitItems vs. Ratings for the visit |
 | **Repeat visit "Ordered before"** | VisitItems from earlier visits at the place, with their ratings |
 

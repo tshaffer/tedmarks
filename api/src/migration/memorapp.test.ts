@@ -30,6 +30,7 @@ test('maps a visited restaurant: visits, deduped dishes, ratings, notes, verdict
   assert.equal(changes.places?.[0]?.status, 'beenThere');
   assert.equal(changes.places?.[0]?.refinedRating, 9);
   assert.equal(changes.visits?.length, 2);
+  assert.equal(changes.visits?.[0]?.startedAt, '2025-06-03T12:00:00.000Z', 'midday UTC keeps the entered date in US time zones');
   assert.equal(changes.placeItems?.length, 1, 'same dish on two visits is one place item');
   assert.equal(changes.visitItems?.length, 2, 'blank dish names are dropped');
   const verdict = changes.ratings?.find((r) => r.subjectType === 'visit');

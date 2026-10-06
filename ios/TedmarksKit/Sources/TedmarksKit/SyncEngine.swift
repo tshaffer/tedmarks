@@ -54,6 +54,10 @@ public final class SyncEngine {
     private var syncAgain = false
     private let defaults: UserDefaults
     private static let cursorKey = "sync.serverSeq"
+    /// Bumped when the phone starts keeping more of what the server has; the next sync then
+    /// re-reads everything once (v2: place details, notes and subtypes from the memorapp import).
+    private static let formatKey = "sync.format"
+    private static let format = 2
     private static let lastSyncedKey = "sync.lastSyncedAt"
     private static let pushBatchSize = 200
 
@@ -161,7 +165,8 @@ public final class SyncEngine {
     // MARK: - Pull
 
     private func pull(transport: SyncTransport, context: ModelContext) async throws {
-        var since = defaults.integer(forKey: Self.cursorKey)
+        let upgrading = defaults.integer(forKey: Self.formatKey) < Self.format
+        var since = upgrading ? 0 : defaults.integer(forKey: Self.cursorKey)
         // Collect every page first, so a record never arrives before the place or visit it belongs to.
         var changes: [String: [SyncRecord]] = [:]
         while true {
@@ -175,6 +180,7 @@ public final class SyncEngine {
             try context.save()
         }
         defaults.set(since, forKey: Self.cursorKey)
+        if upgrading { defaults.set(Self.format, forKey: Self.formatKey) }
     }
 
     /// Applies server records, oldest first, unless this phone has a newer unsynced change.

@@ -8,7 +8,11 @@ enum LocationError: Error {
 /// One-shot "where am I?" using When-In-Use authorization (no background location — decision).
 enum LocationService {
     static func currentLocation(timeout: Duration = .seconds(15)) async throws -> CLLocation {
-        try await withThrowingTaskGroup(of: CLLocation.self) { group in
+        #if DEBUG
+        // Dev/testing: `-noLocation` skips the permission prompt (it blocks scripted simulator runs).
+        if ProcessInfo.processInfo.arguments.contains("-noLocation") { throw LocationError.unavailable }
+        #endif
+        return try await withThrowingTaskGroup(of: CLLocation.self) { group in
             group.addTask {
                 let session = CLServiceSession(authorization: .whenInUse)
                 defer { session.invalidate() }

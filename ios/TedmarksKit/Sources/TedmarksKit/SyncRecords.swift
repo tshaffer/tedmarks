@@ -48,7 +48,10 @@ public typealias SyncRecord = [String: JSONValue]
 
 /// The collections this app syncs, in the order they must be applied (parents first).
 public enum SyncCollection: String, CaseIterable, Sendable {
-    case people, places, placeItems, visits, visitItems, ratings
+    case placeSubtypes, people, places, placeItems, visits, visitItems, ratings, notes
+
+    /// Received but never sent: the phone doesn't edit these yet.
+    var isReadOnly: Bool { self == .placeSubtypes || self == .notes }
 }
 
 /// What was last sent to or received from the server for one record, so local edits can be
@@ -215,6 +218,8 @@ struct LocalRecords {
     var visits: [UUID: Visit] = [:]
     var visitItems: [UUID: VisitItem] = [:]
     var ratings: [UUID: Rating] = [:]
+    var placeSubtypes: [UUID: PlaceSubtype] = [:]
+    var notes: [UUID: Note] = [:]
 
     init(context: ModelContext) throws {
         func byId<T: PersistentModel>(_ type: T.Type, _ id: (T) -> UUID) throws -> [UUID: T] {
@@ -226,6 +231,8 @@ struct LocalRecords {
         visits = try byId(Visit.self) { $0.id }
         visitItems = try byId(VisitItem.self) { $0.id }
         ratings = try byId(Rating.self) { $0.id }
+        placeSubtypes = try byId(PlaceSubtype.self) { $0.id }
+        notes = try byId(Note.self) { $0.id }
     }
 
     /// Each local record as it would be sent (records whose parent is missing are skipped),
@@ -238,6 +245,7 @@ struct LocalRecords {
         case .visits: visits.values.compactMap { v in SyncEncoder.record(v).map { (v.id, $0, v.modifiedAt, { v.modifiedAt = $0 }) } }
         case .visitItems: visitItems.values.compactMap { i in SyncEncoder.record(i).map { (i.id, $0, i.modifiedAt, { i.modifiedAt = $0 }) } }
         case .ratings: ratings.values.map { r in (r.id, SyncEncoder.record(r), r.modifiedAt, { r.modifiedAt = $0 }) }
+        case .placeSubtypes, .notes: []
         }
     }
 
@@ -250,6 +258,7 @@ struct LocalRecords {
         case .visits: visits[id].flatMap(SyncEncoder.record)
         case .visitItems: visitItems[id].flatMap(SyncEncoder.record)
         case .ratings: ratings[id].map(SyncEncoder.record)
+        case .placeSubtypes, .notes: nil
         }
     }
 
@@ -261,6 +270,8 @@ struct LocalRecords {
         case .visits: visits[id]?.modifiedAt
         case .visitItems: visitItems[id]?.modifiedAt
         case .ratings: ratings[id]?.modifiedAt
+        case .placeSubtypes: placeSubtypes[id]?.modifiedAt
+        case .notes: notes[id]?.modifiedAt
         }
     }
 }
@@ -316,6 +327,18 @@ enum SyncDecoder {
             place.googlePrimaryType = google?["primaryType"]?.string
             place.googlePrimaryTypeLabel = google?["primaryTypeLabel"]?.string
             place.googleFetchedAt = SyncValue.parseDate(google?["fetchedAt"])
+            place.googleWebsite = google?["website"]?.string
+            place.googlePhone = google?["phone"]?.string
+            place.googleRating = google?["rating"]?.number
+            place.googleRatingsCount = google?["ratingsCount"]?.number.map { Int($0) }
+            place.googlePriceLevel = google?["priceLevel"]?.number.map { Int($0) }
+            place.googleWeekdayText = google?["openingHours"]?.object?["weekdayText"]?.array?.compactMap(\.string)
+            place.subtypeId = SyncValue.parseId(record["subtypeId"])
+            place.review = string("review")
+            place.refinedRating = record["refinedRating"]?.number.map { Int($0) }
+            let interest = record["interest"]?.object
+            place.interestLevelRaw = interest?["level"]?.string
+            place.interestWhy = interest?["why"]?.string
             place.createdAt = createdAt
             place.modifiedAt = modifiedAt
             place.deletedAt = deletedAt
@@ -411,6 +434,38 @@ enum SyncDecoder {
             rating.createdAt = createdAt
             rating.modifiedAt = modifiedAt
             rating.deletedAt = deletedAt
+
+        case .placeSubtypes:
+            let subtype = local.placeSubtypes[id] ?? {
+                let new = PlaceSubtype(id: id, name: string("name") ?? "Restaurant", sortOrder: 0, now: createdAt)
+                context.insert(new)
+                local.placeSubtypes[id] = new
+                return new
+            }()
+            subtype.kindRaw = string("kind") ?? subtype.kindRaw
+            subtype.name = string("name") ?? subtype.name
+            subtype.sortOrder = Int(record["sortOrder"]?.number ?? 0)
+            subtype.createdAt = createdAt
+            subtype.modifiedAt = modifiedAt
+            subtype.deletedAt = deletedAt
+
+        case .notes:
+            guard let placeId = SyncValue.parseId(record["placeId"]), let text = string("text") else { return false }
+            let note = local.notes[id] ?? {
+                let new = Note(id: id, placeId: placeId, text: text, now: createdAt)
+                context.insert(new)
+                local.notes[id] = new
+                return new
+            }()
+            note.placeId = placeId
+            note.visitId = SyncValue.parseId(record["visitId"])
+            note.visitItemId = SyncValue.parseId(record["visitItemId"])
+            note.personId = SyncValue.parseId(record["personId"])
+            note.text = text
+            note.originRaw = string("origin") ?? note.originRaw
+            note.createdAt = createdAt
+            note.modifiedAt = modifiedAt
+            note.deletedAt = deletedAt
         }
         return true
     }

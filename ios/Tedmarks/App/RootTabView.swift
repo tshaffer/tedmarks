@@ -16,9 +16,11 @@ struct RootTabView: View {
             Tab("Settings", systemImage: "gearshape", value: .settings) { SettingsView() }
         }
         #if DEBUG
-        // Dev/testing: `simctl launch … -openSettings` skips a tap.
+        // Dev/testing: `simctl launch … -openSettings` / `-openPlaces` / `-openPlace <name>` skip taps.
         .onAppear {
-            if ProcessInfo.processInfo.arguments.contains("-openSettings") { selectedTab = .settings }
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("-openSettings") { selectedTab = .settings }
+            if arguments.contains("-openPlaces") || arguments.contains("-openPlace") { selectedTab = .places }
         }
         #endif
         // Deep links from the Lock Screen widget (01), Live Activity (03) and notifications (06).
@@ -27,7 +29,7 @@ struct RootTabView: View {
             guard let request else { return }
             selectedTab = .visit
             // The Visit tab is the start screen when no visit is in progress, otherwise the current visit.
-            if request == .startVisit { AppRouter.shared.request = nil }
+            if request == .startVisit || request == .currentVisit { AppRouter.shared.request = nil }
             // rate-dish / wrap-up are opened by VisitHomeView.
         }
     }

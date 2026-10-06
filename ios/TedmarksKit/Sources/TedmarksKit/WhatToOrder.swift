@@ -12,25 +12,22 @@ public struct WhatToOrderResult: Hashable, Sendable {
 }
 
 /// Place page "What to order". Mirrors shared/src/rules/whatToOrder.ts.
-/// - disagree: any visit's rating is split
-/// - skip: otherwise, any joint 👎
-/// - orderAgain: otherwise, at least one rating and all 😍/👍
-/// - unrated: no ratings
+/// The most recent rating decides (`displays` are newest visit first):
+/// - disagree: it's split
+/// - skip: it's a joint 👎
+/// - orderAgain: it's a joint 😍/👍
+/// - unrated: never rated
 public func whatToOrder(
     placeItemId: String,
     onLatestMenu: Bool?,
     displays: [RatingDisplay<ItemRatingValue>]
 ) -> WhatToOrderResult {
     let rated = displays.filter { $0 != .none }
-    let group: WhatToOrderGroup
-    if rated.contains(where: { if case .split = $0 { true } else { false } }) {
-        group = .disagree
-    } else if rated.contains(.joint(.skip)) {
-        group = .skip
-    } else if !rated.isEmpty {
-        group = .orderAgain
-    } else {
-        group = .unrated
+    let group: WhatToOrderGroup = switch rated.first {
+    case nil, .none?: .unrated
+    case .split?: .disagree
+    case .joint(.skip)?: .skip
+    case .joint?: .orderAgain
     }
     return WhatToOrderResult(
         placeItemId: placeItemId,

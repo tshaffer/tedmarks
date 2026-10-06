@@ -149,9 +149,16 @@ public enum DishCapture {
     // MARK: - Private
 
     private static func display<V: RawRepresentable & Hashable & Sendable>(
-        subjectId: UUID, household: [UUID], in context: ModelContext, as: V.Type
+        subjectId: UUID, household: [UUID], in context: ModelContext, as type: V.Type
     ) throws -> RatingDisplay<V> where V.RawValue == String {
-        let inputs: [RatingInput<V>] = try ratings(for: subjectId, in: context).compactMap { rating in
+        display(try ratings(for: subjectId, in: context), household: household, as: type)
+    }
+
+    /// "Joint unless we disagree" over already-fetched live ratings for one subject.
+    public static func display<V: RawRepresentable & Hashable & Sendable>(
+        _ ratings: [Rating], household: [UUID], as: V.Type
+    ) -> RatingDisplay<V> where V.RawValue == String {
+        let inputs: [RatingInput<V>] = ratings.filter { $0.deletedAt == nil }.compactMap { rating in
             guard let value = V(rawValue: rating.valueRaw) else { return nil }
             return RatingInput(scope: rating.scope, personId: rating.personId?.uuidString, value: value)
         }

@@ -158,3 +158,37 @@ private let doppio = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", a
     #expect(rating.personId == Household.tedId)
     #expect(rating.enteredByPersonId == Household.tedId)
 }
+
+@MainActor
+@Test func importedDetailsAndNotesArriveButAreNeverSentBack() async throws {
+    let server = FakeServer()
+    let placeId = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e"
+    let stamp = "2025-06-03T00:00:00.000Z"
+    let meta: SyncRecord = ["createdAt": .string(stamp), "modifiedAt": .string(stamp)]
+    _ = try await server.syncPush([
+        "places": [meta.merging([
+            "id": .string(placeId), "kind": .string("restaurant"), "status": .string("beenThere"), "name": .string("State of Mind"),
+            "location": .object(["type": .string("Point"), "coordinates": .array([.number(-122.11), .number(37.38)])]),
+            "tags": .array([]), "review": .string("Grandma Pie is my favorite."), "refinedRating": .number(9),
+            "interest": .object(["level": .string("reallyWantToGo"), "why": .string("Pizza")]),
+            "google": .object(["placeId": .string("g1"), "name": .string("State of Mind"), "website": .string("https://example.com"),
+                               "openingHours": .object(["weekdayText": .array([.string("Monday: 11 AM–9 PM")])])]),
+        ]) { $1 }],
+        "notes": [meta.merging(["id": .string("3c4d5e6f-7a8b-4c9d-8e1f-2a3b4c5d6e7f"), "placeId": .string(placeId), "text": .string("salty!")]) { $1 }],
+    ])
+
+    let phone = try Phone(server: server)
+    await phone.engine.sync()
+    let place = try #require(try phone.context.fetch(FetchDescriptor<Place>()).first)
+    #expect(place.review == "Grandma Pie is my favorite.")
+    #expect(place.refinedRating == 9)
+    #expect(place.interestLevelRaw == "reallyWantToGo")
+    #expect(place.googleWebsite == "https://example.com")
+    #expect(place.googleWeekdayText == ["Monday: 11 AM–9 PM"])
+    #expect(try phone.context.fetch(FetchDescriptor<Note>()).map(\.text) == ["salty!"])
+
+    // Only Ted and Lori go up; the place and note came from the server unchanged.
+    await server.resetPushCount()
+    await phone.engine.sync()
+    #expect(await server.pushedCount == 0)
+}

@@ -70,15 +70,41 @@ public enum VisitStarter {
         VisitSideEffects.reconcile(in: context)
     }
 
-    /// Makes sure Ted and Lori exist as household people (first launch).
+    /// Makes sure Ted and Lori exist as household people, with the same ids on every install
+    /// (so a reinstall, a second phone and the server all agree on who they are).
+    /// Earlier builds gave them random ids; those are moved to the fixed ones, with every reference.
     @MainActor
     public static func ensureHousehold(in context: ModelContext) throws {
         let household = PersonKind.household.rawValue
-        let existing = try context.fetch(FetchDescriptor<Person>(predicate: #Predicate { $0.kindRaw == household }))
-        guard existing.isEmpty else { return }
-        context.insert(Person(displayName: "Ted", kind: .household))
-        context.insert(Person(displayName: "Lori", kind: .household))
-        try context.save()
+        var people = try context.fetch(FetchDescriptor<Person>(predicate: #Predicate { $0.kindRaw == household }))
+        for (name, fixedId) in [("Ted", Household.tedId), ("Lori", Household.loriId)] {
+            let fixed = people.first { $0.id == fixedId }
+            if let old = people.first(where: { $0.displayName == name && $0.id != fixedId && $0.deletedAt == nil }) {
+                try remapPerson(from: old.id, to: fixedId, in: context)
+                if fixed == nil {
+                    old.id = fixedId
+                } else {
+                    context.delete(old)   // created before sync existed, so never on the server
+                    people.removeAll { $0 === old }
+                }
+            } else if fixed == nil {
+                let person = Person(id: fixedId, displayName: name, kind: .household)
+                context.insert(person)
+                people.append(person)
+            }
+        }
+        if context.hasChanges { try context.save() }
+    }
+
+    @MainActor
+    private static func remapPerson(from old: UUID, to new: UUID, in context: ModelContext) throws {
+        for visit in try context.fetch(FetchDescriptor<Visit>()) where visit.participantIds.contains(old) {
+            visit.participantIds = visit.participantIds.map { $0 == old ? new : $0 }
+        }
+        for rating in try context.fetch(FetchDescriptor<Rating>()) {
+            if rating.personId == old { rating.personId = new }
+            if rating.enteredByPersonId == old { rating.enteredByPersonId = new }
+        }
     }
 
     /// The person who owns this phone (Ted, for now — sign-in will make this explicit).
@@ -86,6 +112,12 @@ public enum VisitStarter {
     public static func devicePerson(in context: ModelContext) throws -> Person? {
         let household = PersonKind.household.rawValue
         let people = try context.fetch(FetchDescriptor<Person>(predicate: #Predicate { $0.kindRaw == household }))
-        return people.first { $0.displayName == "Ted" } ?? people.min { $0.createdAt < $1.createdAt }
+        return people.first { $0.id == Household.tedId } ?? people.min { $0.createdAt < $1.createdAt }
     }
+}
+
+/// Ted and Lori's fixed person ids (the same on every install and on the server).
+public enum Household {
+    public static let tedId = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+    public static let loriId = UUID(uuidString: "00000000-0000-4000-8000-000000000002")!
 }

@@ -5,7 +5,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
-import { collectionNames, collectionSchemas, recordTypeNames } from '../src/index.js';
+import { SyncPullResponse, SyncPushRequest, SyncPushResponse, collectionNames, collectionSchemas, recordTypeNames } from '../src/index.js';
 
 const schemas: Record<string, unknown> = {};
 for (const name of collectionNames) {
@@ -38,15 +38,18 @@ const doc = {
     '/sync/pull': {
       get: {
         operationId: 'syncPull',
-        parameters: [{ name: 'since', in: 'query', required: true, schema: { type: 'integer', minimum: 0 } }],
+        parameters: [
+          { name: 'since', in: 'query', required: true, schema: { type: 'integer', minimum: 0 } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 1000 } },
+        ],
         responses: { '200': { description: 'Changes since serverSeq', content: { 'application/json': { schema: { $ref: '#/components/schemas/SyncPullResponse' } } } } },
       },
     },
     '/sync/push': {
       post: {
         operationId: 'syncPush',
-        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ChangeSet' } } } },
-        responses: { '200': { description: 'Accepted records with assigned serverSeq' } },
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/SyncPushRequest' } } } },
+        responses: { '200': { description: 'Accepted, newer, and rejected records', content: { 'application/json': { schema: { $ref: '#/components/schemas/SyncPushResponse' } } } } },
       },
     },
   },
@@ -54,11 +57,9 @@ const doc = {
     schemas: {
       ...schemas,
       ChangeSet: changeSet,
-      SyncPullResponse: {
-        type: 'object',
-        required: ['serverSeq', 'changes'],
-        properties: { serverSeq: { type: 'integer' }, changes: { $ref: '#/components/schemas/ChangeSet' } },
-      },
+      SyncPushRequest: z.toJSONSchema(SyncPushRequest, { target: 'openapi-3.0', io: 'input' }),
+      SyncPushResponse: z.toJSONSchema(SyncPushResponse, { target: 'openapi-3.0' }),
+      SyncPullResponse: z.toJSONSchema(SyncPullResponse, { target: 'openapi-3.0' }),
     },
   },
 };

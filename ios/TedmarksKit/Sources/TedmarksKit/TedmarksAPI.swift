@@ -57,7 +57,7 @@ public enum TedmarksAPIError: Error, Sendable {
 
 /// Minimal hand-written client for the endpoints the app uses so far.
 /// (To be replaced by the client generated from shared/openapi.)
-public struct TedmarksAPI: Sendable {
+public struct TedmarksAPI: Sendable, SyncTransport {
     public let baseURL: URL
     private let accessKey: String?
     private let session: URLSession
@@ -129,6 +129,21 @@ public struct TedmarksAPI: Sendable {
         let body = Body(lat: latitude, lng: longitude, radiusMeters: radiusMeters, excludeIds: shownIds, pageToken: pageToken)
         let data = try await send(path: "places/more", method: "POST", query: [], body: try JSONEncoder().encode(body))
         return try decode(MorePlaces.self, from: data)
+    }
+
+    // MARK: - Sync
+
+    public func syncPush(_ changes: [String: [SyncRecord]]) async throws -> SyncPushResult {
+        let body = try JSONEncoder().encode(["changes": changes])
+        return try decode(SyncPushResult.self, from: try await send(path: "sync/push", method: "POST", query: [], body: body))
+    }
+
+    public func syncPull(since: Int, limit: Int) async throws -> SyncPullResult {
+        let data = try await get(path: "sync/pull", query: [
+            URLQueryItem(name: "since", value: String(since)),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ])
+        return try decode(SyncPullResult.self, from: data)
     }
 
     private struct PlacesResponse: Decodable { var places: [NearbyPlace] }

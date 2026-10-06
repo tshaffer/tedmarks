@@ -24,6 +24,9 @@ export const GooglePlaceSnapshot = z.object({
   placeId: z.string().min(1),
   name: z.string(),
   formattedAddress: z.string().optional(),
+  /** Google's primary type, e.g. "pizza_restaurant", and its label, "Pizza Restaurant". */
+  primaryType: z.string().optional(),
+  primaryTypeLabel: z.string().optional(),
   addressComponents: z
     .array(z.object({ longName: z.string(), shortName: z.string(), types: z.array(z.string()) }))
     .optional(),
@@ -67,7 +70,8 @@ export const Place = SyncedRecord.extend({
   refinedRating: z.number().int().min(0).max(10).optional(),
   tags: z.array(z.string()),
   coverPhotoId: Id.optional(),
-  attributes: PlaceAttributes,
+  /** Kind-specific details; absent until set (the iPhone app doesn't record them yet). */
+  attributes: PlaceAttributes.optional(),
   latestMenuId: Id.optional(),
   neverAskHere: z.boolean().optional(),
 });

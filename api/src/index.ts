@@ -1,4 +1,5 @@
 import { loadConfig, missingSettings } from './config.js';
+import { ensureIndexes } from './db/indexes.js';
 import { closeMongo, connectMongo } from './db/mongo.js';
 import { PlacesClient } from './google/placesClient.js';
 import { createApp } from './server.js';
@@ -10,7 +11,11 @@ if (missing.length > 0) {
 }
 
 const db = config.mongoUri ? await connectMongo(config.mongoUri, config.mongoDbName) : undefined;
-if (db) console.log(`[tedmarks-api] Connected to MongoDB database "${config.mongoDbName}"`);
+if (db) {
+  console.log(`[tedmarks-api] Connected to MongoDB database "${config.mongoDbName}"`);
+  // Idempotent; keeps indexes current after deploys without a separate step.
+  await ensureIndexes(db);
+}
 
 const places = config.googlePlacesApiKey ? new PlacesClient(config.googlePlacesApiKey) : undefined;
 

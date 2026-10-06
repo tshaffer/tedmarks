@@ -11,6 +11,7 @@ import ActivityKit
 public enum VisitSideEffects {
 
     public static func reconcile(in context: ModelContext) {
+        SyncEngine.shared.scheduleSync()   // no-op where sync isn't configured (widget extension)
         #if os(iOS)
         let work = plannedWork(in: context)
         Task { await perform(work) }
@@ -20,6 +21,7 @@ public enum VisitSideEffects {
     /// Same as reconcile, but finishes before returning — for Live Activity buttons and
     /// notification actions, where iOS may suspend the app as soon as the action returns.
     public static func reconcileNow(in context: ModelContext) async {
+        SyncEngine.shared.scheduleSync()
         #if os(iOS)
         await perform(plannedWork(in: context))
         #endif

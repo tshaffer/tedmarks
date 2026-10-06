@@ -52,6 +52,8 @@ struct SettingsView: View {
                 }
                 #endif
 
+                SyncSection()
+
                 Section("Account") {
                     Text("Sign in with Apple — not set up yet")
                         .foregroundStyle(.secondary)

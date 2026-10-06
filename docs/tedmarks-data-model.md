@@ -148,7 +148,7 @@ interface Place extends SyncedRecord {
   tags: string[];                        // "patio", "noisy", "date night"
   coverPhotoId?: string;                 // → Photo; default = most recent visit photo
 
-  attributes: PlaceAttributes;           // kind-specific, see below
+  attributes?: PlaceAttributes;          // kind-specific, see below; absent until set
   latestMenuId?: string;                 // → Menu
   neverAskHere?: boolean;                // suppress prompts/suggestions here
 }
@@ -157,6 +157,8 @@ interface GooglePlaceSnapshot {
   placeId: string;                       // unique index
   name: string;
   formattedAddress?: string;
+  primaryType?: string;                  // "pizza_restaurant"
+  primaryTypeLabel?: string;             // "Pizza Restaurant"
   addressComponents?: { longName: string; shortName: string; types: string[] }[];
   website?: string;
   phone?: string;
@@ -455,14 +457,30 @@ interface UserSettings extends SyncedRecord {
 | Endpoint | Purpose |
 |---|---|
 | `POST /auth/apple` | Exchange Apple identity token for a session token (allowlist check) |
-| `GET /sync/pull?since=<serverSeq>` | All records changed since N, across collections |
-| `POST /sync/push` | Batch of created/modified/deleted records from the outbox; returns accepted serverSeqs and any newer server versions |
+| `GET /sync/pull?since=<serverSeq>&limit=<n>` | Records changed since N, across collections, oldest first (`hasMore` when there's another page) |
+| `POST /sync/push` | Batch of created/modified/deleted records; returns `accepted` (with serverSeqs), `newer` (server versions that beat the pushed ones) and `rejected` (failed validation) |
 | `GET /places/nearby?lat&lng` | Google Nearby Search proxy (Start visit) |
 | `GET /places/search?q&lat&lng` | Google text search proxy ("Somewhere else…") |
 | `POST /places/:id/refresh` | Re-fetch the Google snapshot |
 | `POST /ai/menu` | Menu page images → extracted items (images not kept) |
 | `POST /ai/receipt` | Receipt image → items, date, place hint (image not kept) |
 | `POST /ai/voice` | Transcript + visit context → proposed changes (Draft) |
+
+**How sync works (built 2026-10-05):**
+- **Push is a patch.** A client sends the fields it keeps; fields it leaves out are kept as
+  stored (so the web can add fields the iPhone doesn't know about), `null` clears a field,
+  nested objects merge. The merged record must pass the collection's zod schema.
+- **Latest `modifiedAt` wins**, compared as instants (any offset). An older push gets the
+  server's record back in `newer`.
+- **One live rating per (subject, scope, person)** is enforced in code, not by a unique
+  index (tombstones would collide): the later one wins, the other is tombstoned.
+- **The iPhone finds its changes by hash**: each record's last-synced JSON hash is kept
+  (`SyncRecordState`), so every edit is caught even if it didn't bump `modifiedAt` (it gets
+  bumped at push time). Sync runs a few seconds after each change, when the app opens, and
+  when it goes to the background; pulls collect every page before applying (parents first).
+- **Ted and Lori have fixed person ids** (`…000000000001` / `…000000000002`) on every
+  install, so reinstalls and a second phone don't create duplicates.
+- Until Sign in with Apple, `createdBy`/`modifiedBy` are Ted's person id.
 
 ---
 

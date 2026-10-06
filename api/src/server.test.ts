@@ -25,8 +25,20 @@ test('GET /health reports ok without a database', async () => {
 
 test('designed-but-unbuilt endpoints return 501', async () => {
   await withServer(async (base) => {
-    const res = await fetch(`${base}/sync/pull?since=0`);
+    const res = await fetch(`${base}/ai/menu`, { method: 'POST' });
     assert.equal(res.status, 501);
+  });
+});
+
+test('sync reports not configured without a database', async () => {
+  await withServer(async (base) => {
+    assert.equal((await fetch(`${base}/sync/pull?since=0`)).status, 503);
+    const push = await fetch(`${base}/sync/push`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ changes: {} }),
+    });
+    assert.equal(push.status, 503);
   });
 });
 

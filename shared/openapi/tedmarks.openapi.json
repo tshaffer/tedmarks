@@ -58,6 +58,16 @@
               "type": "integer",
               "minimum": 0
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
           }
         ],
         "responses": {
@@ -82,14 +92,21 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChangeSet"
+                "$ref": "#/components/schemas/SyncPushRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Accepted records with assigned serverSeq"
+            "description": "Accepted, newer, and rejected records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPushResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -303,6 +320,12 @@
                 "type": "string"
               },
               "formattedAddress": {
+                "type": "string"
+              },
+              "primaryType": {
+                "type": "string"
+              },
+              "primaryTypeLabel": {
                 "type": "string"
               },
               "addressComponents": {
@@ -564,8 +587,7 @@
           "status",
           "name",
           "location",
-          "tags",
-          "attributes"
+          "tags"
         ]
       },
       "PlaceSubtype": {
@@ -1736,6 +1758,11 @@
                 "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
               }
             ]
+          },
+          "nearbyRadiusMeters": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 50000
           }
         },
         "required": [
@@ -1841,20 +1868,137 @@
           }
         }
       },
+      "SyncPushRequest": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "modifiedAt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "modifiedAt"
+                ],
+                "additionalProperties": {}
+              }
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      },
+      "SyncPushResponse": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "collection": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "serverSeq": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "collection",
+                "id",
+                "serverSeq"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "newer": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "collection": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "collection",
+                "id",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "accepted",
+          "newer",
+          "rejected"
+        ],
+        "additionalProperties": false
+      },
       "SyncPullResponse": {
         "type": "object",
-        "required": [
-          "serverSeq",
-          "changes"
-        ],
         "properties": {
-          "serverSeq": {
-            "type": "integer"
-          },
           "changes": {
-            "$ref": "#/components/schemas/ChangeSet"
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "serverSeq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "hasMore": {
+            "type": "boolean"
           }
-        }
+        },
+        "required": [
+          "changes",
+          "serverSeq",
+          "hasMore"
+        ],
+        "additionalProperties": false
       }
     }
   }

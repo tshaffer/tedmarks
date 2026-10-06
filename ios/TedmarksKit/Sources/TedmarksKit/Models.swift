@@ -3,7 +3,7 @@ import SwiftData
 
 // On-device models (SwiftData). Field names follow docs/tedmarks-data-model.md and
 // shared/src/schema. Enums are stored as raw strings so records sync as-is.
-// Sync fields still to add with sign-in: createdBy/modifiedBy (user ids) and serverSeq.
+// createdBy/modifiedBy aren't stored yet: until sign-in every change is Ted's (SyncEncoder).
 
 public enum PlaceKind: String, Codable, Sendable { case restaurant }
 public enum PlaceStatus: String, Codable, Sendable { case wantToGo, beenThere }
@@ -145,5 +145,5 @@ public final class Visit {
 
 /// All SwiftData model types, for building a ModelContainer.
 public let tedmarksModelTypes: [any PersistentModel.Type] = [
-    Person.self, Place.self, Visit.self, PlaceItem.self, VisitItem.self, Rating.self,
+    Person.self, Place.self, Visit.self, PlaceItem.self, VisitItem.self, Rating.self, SyncRecordState.self,
 ]

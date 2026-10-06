@@ -8,6 +8,7 @@ import { authRoutes } from './auth/authRoutes.js';
 import type { PlacesClient } from './google/placesClient.js';
 import { placesRoutes } from './google/placesRoutes.js';
 import { syncRoutes } from './sync/syncRoutes.js';
+import { SyncStore } from './sync/syncStore.js';
 
 export interface AppDeps {
   db?: Db | undefined;
@@ -28,7 +29,7 @@ export function createApp(deps: AppDeps = {}): Express {
   });
 
   app.use('/auth', authRoutes());
-  app.use('/sync', syncRoutes());
+  app.use('/sync', syncRoutes(deps.db ? new SyncStore(deps.db) : undefined));
   app.use('/places', placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS));
   app.use('/ai', aiRoutes());
 

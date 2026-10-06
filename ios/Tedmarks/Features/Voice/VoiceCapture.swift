@@ -13,13 +13,22 @@ final class VoiceCapture {
     var message: String?
     /// The draft to show for confirmation.
     var draftToReview: Draft?
+    /// The button is being held (the release can arrive while permission prompts are up).
+    private var holding = false
 
     func begin() async {
+        holding = true
         guard recorder.state == .idle else { return }
-        guard await VoiceRecorder.requestPermissions() else {
-            message = "Tedmarks needs microphone and speech recognition access. Turn them on in Settings → Tedmarks."
+        if !VoiceRecorder.hasPermissions {
+            // First time: iOS's prompts take over the screen (and the press), so just ask.
+            let granted = await VoiceRecorder.requestPermissions()
+            holding = false
+            message = granted
+                ? "You're all set. Hold the button while you talk, then let go."
+                : "Tedmarks needs microphone and speech recognition access. Turn them on in Settings → Tedmarks."
             return
         }
+        guard holding else { return }   // already let go
         do {
             try recorder.start()
         } catch {
@@ -28,6 +37,7 @@ final class VoiceCapture {
     }
 
     func end(visit: Visit, in context: ModelContext) async {
+        holding = false
         guard let recording = await recorder.stop() else { return }
         guard !recording.transcript.isEmpty else {
             if let name = recording.audioFileName { try? FileManager.default.removeItem(at: VoiceFiles.url(for: name)) }

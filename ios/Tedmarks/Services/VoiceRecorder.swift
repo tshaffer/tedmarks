@@ -19,19 +19,31 @@ final class VoiceRecorder {
 
     private(set) var state: State = .idle
     /// Live words while recording.
-    private(set) var transcript = ""
+    var transcript: String { assembler.text }
 
     private let engine = AVAudioEngine()
-    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var assembler = TranscriptAssembler()
+    private var recognizer: SFSpeechRecognizer?
+    /// Where the microphone tap sends audio; swapped when recognition restarts after a pause.
+    private let requestBox = RequestBox()
     private var task: SFSpeechRecognitionTask?
+    /// Results from an earlier recognition task (before a restart) are ignored.
+    private var generation = 0
     private var fileName: String?
     private var startedAt: Date?
     private var gotFinalResult = false
 
+    /// True once speech recognition and the microphone are both allowed.
+    nonisolated static var hasPermissions: Bool {
+        SFSpeechRecognizer.authorizationStatus() == .authorized && AVAudioApplication.shared.recordPermission == .granted
+    }
+
     /// Asks for speech recognition and microphone access (once; iOS remembers).
-    static func requestPermissions() async -> Bool {
-        let speech = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+    /// Nonisolated: iOS answers on a background queue, and a main-actor callback there
+    /// stops the app (Swift 6 checks isolation at run time).
+    nonisolated static func requestPermissions() async -> Bool {
+        let speech = await withCheckedContinuation { (continuation: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
+            SFSpeechRecognizer.requestAuthorization { status in continuation.resume(returning: status) }
         }
         guard speech == .authorized else { return false }
         return await AVAudioApplication.requestRecordPermission()
@@ -45,11 +57,6 @@ final class VoiceRecorder {
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)
         try session.setActive(true, options: .notifyOthersOnDeactivation)
 
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        request.addsPunctuation = true
-        if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
-
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         let name = "\(UUID().uuidString).m4a"
@@ -60,17 +67,42 @@ final class VoiceRecorder {
             commonFormat: format.commonFormat,
             interleaved: format.isInterleaved
         )
-        input.installTap(onBus: 0, bufferSize: 1024, format: format, block: Self.tap(request: request, file: file))
+        input.installTap(onBus: 0, bufferSize: 1024, format: format, block: Self.tap(box: requestBox, file: file))
+
+        self.recognizer = recognizer
+        assembler = TranscriptAssembler()
+        fileName = file == nil ? nil : name
+        gotFinalResult = false
+        startRecognition()
         engine.prepare()
         try engine.start()
-
-        self.request = request
-        fileName = file == nil ? nil : name
-        transcript = ""
-        gotFinalResult = false
         startedAt = .now
-        task = recognizer.recognitionTask(with: request, resultHandler: Self.resultHandler(for: self))
         state = .recording
+    }
+
+    /// A fresh recognition request + task fed by the same microphone tap.
+    private func startRecognition() {
+        guard let recognizer else { return }
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        request.addsPunctuation = true
+        if recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
+        requestBox.set(request)
+        generation += 1
+        task = recognizer.recognitionTask(with: request, resultHandler: Self.resultHandler(for: self, generation: generation))
+    }
+
+    private func handle(text: String?, isFinal: Bool, generation: Int) {
+        guard generation == self.generation else { return }
+        if let text { assembler.update(text) }
+        guard isFinal else { return }
+        assembler.commit()
+        if state == .recording {
+            // iOS ended the phrase at a pause; keep listening for the rest.
+            startRecognition()
+        } else {
+            gotFinalResult = true
+        }
     }
 
     /// Stops and waits briefly for the final transcript.
@@ -79,13 +111,14 @@ final class VoiceRecorder {
         state = .finishing
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)   // releases (and closes) the audio file
-        request?.endAudio()
+        requestBox.endAudio()
         for _ in 0..<25 where !gotFinalResult {
             try? await Task.sleep(for: .milliseconds(100))
         }
         task?.cancel()
         task = nil
-        request = nil
+        assembler.commit()
+        requestBox.set(nil)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         let duration = startedAt.map { Date.now.timeIntervalSince($0) } ?? 0
         state = .idle
@@ -95,25 +128,42 @@ final class VoiceRecorder {
 
     // Built outside the main actor: the tap and the recognizer call back on their own threads.
 
-    private nonisolated static func tap(request: SFSpeechAudioBufferRecognitionRequest, file: AVAudioFile?) -> AVAudioNodeTapBlock {
-        nonisolated(unsafe) let request = request
-        let file = file
-        return { buffer, _ in
-            request.append(buffer)
+    private nonisolated static func tap(box: RequestBox, file: AVAudioFile?) -> AVAudioNodeTapBlock {
+        { buffer, _ in
+            box.append(buffer)
             try? file?.write(from: buffer)
         }
     }
 
-    private nonisolated static func resultHandler(for recorder: VoiceRecorder) -> @Sendable (SFSpeechRecognitionResult?, Error?) -> Void {
+    private nonisolated static func resultHandler(for recorder: VoiceRecorder, generation: Int) -> @Sendable (SFSpeechRecognitionResult?, Error?) -> Void {
         { [weak recorder] result, error in
             let text = result?.bestTranscription.formattedString
             let isFinal = (result?.isFinal ?? false) || error != nil
             Task { @MainActor in
-                guard let recorder else { return }
-                if let text { recorder.transcript = text }
-                if isFinal { recorder.gotFinalResult = true }
+                recorder?.handle(text: text, isFinal: isFinal, generation: generation)
             }
         }
+    }
+}
+
+/// The current recognition request, shared with the audio thread.
+private final class RequestBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+
+    func set(_ request: SFSpeechAudioBufferRecognitionRequest?) {
+        lock.withLock {
+            self.request?.endAudio()
+            self.request = request
+        }
+    }
+
+    func append(_ buffer: AVAudioPCMBuffer) {
+        lock.withLock { request?.append(buffer) }
+    }
+
+    func endAudio() {
+        lock.withLock { request?.endAudio() }
     }
 }
 

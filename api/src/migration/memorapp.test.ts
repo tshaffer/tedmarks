@@ -40,6 +40,14 @@ test('maps a visited restaurant: visits, deduped dishes, ratings, notes, verdict
   assert.equal(changes.notes?.length, 1);
 });
 
+test('places deleted in Tedmarks are not imported again', () => {
+  const place: MemorappPlace = { _id: '6803f283db03ac727fb188d7', googlePlaceId: 'g4', placeType: 0, placeRating: 9 };
+  const existing = new Map([['g4', { id: '22222222-2222-4222-8222-222222222222', status: 'beenThere', items: new Map(), deleted: true }]]);
+  const { changes, report } = mapMemorapp([place], [google('g4', 'Gone')], existing, new Date());
+  assert.equal(changes.places, undefined);
+  assert.deepEqual(report.skipped, [{ name: 'Gone', reason: 'Deleted in Tedmarks' }]);
+});
+
 test('rated place with no visits gets a stand-in visit; non-restaurants are skipped; existing places are merged', () => {
   const rated: MemorappPlace = { _id: '6803f283db03ac727fb188d5', googlePlaceId: 'g2', placeType: 0, placeRating: 2 };
   const grocery: MemorappPlace = { _id: '6803f283db03ac727fb188d6', googlePlaceId: 'g3', placeType: 1 };

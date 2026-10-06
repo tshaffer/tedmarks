@@ -51,6 +51,8 @@ export interface ExistingPlace {
   status: string;
   /** Its dishes by normalized name, so imported dishes reuse them. */
   items: Map<string, string>;
+  /** Deleted in Tedmarks: the import leaves it (and its visits) deleted. */
+  deleted?: boolean;
 }
 
 type Doc = Record<string, unknown> & { id: string; modifiedAt: string };
@@ -137,6 +139,10 @@ export function mapMemorapp(
 
     const created = objectIdTime(place._id) ?? now;
     const prior = existing.get(place.googlePlaceId);
+    if (prior?.deleted) {
+      result.report.skipped.push({ name, reason: 'Deleted in Tedmarks' });
+      continue;
+    }
     const placeId = prior?.id ?? importId('place', idText(place._id));
     // Merging into a place the phone already created: stamp now so the added fields win;
     // otherwise keep memorapp's own time so later edits in Tedmarks always win over a re-run.

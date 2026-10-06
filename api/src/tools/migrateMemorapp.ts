@@ -42,17 +42,18 @@ try {
   const places = await source.collection<MemorappPlace>('mrplaces').find().toArray();
   const googlePlaces = await source.collection<MemorappGooglePlace>('mongoPlaces').find().toArray();
 
-  // Places already in Tedmarks (from the iPhone app), so imports merge instead of duplicating.
+  // Places already in Tedmarks (from the iPhone app or an earlier import), so imports merge
+  // instead of duplicating, and places deleted in Tedmarks stay deleted.
   const existing = new Map<string, ExistingPlace>();
   const tedmarksPlaces = await db
     .collection<{ id: string; status: string; google?: { placeId?: string }; deletedAt?: string }>('places')
-    .find({ 'google.placeId': { $exists: true }, deletedAt: { $exists: false } })
+    .find({ 'google.placeId': { $exists: true } })
     .toArray();
   const items = await db.collection<{ id: string; placeId: string; normalizedName: string }>('placeItems')
     .find({ deletedAt: { $exists: false } }).toArray();
   for (const place of tedmarksPlaces) {
     const byName = new Map(items.filter((i) => i.placeId === place.id).map((i) => [i.normalizedName, i.id]));
-    existing.set(place.google!.placeId!, { id: place.id, status: place.status, items: byName });
+    existing.set(place.google!.placeId!, { id: place.id, status: place.status, items: byName, deleted: !!place.deletedAt });
   }
 
   const { changes, report } = mapMemorapp(places, googlePlaces, existing, new Date());
@@ -67,7 +68,7 @@ try {
   }
 
   console.log(`\nmemorapp (${sourceDbName}): ${places.length} places, ${googlePlaces.length} Google snapshots`);
-  console.log(`Tedmarks (${config.mongoDbName}): ${tedmarksPlaces.length} places already there\n`);
+  console.log(`Tedmarks (${config.mongoDbName}): ${tedmarksPlaces.filter((p) => !p.deletedAt).length} places already there\n`);
   console.log('Would write:');
   for (const [collection, docs] of Object.entries(changes)) console.log(`  ${collection.padEnd(14)} ${docs?.length}`);
   const placeDocs = changes.places ?? [];

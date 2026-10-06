@@ -76,3 +76,23 @@ public enum PastVisits {
         VisitSideEffects.reconcile(in: context)
     }
 }
+
+/// Deleting a place from the Places list.
+@MainActor
+public enum PlaceEditing {
+    /// Deletes a place (tombstoned) with every visit to it — their dishes and ratings too — and
+    /// its dish list. Notes stay on the server, hidden with their place (the phone doesn't send notes).
+    public static func delete(_ place: Place, in context: ModelContext, now: Date = .now) throws {
+        for visit in place.visits where visit.deletedAt == nil {
+            try PastVisits.delete(visit, in: context, now: now)
+        }
+        for item in place.items where item.deletedAt == nil {
+            item.deletedAt = now
+            item.modifiedAt = now
+        }
+        place.deletedAt = now
+        place.modifiedAt = now
+        try context.save()
+        VisitSideEffects.reconcile(in: context)
+    }
+}

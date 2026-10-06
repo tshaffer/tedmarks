@@ -18,6 +18,7 @@ struct PlacesView: View {
     @State private var search = ""
     @State private var location: CLLocation?
     @State private var path: [UUID] = []
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -34,6 +35,9 @@ struct PlacesView: View {
                 }
                 ForEach(summaries) { summary in
                     NavigationLink(value: summary.place.id) { row(summary) }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button("Delete", systemImage: "trash", role: .destructive) { delete(summary.place) }
+                        }
                 }
             }
             .listSectionSpacing(.compact)
@@ -48,6 +52,9 @@ struct PlacesView: View {
                 }
             }
             .navigationTitle("Places")
+            .alert("Couldn't delete", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
             .searchable(text: $search, prompt: "Search by name")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -133,6 +140,15 @@ struct PlacesView: View {
         case .beenThere: places.filter { $0.status == .beenThere }.count
         case .wantToGo: places.filter { $0.status == .wantToGo }.count
         case .all: places.count
+        }
+    }
+
+    /// Deletes the place and every visit to it (with their dishes and ratings).
+    private func delete(_ place: Place) {
+        do {
+            try PlaceEditing.delete(place, in: context)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

@@ -55,6 +55,7 @@ struct PlaceDetailView: View {
                 }
             }
 
+            menuSection
             infoSection
         }
         .navigationTitle(place.name)
@@ -62,12 +63,15 @@ struct PlaceDetailView: View {
         .safeAreaInset(edge: .bottom) { startVisitButton }
         .sheet(item: $wrapUpVisit) { WrapUpSheet(visit: $0) }
         .sheet(isPresented: $isEditing) { EditPlaceSheet(place: place) }
-        .sheet(item: $showingMenu) { MenuPagesView(menu: $0) }
+        .sheet(item: $showingMenu) { MenuSheet(menu: $0, place: place) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) { Button("Edit") { isEditing = true } }
         }
         #if DEBUG
-        .task { if ProcessInfo.processInfo.arguments.contains("-editPlace") { isEditing = true } }
+        .task {
+            if ProcessInfo.processInfo.arguments.contains("-editPlace") { isEditing = true }
+            if ProcessInfo.processInfo.arguments.contains("-viewMenu") { showingMenu = latestReadMenu }
+        }
         #endif
         .alert("Couldn't start the visit", isPresented: .constant(errorMessage != nil)) {
             Button("OK") { errorMessage = nil }
@@ -188,6 +192,24 @@ struct PlaceDetailView: View {
         .contentShape(Rectangle())
     }
 
+    /// View the latest menu, or snap / pick one (no visit needed).
+    private var menuSection: some View {
+        Section("Menu") {
+            if let menu = latestReadMenu {
+                Button { showingMenu = menu } label: {
+                    let count = menu.extracted?.count ?? 0
+                    Label("View menu · \(count) dish\(count == 1 ? "" : "es")", systemImage: "menucard")
+                }
+            }
+            MenuPanel(place: place, visit: nil)
+                .padding(.vertical, 2)
+        }
+    }
+
+    private var latestReadMenu: PlaceMenu? {
+        menus.filter { $0.placeId == place.id && $0.readStatus == .read }.max { $0.capturedAt < $1.capturedAt }
+    }
+
     private var infoSection: some View {
         Section("Info") {
             if let address = place.googleAddress {
@@ -210,12 +232,6 @@ struct PlaceDetailView: View {
                 } label: {
                     Label(hours.first { $0.hasPrefix(todayName) } ?? "Hours", systemImage: "clock")
                         .lineLimit(1)
-                }
-            }
-            if let menuId = place.latestMenuId, let menu = menus.first(where: { $0.id == menuId }), !menu.pagePhotoIds.isEmpty {
-                Button { showingMenu = menu } label: {
-                    Label("Menu · \(menu.pagePhotoIds.count) page\(menu.pagePhotoIds.count == 1 ? "" : "s") · \(menu.capturedAt.formatted(date: .abbreviated, time: .omitted))",
-                          systemImage: "menucard")
                 }
             }
             if let website = place.googleWebsite, let url = URL(string: website) {

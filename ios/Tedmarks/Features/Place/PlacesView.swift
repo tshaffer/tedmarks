@@ -90,7 +90,7 @@ struct PlacesView: View {
             .task {
                 if ProcessInfo.processInfo.arguments.contains("-savePlace") { isSavingPlace = true }
                 if let name = UserDefaults.standard.string(forKey: "openPlace"),
-                   let place = places.first(where: { $0.name.localizedStandardContains(name) }) {
+                   let place = places.first(where: { $0.name == name }) ?? places.first(where: { $0.name.localizedStandardContains(name) }) {
                     path = [place.id]
                 }
             }

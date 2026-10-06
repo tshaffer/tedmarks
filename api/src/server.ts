@@ -35,8 +35,9 @@ export function createApp(deps: AppDeps = {}): Express {
   });
 
   app.use('/auth', authRoutes());
-  app.use('/sync', syncRoutes(deps.db ? new SyncStore(deps.db) : undefined));
-  app.use('/places', placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS));
+  const store = deps.db ? new SyncStore(deps.db) : undefined;
+  app.use('/sync', syncRoutes(store));
+  app.use('/places', placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS, store));
   app.use('/ai', aiRoutes(deps.voice, deps.menu));
 
   return app;

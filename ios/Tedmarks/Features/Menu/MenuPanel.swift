@@ -96,14 +96,23 @@ struct MenuPanel: View {
     }
 
     private func buttons(primary: Bool) -> some View {
-        HStack(spacing: 10) {
-            cameraButton
-                .buttonStyle(.borderedProminent)
-                .tint(primary ? .accentColor : .secondary)
-            photosButton
-                .buttonStyle(.bordered)
+        // Side by side when there's room (Add dish), stacked in narrower lists (Place page).
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) { buttonPair(primary: primary) }
+            VStack(alignment: .leading, spacing: 8) { buttonPair(primary: primary) }
         }
         .controlSize(.regular)
+    }
+
+    @ViewBuilder
+    private func buttonPair(primary: Bool) -> some View {
+        cameraButton
+            .buttonStyle(.borderedProminent)
+            .tint(primary ? .accentColor : .secondary)
+            .fixedSize()
+        photosButton
+            .buttonStyle(.bordered)
+            .fixedSize()
     }
 
     private var cameraButton: some View {

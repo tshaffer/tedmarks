@@ -6,9 +6,9 @@ import {
   type PlaceDetailsResponse,
   type PlaceSuggestionsResponse,
 } from '@tedmarks/shared';
-import { notImplemented } from '../notImplemented.js';
 import { MAX_SEARCH_RADIUS_METERS } from '@tedmarks/shared';
 import type { LatLng, PlacesClient } from './placesClient.js';
+import type { SyncStore } from '../sync/syncStore.js';
 
 function parseOrigin(req: Request): LatLng | null {
   const latitude = Number(req.query['lat']);
@@ -31,7 +31,7 @@ function sendError(res: Response, error: unknown): void {
   res.status(502).json({ error: 'places_unavailable', message: 'Could not reach Google Places.' });
 }
 
-export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMeters: number): Router {
+export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMeters: number, store?: SyncStore): Router {
   const router = Router();
 
   router.use((_req, res, next) => {
@@ -128,6 +128,43 @@ export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMete
     }
   });
 
-  router.post('/:id/refresh', notImplemented('Re-fetch the Google snapshot for a place'));
+  /**
+   * POST /places/:id/refresh — re-fetches a saved place's Google snapshot (hours, website,
+   * phone, rating) and saves it through sync, so every phone gets it on its next pull.
+   */
+  router.post('/:id/refresh', async (req, res) => {
+    if (!store) {
+      res.status(503).json({ error: 'db_not_configured', message: 'MONGODB_URI is not set on the server.' });
+      return;
+    }
+    try {
+      const place = await store.find('places', req.params.id);
+      const googleId = (place?.google as { placeId?: string } | undefined)?.placeId;
+      if (!place || place.deletedAt || !googleId) {
+        res.status(404).json({ error: 'not_found', message: 'No saved Google place with that id.' });
+        return;
+      }
+      const snapshot = await client!.snapshot(googleId);
+      if (!snapshot) {
+        res.status(404).json({ error: 'not_found', message: 'Google no longer has this place.' });
+        return;
+      }
+      // Fields Google didn't return are cleared (null), except the name, which stays ours.
+      const google: Record<string, unknown> = { ...snapshot, name: (place.google as { name?: string }).name ?? snapshot.name, fetchedAt: new Date().toISOString() };
+      for (const key of ['formattedAddress', 'primaryType', 'primaryTypeLabel', 'website', 'phone', 'rating', 'ratingsCount', 'priceLevel', 'openingHours', 'utcOffsetMinutes']) {
+        if (google[key] === undefined) google[key] = null;
+      }
+      const result = await store.push({
+        changes: { places: [{ id: place.id, modifiedAt: new Date().toISOString(), google }] },
+      });
+      if (result.rejected.length > 0) {
+        res.status(500).json({ error: 'refresh_failed', message: result.rejected[0]!.reason });
+        return;
+      }
+      res.json({ serverSeq: result.accepted[0]?.serverSeq ?? null });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
   return router;
 }

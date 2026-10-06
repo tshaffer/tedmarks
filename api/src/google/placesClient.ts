@@ -1,4 +1,4 @@
-import type { MorePlacesResponse, NearbyPlace, PlaceSuggestion } from '@tedmarks/shared';
+import type { GooglePlaceSnapshot, MorePlacesResponse, NearbyPlace, PlaceSuggestion } from '@tedmarks/shared';
 
 // Server-side wrapper around Google Places API (New). Called only from the API
 // so the key never reaches the phone (decision #7).
@@ -165,6 +165,21 @@ export class PlacesClient {
   }
 
   /** The place picked from autocomplete (ends the billing session). */
+  /**
+   * The full Google snapshot for a saved place: address, hours, website, phone, rating.
+   * (Hours and contact details are a pricier Place Details tier, so only on refresh.)
+   */
+  async snapshot(googlePlaceId: string): Promise<Omit<GooglePlaceSnapshot, 'fetchedAt'> | undefined> {
+    const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}`);
+    const response = await this.request(url, {
+      method: 'GET',
+      fieldMask: SNAPSHOT_FIELDS,
+    });
+    const place = (await response.json()) as GoogleSnapshotPlace;
+    if (!place.id) return undefined;
+    return toSnapshot(place);
+  }
+
   async details(googlePlaceId: string, origin: LatLng, sessionToken?: string): Promise<NearbyPlace | undefined> {
     const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(googlePlaceId)}`);
     if (sessionToken) url.searchParams.set('sessionToken', sessionToken);
@@ -245,4 +260,74 @@ export function distanceMeters(a: LatLng, b: LatLng): number {
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+const SNAPSHOT_FIELDS = [
+  'id',
+  'displayName',
+  'formattedAddress',
+  'primaryType',
+  'primaryTypeDisplayName',
+  'websiteUri',
+  'nationalPhoneNumber',
+  'rating',
+  'userRatingCount',
+  'priceLevel',
+  'regularOpeningHours',
+  'utcOffsetMinutes',
+].join(',');
+
+interface GooglePoint { day?: number; hour?: number; minute?: number }
+
+interface GoogleSnapshotPlace extends GooglePlace {
+  websiteUri?: string;
+  nationalPhoneNumber?: string;
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: string;
+  regularOpeningHours?: { periods?: { open?: GooglePoint; close?: GooglePoint }[]; weekdayDescriptions?: string[] };
+  utcOffsetMinutes?: number;
+}
+
+const PRICE_LEVELS: Record<string, number> = {
+  PRICE_LEVEL_FREE: 0,
+  PRICE_LEVEL_INEXPENSIVE: 1,
+  PRICE_LEVEL_MODERATE: 2,
+  PRICE_LEVEL_EXPENSIVE: 3,
+  PRICE_LEVEL_VERY_EXPENSIVE: 4,
+};
+
+/** "0930" from Google's {hour: 9, minute: 30}. */
+function hhmm(point: GooglePoint): string {
+  return `${String(point.hour ?? 0).padStart(2, '0')}${String(point.minute ?? 0).padStart(2, '0')}`;
+}
+
+export function toSnapshot(place: GoogleSnapshotPlace): Omit<GooglePlaceSnapshot, 'fetchedAt'> {
+  const hours = place.regularOpeningHours;
+  return {
+    placeId: place.id!,
+    name: place.displayName?.text ?? '',
+    formattedAddress: place.formattedAddress,
+    primaryType: place.primaryType,
+    primaryTypeLabel: place.primaryTypeDisplayName?.text,
+    website: place.websiteUri,
+    phone: place.nationalPhoneNumber,
+    rating: place.rating,
+    ratingsCount: place.userRatingCount,
+    priceLevel: place.priceLevel ? PRICE_LEVELS[place.priceLevel] : undefined,
+    openingHours: hours
+      ? {
+          periods: (hours.periods ?? []).flatMap((period) =>
+            period.open?.day === undefined
+              ? []
+              : [{
+                  open: { day: period.open.day, time: hhmm(period.open) },
+                  ...(period.close?.day !== undefined ? { close: { day: period.close.day, time: hhmm(period.close) } } : {}),
+                }],
+          ),
+          weekdayText: hours.weekdayDescriptions ?? [],
+        }
+      : undefined,
+    utcOffsetMinutes: place.utcOffsetMinutes,
+  };
 }

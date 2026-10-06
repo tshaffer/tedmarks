@@ -19,6 +19,7 @@ struct PlaceDetailView: View {
     @State private var wrapUpVisit: Visit?
     @State private var errorMessage: String?
     @State private var isEditing = false
+    @State private var isRefreshing = false
     @State private var showingMenu: PlaceMenu?
     @Query(filter: #Predicate<PlaceMenu> { $0.deletedAt == nil }) private var menus: [PlaceMenu]
 
@@ -56,6 +57,7 @@ struct PlaceDetailView: View {
             }
 
             menuSection
+            hoursSection
             infoSection
         }
         .navigationTitle(place.name)
@@ -67,6 +69,7 @@ struct PlaceDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) { Button("Edit") { isEditing = true } }
         }
+        .task { await refreshFromGoogleIfStale() }
         #if DEBUG
         .task {
             if ProcessInfo.processInfo.arguments.contains("-editPlace") { isEditing = true }
@@ -210,29 +213,43 @@ struct PlaceDetailView: View {
         menus.filter { $0.placeId == place.id && $0.readStatus == .read }.max { $0.capturedAt < $1.capturedAt }
     }
 
+    private var hoursSection: some View {
+        Section {
+            if let hours = place.googleWeekdayText, !hours.isEmpty {
+                ForEach(hours, id: \.self) { line in
+                    let isToday = line.hasPrefix(todayName)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(dayName(line)).frame(width: 100, alignment: .leading)
+                        Text(dayHours(line)).foregroundStyle(isToday ? .primary : .secondary)
+                        Spacer(minLength: 0)
+                    }
+                    .font(.subheadline)
+                    .fontWeight(isToday ? .semibold : .regular)
+                    .accessibilityElement(children: .combine)
+                }
+            } else if isRefreshing {
+                HStack(spacing: 8) { ProgressView(); Text("Getting hours from Google…").foregroundStyle(.secondary) }
+            } else {
+                Text("No hours from Google.").foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Hours")
+        }
+    }
+
     private var infoSection: some View {
         Section("Info") {
             if let address = place.googleAddress {
-                Button { openURL(appleMapsURL) } label: {
+                Button { openURL(googleMapsPlaceURL) } label: {
                     Label(address, systemImage: "mappin.and.ellipse").foregroundStyle(.primary)
                 }
             }
-            Menu {
-                Button("Apple Maps") { openURL(appleMapsURL) }
-                Button("Google Maps") { openURL(googleMapsURL) }
-            } label: {
+            Button { openURL(googleMapsDirectionsURL) } label: {
                 Label("Directions", systemImage: "arrow.triangle.turn.up.right.diamond")
             }
-            if let hours = place.googleWeekdayText, !hours.isEmpty {
-                DisclosureGroup {
-                    ForEach(hours, id: \.self) { line in
-                        Text(line).font(.subheadline)
-                            .fontWeight(line.hasPrefix(todayName) ? .semibold : .regular)
-                    }
-                } label: {
-                    Label(hours.first { $0.hasPrefix(todayName) } ?? "Hours", systemImage: "clock")
-                        .lineLimit(1)
-                }
+            if let phone = place.googlePhone,
+               let url = URL(string: "tel:" + phone.filter { $0.isNumber || $0 == "+" }) {
+                Link(destination: url) { Label(phone, systemImage: "phone") }
             }
             if let website = place.googleWebsite, let url = URL(string: website) {
                 Link(destination: url) {
@@ -296,18 +313,28 @@ struct PlaceDetailView: View {
         Date.now.formatted(.dateTime.weekday(.wide))
     }
 
-    private var appleMapsURL: URL {
-        var components = URLComponents(string: "https://maps.apple.com/")!
+    /// "Monday" and "11:30 AM – 9:00 PM" from Google's "Monday: 11:30 AM – 9:00 PM".
+    private func dayName(_ line: String) -> String {
+        line.split(separator: ":", maxSplits: 1).first.map(String.init) ?? line
+    }
+
+    private func dayHours(_ line: String) -> String {
+        let parts = line.split(separator: ":", maxSplits: 1)
+        return parts.count == 2 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+    }
+
+    /// The place in Google Maps (opens the Google Maps app when installed — a universal link).
+    private var googleMapsPlaceURL: URL {
+        var components = URLComponents(string: "https://www.google.com/maps/search/")!
         components.queryItems = [
-            URLQueryItem(name: "q", value: place.name),
-            URLQueryItem(name: "ll", value: "\(place.latitude),\(place.longitude)"),
-            URLQueryItem(name: "daddr", value: "\(place.latitude),\(place.longitude)"),
-        ]
+            URLQueryItem(name: "api", value: "1"),
+            URLQueryItem(name: "query", value: [place.name, place.googleAddress].compactMap { $0 }.joined(separator: ", ")),
+        ] + (place.googlePlaceId.map { [URLQueryItem(name: "query_place_id", value: $0)] } ?? [])
         return components.url!
     }
 
-    /// Opens the Google Maps app when installed (universal link), otherwise the website.
-    private var googleMapsURL: URL {
+    /// Directions in Google Maps (the app when installed, otherwise the website).
+    private var googleMapsDirectionsURL: URL {
         var components = URLComponents(string: "https://www.google.com/maps/dir/")!
         components.queryItems = [
             URLQueryItem(name: "api", value: "1"),
@@ -315,6 +342,26 @@ struct PlaceDetailView: View {
         ] + (place.googlePlaceId.map { [URLQueryItem(name: "destination_place_id", value: $0)] } ?? [])
         return components.url!
     }
+
+    /// Places saved from search have no hours; imported ones age. Ask the server to fetch the
+    /// Google details (hours, website, phone, rating) when missing or over a month old, then pull.
+    private func refreshFromGoogleIfStale() async {
+        guard place.googlePlaceId != nil, !Self.refreshedThisSession.contains(place.id) else { return }
+        let stale = place.googleFetchedAt.map { Date.now.timeIntervalSince($0) > 30 * 86_400 } ?? true
+        guard place.googleWeekdayText == nil || stale else { return }
+        Self.refreshedThisSession.insert(place.id)
+        isRefreshing = true
+        defer { isRefreshing = false }
+        do {
+            try await AppConfig.api.refreshPlace(id: place.id)
+            await SyncEngine.shared.sync()
+        } catch {
+            // Not on the server yet (just saved) or offline: try again next time.
+            Self.refreshedThisSession.remove(place.id)
+        }
+    }
+
+    private static var refreshedThisSession: Set<UUID> = []
 
     private func startVisit() {
         do {

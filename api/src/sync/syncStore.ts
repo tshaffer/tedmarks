@@ -110,6 +110,11 @@ export class SyncStore {
     if (newer.length > 0) response.newer[collection] = newer;
   }
 
+  /** One stored record by id (without Mongo's _id). */
+  async find(collection: CollectionName, id: string): Promise<StoredRecord | null> {
+    return this.db.collection<StoredRecord>(collection).findOne({ id }, { projection: { _id: 0 } });
+  }
+
   /** Everything changed after `since`, oldest first, at most `limit` records. */
   async pull(since: number, limit: number): Promise<SyncPullResponse> {
     const found: { collection: CollectionName; record: StoredRecord }[] = [];

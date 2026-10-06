@@ -140,6 +140,12 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         return try decode(Response.self, from: data).changes
     }
 
+    /// Asks the server to re-fetch a saved place's Google details (hours, website, phone,
+    /// rating); they arrive on the next sync.
+    public func refreshPlace(id: UUID) async throws {
+        _ = try await send(path: "places/\(id.uuidString.lowercased())/refresh", method: "POST", query: [], body: nil)
+    }
+
     // MARK: - Menus
 
     /// Claude reads dishes from menu pages (JPEG data, in order). Pages aren't kept on the server.

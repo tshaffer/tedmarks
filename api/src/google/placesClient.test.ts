@@ -150,3 +150,27 @@ test('moreNearby stops once it has enough new places and hands back the token', 
   assert.equal(result.places.length, 12);
   assert.equal(result.nextPageToken, 'next');
 });
+
+test('toSnapshot maps hours, price level and contact details', async () => {
+  const { toSnapshot } = await import('./placesClient.js');
+  const snapshot = toSnapshot({
+    id: 'g1',
+    displayName: { text: 'Doppio Zero' },
+    formattedAddress: '160 Castro St, Mountain View, CA 94041, USA',
+    websiteUri: 'https://doppiozero.example',
+    nationalPhoneNumber: '(650) 555-0100',
+    rating: 4.4,
+    userRatingCount: 812,
+    priceLevel: 'PRICE_LEVEL_MODERATE',
+    regularOpeningHours: {
+      periods: [{ open: { day: 1, hour: 11, minute: 30 }, close: { day: 1, hour: 21, minute: 0 } }],
+      weekdayDescriptions: ['Monday: 11:30 AM – 9:00 PM'],
+    },
+  });
+  assert.equal(snapshot.priceLevel, 2);
+  assert.equal(snapshot.phone, '(650) 555-0100');
+  assert.deepEqual(snapshot.openingHours, {
+    periods: [{ open: { day: 1, time: '1130' }, close: { day: 1, time: '2100' } }],
+    weekdayText: ['Monday: 11:30 AM – 9:00 PM'],
+  });
+});

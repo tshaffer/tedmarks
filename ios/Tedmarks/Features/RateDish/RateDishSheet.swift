@@ -15,6 +15,7 @@ struct RateDishSheet: View {
     @State private var newDishName = ""
     @FocusState private var isTypingName: Bool
     @State private var errorMessage: String?
+    @State private var dishNote = ""
 
     enum Selection: Hashable {
         case orderItem(VisitItem)
@@ -103,6 +104,11 @@ struct RateDishSheet: View {
     private var ratingCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(selectionTitle).font(.headline).lineLimit(1)
+            if selection != nil {
+                TextField("Add a note (optional)", text: $dishNote, axis: .vertical)
+                    .lineLimit(1...3)
+                    .textFieldStyle(.roundedBorder)
+            }
             RatingButtons(values: ItemRatingValue.buttonOrder, selected: currentValue) { value in
                 save(value)
             }
@@ -191,6 +197,7 @@ struct RateDishSheet: View {
     private func select(_ newSelection: Selection) {
         selection = newSelection
         newDishName = ""
+        dishNote = ""
         isTypingName = false
     }
 
@@ -207,6 +214,7 @@ struct RateDishSheet: View {
             guard let item else { return }
             let me = try VisitStarter.devicePerson(in: context)?.id
             try DishCapture.rate(item, value, for: rateFor, enteredBy: me, in: context)
+            try NoteEditing.addDishNote(dishNote, to: item, in: context)   // ignored when empty
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

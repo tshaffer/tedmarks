@@ -26,3 +26,25 @@ import Testing
     try NoteEditing.update(note, text: "", in: context)
     #expect(try NoteEditing.visitNotes(for: visit, in: context).map(\.text) == ["Sat on the patio"])
 }
+
+@MainActor
+@Test func dishNotesBelongToTheirDish() throws {
+    let container = try ModelContainer(for: Schema(tedmarksModelTypes), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let context = container.mainContext
+    try VisitStarter.ensureHousehold(in: context)
+    let doppio = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", latitude: 37.39, longitude: -122.08, distanceMeters: 0)
+    let visit = try VisitStarter.startVisit(at: doppio, participantIds: [], in: context)
+    let burrata = try #require(try DishCapture.addItem(named: "Burrata", to: visit, addedVia: .order, in: context))
+    let pizza = try #require(try DishCapture.addItem(named: "Pizza", to: visit, addedVia: .order, in: context))
+
+    try NoteEditing.addDishNote("Ask for extra bread", to: burrata, in: context)
+    try NoteEditing.addDishNote("Crust was soggy", to: pizza, in: context)
+    try NoteEditing.addVisitNote("Slow service", to: visit, in: context)
+
+    #expect(try NoteEditing.dishNotes(for: burrata, in: context).map(\.text) == ["Ask for extra bread"])
+    #expect(try NoteEditing.visitNotes(for: visit, in: context).map(\.text) == ["Slow service"])
+    // Dish notes show on the Place page with the dish.
+    let place = try #require(visit.place)
+    let dishes = try PlaceInsights(context: context).dishes(at: place)
+    #expect(dishes.first { $0.item.name == "Pizza" }?.comments == ["Crust was soggy"])
+}

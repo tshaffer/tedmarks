@@ -20,6 +20,7 @@ struct WrapUpSheet: View {
     @State private var errorMessage: String?
     @State private var newNote = ""
     @State private var editingNote: Note?
+    @State private var notesForDish: VisitItem?
     @State private var editedText = ""
     @FocusState private var isWritingNote: Bool
 
@@ -106,6 +107,7 @@ struct WrapUpSheet: View {
                     .background(.bar)
                 }
             }
+            .sheet(item: $notesForDish) { DishNotesSheet(item: $0) }
             .sheet(isPresented: $isAddingDish) {
                 RateDishSheet(visit: visit)
             }
@@ -132,9 +134,22 @@ struct WrapUpSheet: View {
     private func dishRow(_ item: VisitItem) -> some View {
         let display = (try? DishCapture.display(for: item, household: householdIds, in: context)) ?? .none
         let recorded = (try? DishCapture.recordedValue(for: item.id, rateFor: rateFor, in: context)).flatMap { $0.flatMap(ItemRatingValue.init(rawValue:)) }
+        let dishNotes = allNotes.filter { $0.visitItemId == item.id }.sorted { $0.createdAt < $1.createdAt }
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.displayName).font(.body.weight(.medium))
+                // Tap the name for this dish's notes.
+                Button { notesForDish = item } label: {
+                    HStack(spacing: 4) {
+                        Text(item.displayName).font(.body.weight(.medium)).foregroundStyle(.primary)
+                        Image(systemName: dishNotes.isEmpty ? "square.and.pencil" : "note.text")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Notes about this dish")
+                ForEach(dishNotes) { note in
+                    Text(note.text).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
                 switch display {
                 case .none:
                     Text("Not rated yet").font(.caption.weight(.semibold)).foregroundStyle(.orange)

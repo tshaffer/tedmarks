@@ -84,6 +84,28 @@ public enum NoteEditing {
         return note
     }
 
+    /// Live notes about one dish on a visit, oldest first.
+    public static func dishNotes(for item: VisitItem, in context: ModelContext) throws -> [Note] {
+        let itemId = item.id
+        return try context.fetch(FetchDescriptor<Note>(
+            predicate: #Predicate { $0.visitItemId == itemId && $0.deletedAt == nil },
+            sortBy: [SortDescriptor(\.createdAt)]
+        ))
+    }
+
+    @discardableResult
+    public static func addDishNote(_ text: String, to item: VisitItem, in context: ModelContext, now: Date = .now) throws -> Note? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let visit = item.visit, let place = visit.place else { return nil }
+        let note = Note(placeId: place.id, text: trimmed, origin: "typed", now: now)
+        note.visitId = visit.id
+        note.visitItemId = item.id
+        context.insert(note)
+        try context.save()
+        SyncEngine.shared.scheduleSync()
+        return note
+    }
+
     /// Changes a note's text; an empty text deletes it.
     public static func update(_ note: Note, text: String, in context: ModelContext, now: Date = .now) throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

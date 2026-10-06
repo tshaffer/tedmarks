@@ -19,6 +19,7 @@ struct PlacesView: View {
     @State private var location: CLLocation?
     @State private var path: [UUID] = []
     @State private var errorMessage: String?
+    @State private var isSavingPlace = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -57,6 +58,9 @@ struct PlacesView: View {
             } message: { Text(errorMessage ?? "") }
             .searchable(text: $search, prompt: "Search by name")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { isSavingPlace = true } label: { Label("Save a place to try", systemImage: "plus") }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Picker("Sort by", selection: $sort) {
@@ -67,6 +71,13 @@ struct PlacesView: View {
                     }
                 }
             }
+            .sheet(isPresented: $isSavingPlace) {
+                SavePlaceSheet { place in
+                    // Show where it landed.
+                    if filter != .all { filter = place.status == .wantToGo ? .wantToGo : .beenThere }
+                    search = ""
+                }
+            }
             .navigationDestination(for: UUID.self) { id in
                 if let place = places.first(where: { $0.id == id }) { PlaceDetailView(place: place) }
             }
@@ -75,8 +86,9 @@ struct PlacesView: View {
                 location = try? await LocationService.currentLocation()
             }
             #if DEBUG
-            // Dev/testing: `-openPlace <name>` opens that Place page.
+            // Dev/testing: `-openPlace <name>` opens that Place page; `-savePlace` opens Save a place.
             .task {
+                if ProcessInfo.processInfo.arguments.contains("-savePlace") { isSavingPlace = true }
                 if let name = UserDefaults.standard.string(forKey: "openPlace"),
                    let place = places.first(where: { $0.name.localizedStandardContains(name) }) {
                     path = [place.id]

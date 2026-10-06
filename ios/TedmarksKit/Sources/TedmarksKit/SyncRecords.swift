@@ -144,6 +144,15 @@ enum SyncEncoder {
                 "location": .object(["type": .string("Point"), "coordinates": .array([.number(place.longitude), .number(place.latitude)])]),
                 "tags": SyncValue.strings(place.tags),
                 "google": google,
+                "subtypeId": SyncValue.id(place.subtypeId),
+                "review": SyncValue.string(place.review),
+                "interest": place.interestLevel.map { level in
+                    .object([
+                        "level": .string(level.rawValue),
+                        "why": SyncValue.string(place.interestWhy),
+                        "savedAt": SyncValue.date(place.interestSavedAt ?? place.createdAt),
+                    ])
+                } ?? .null,
             ]) { $1 }
     }
 
@@ -402,6 +411,7 @@ enum SyncDecoder {
             let interest = record["interest"]?.object
             place.interestLevelRaw = interest?["level"]?.string
             place.interestWhy = interest?["why"]?.string
+            place.interestSavedAt = SyncValue.parseDate(interest?["savedAt"])
             place.createdAt = createdAt
             place.modifiedAt = modifiedAt
             place.deletedAt = deletedAt

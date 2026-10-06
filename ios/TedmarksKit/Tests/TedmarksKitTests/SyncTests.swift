@@ -217,3 +217,46 @@ private let doppio = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", a
     #expect(try other.context.fetch(FetchDescriptor<VoiceNote>()).first?.transcript == "Burrata was amazing")
     #expect(try other.context.fetch(FetchDescriptor<Note>()).map(\.text) == ["Great patio"])
 }
+
+@MainActor
+@Test func savedAndEditedPlacesSyncAndTheUpgradeDoesNotResendEverything() async throws {
+    let server = FakeServer()
+    let suite = "sync-test-\(UUID())"
+    let defaults = UserDefaults(suiteName: suite)!
+    let container = try ModelContainer(for: Schema(tedmarksModelTypes), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let context = container.mainContext
+    try VisitStarter.ensureHousehold(in: context)
+    let engine = SyncEngine(defaults: defaults)
+    engine.configure(transport: server, context: context)
+
+    let bruno = NearbyPlace(googlePlaceId: "bruno", name: "Bruno's", address: "1709 NE 6th St, Bend", latitude: 44.06, longitude: -121.3, distanceMeters: 0)
+    let place = try PlaceEditing.saveToTry(bruno, level: .reallyWantToGo, why: "Meatball sub", in: context)
+    #expect(place.status == .wantToGo)
+    await engine.sync()
+
+    var changes = PlaceEditing.Changes(place)
+    changes.status = .beenThere
+    changes.review = "Great sub."
+    try PlaceEditing.update(place, with: changes, in: context)
+    await engine.sync()
+    #expect(engine.rejected.isEmpty)
+
+    let other = try Phone(server: server)
+    await other.engine.sync()
+    let copy = try #require(try other.context.fetch(FetchDescriptor<Place>()).first { $0.googlePlaceId == "bruno" })
+    #expect(copy.status == .beenThere)
+    #expect(copy.review == "Great sub.")
+    #expect(copy.interestLevel == .reallyWantToGo)
+    #expect(copy.interestWhy == "Meatball sub")
+
+    // An older phone kept different hashes (it sent fewer place fields). After upgrading it
+    // re-reads everything first, so nothing goes back up.
+    for state in try context.fetch(FetchDescriptor<SyncRecordState>()) where state.recordKey.hasPrefix("places/") {
+        state.recordHash = "from-an-older-version"
+    }
+    try context.save()
+    defaults.set(3, forKey: "sync.format")
+    await server.resetPushCount()
+    await engine.sync()
+    #expect(await server.pushedCount == 0)
+}

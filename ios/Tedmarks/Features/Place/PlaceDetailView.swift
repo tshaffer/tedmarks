@@ -18,6 +18,7 @@ struct PlaceDetailView: View {
 
     @State private var wrapUpVisit: Visit?
     @State private var errorMessage: String?
+    @State private var isEditing = false
 
     var body: some View {
         let _ = refreshKey
@@ -58,6 +59,13 @@ struct PlaceDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) { startVisitButton }
         .sheet(item: $wrapUpVisit) { WrapUpSheet(visit: $0) }
+        .sheet(isPresented: $isEditing) { EditPlaceSheet(place: place) }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { Button("Edit") { isEditing = true } }
+        }
+        #if DEBUG
+        .task { if ProcessInfo.processInfo.arguments.contains("-editPlace") { isEditing = true } }
+        #endif
         .alert("Couldn't start the visit", isPresented: .constant(errorMessage != nil)) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }

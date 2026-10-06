@@ -52,21 +52,28 @@ public final class Place {
     public var googlePrimaryTypeLabel: String?
     public var googleFetchedAt: Date?
 
-    // Read only on the phone for now (from the memorapp import or, later, the web app):
-    // received by sync, never sent back.
+    // Google details, read only on the phone (from the memorapp import or, later, the web).
     public var googleWebsite: String?
     public var googlePhone: String?
     public var googleRating: Double?
     public var googleRatingsCount: Int?
     public var googlePriceLevel: Int?
     public var googleWeekdayText: [String]?
+    /// memorapp's 0–10 rating, kept as the "refined rating" (read only on the phone).
+    public var refinedRating: Int?
+
+    // Editable on the phone (Edit place / Save a place to try).
     public var subtypeId: UUID?
     public var review: String?
-    /// memorapp's 0–10 rating, kept as the "refined rating".
-    public var refinedRating: Int?
     /// InterestLevel raw value: curious, reallyWantToGo.
     public var interestLevelRaw: String?
     public var interestWhy: String?
+    public var interestSavedAt: Date?
+
+    public var interestLevel: InterestLevel? {
+        get { interestLevelRaw.flatMap(InterestLevel.init) }
+        set { interestLevelRaw = newValue?.rawValue }
+    }
 
     public var createdAt: Date
     public var modifiedAt: Date

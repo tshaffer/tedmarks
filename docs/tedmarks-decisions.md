@@ -84,7 +84,21 @@ and for the web app).
 
 ---
 
+## Web app (decided 2026-10-06)
+
+| Topic | Decision |
+|---|---|
+| Role | Browse, plan and tidy up at a desk; capture stays on the phone |
+| Sign-in | **Sign in with Apple** (web first), allowlisted Apple accounts; server issues its own session cookie. The phone keeps the shared key until it moves over. |
+| Design | **Figma first** (web page in the existing Tedmarks file) |
+| Stack | React + TypeScript + Vite, MUI, Google Maps JavaScript API (browser key restricted to the app's address) |
+| Data | The web app is another sync client (pull everything, push edits); shared TS rules for ratings and "what to order" |
+| Hosting | Served by the same Heroku app |
+| First version | Map + list + detail panel, filters, place page, edit places, **add past visits**, **add menus from a PDF or JPG** (read by Claude; files not kept), save places to try |
+| Not on the web | Photos and menu page images (they're references into the iPhone Photos library); menus show as their dish list |
+| Main flow | **Choose a restaurant, then act on it.** Choose by name search, a map pin (Google's or ours) or a row in the list; the panel's actions depend on status (visited: edit/delete visits, add a past visit; never visited: save as want to go, add a menu, add a past visit). No global "+ Add". |
+| Deleting | **Wherever something can be edited, it can be deleted.** Deletes are immediate with an Undo banner (no confirmation dialog). |
+
 ## Still open (not blocking)
 
 - AI monthly cost ceiling
-- Web app stack

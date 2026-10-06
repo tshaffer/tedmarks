@@ -29,6 +29,12 @@ const server = createApp({
   accessKey: config.accessKey,
   voice: config.anthropicApiKey ? new ClaudeVoiceStructurer(config.anthropicApiKey) : undefined,
   menu: config.anthropicApiKey ? new ClaudeMenuReader(config.anthropicApiKey) : undefined,
+  auth: {
+    servicesId: config.appleServicesId,
+    publicUrl: config.publicUrl,
+    allowedAppleUserIds: config.allowedAppleUserIds,
+    sessionSecret: config.sessionSecret,
+  },
 }).listen(config.port, '0.0.0.0', () => {
   console.log(`[tedmarks-api] Listening on port ${config.port}`);
 });

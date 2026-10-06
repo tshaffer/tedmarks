@@ -95,7 +95,7 @@ test('nearby rejects an out-of-range radius', async () => {
   }
 });
 
-test('access key protects everything except /health', async () => {
+test('access key or a signed-in session protects the API; /health and /auth are public', async () => {
   const server = createApp({ accessKey: 'secret-key' }).listen(0);
   await new Promise<void>((resolve) => server.once('listening', () => resolve()));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

@@ -10,7 +10,8 @@
     "dev:api": "pnpm --filter @tedmarks/api dev",
     "indexes:create": "pnpm --filter @tedmarks/api indexes:create",
     "openapi:generate": "pnpm --filter @tedmarks/shared openapi:generate",
-    "start": "node api/dist/index.js"
+    "start": "node api/dist/index.js",
+    "dev:web": "pnpm --filter @tedmarks/web dev"
   },
   "devDependencies": {
     "rimraf": "6.1.3",

@@ -12,10 +12,16 @@ struct WrapUpSheet: View {
     @Query(filter: #Predicate<Person> { $0.deletedAt == nil }, sort: \Person.createdAt) private var people: [Person]
     // Re-render when ratings change.
     @Query(filter: #Predicate<Rating> { $0.deletedAt == nil }) private var allRatings: [Rating]
+    // Re-render when notes change.
+    @Query(filter: #Predicate<Note> { $0.deletedAt == nil }) private var allNotes: [Note]
 
     @State private var rateFor: RateFor = .us
     @State private var isAddingDish = false
     @State private var errorMessage: String?
+    @State private var newNote = ""
+    @State private var editingNote: Note?
+    @State private var editedText = ""
+    @FocusState private var isWritingNote: Bool
 
     var body: some View {
         NavigationStack {
@@ -56,6 +62,29 @@ struct WrapUpSheet: View {
                 } header: {
                     Text("Would you come back?")
                 }
+
+                Section {
+                    ForEach(visitNotes) { note in
+                        Button {
+                            editedText = note.text
+                            editingNote = note
+                        } label: {
+                            Text(note.text).foregroundStyle(.primary).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .onDelete(perform: deleteNotes)
+                    HStack(alignment: .firstTextBaseline) {
+                        TextField("Add a note about this visit", text: $newNote, axis: .vertical)
+                            .focused($isWritingNote)
+                            .lineLimit(1...6)
+                        Button("Add", action: addNote)
+                            .disabled(newNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                } header: {
+                    Text("Notes")
+                } footer: {
+                    Text("Anything worth remembering that isn't about one dish — the service, the room, who was there.")
+                }
             }
             .navigationTitle(visit.place?.name ?? "Wrap up")
             .navigationBarTitleDisplayMode(.inline)
@@ -79,6 +108,18 @@ struct WrapUpSheet: View {
             }
             .sheet(isPresented: $isAddingDish) {
                 RateDishSheet(visit: visit)
+            }
+            .alert("Edit note", isPresented: .constant(editingNote != nil)) {
+                TextField("Note", text: $editedText, axis: .vertical)
+                Button("Save") {
+                    if let note = editingNote { perform { try NoteEditing.update(note, text: editedText, in: context) } }
+                    editingNote = nil
+                }
+                Button("Delete", role: .destructive) {
+                    if let note = editingNote { perform { try NoteEditing.delete(note, in: context) } }
+                    editingNote = nil
+                }
+                Button("Cancel", role: .cancel) { editingNote = nil }
             }
             .alert("Couldn't save", isPresented: .constant(errorMessage != nil)) {
                 Button("OK") { errorMessage = nil }
@@ -153,6 +194,21 @@ struct WrapUpSheet: View {
     private func deleteItems(at offsets: IndexSet) {
         let items = orderItems
         perform { for index in offsets { try DishCapture.removeItem(items[index], in: context) } }
+    }
+
+    private var visitNotes: [Note] {
+        _ = allNotes.count
+        return (try? NoteEditing.visitNotes(for: visit, in: context)) ?? []
+    }
+
+    private func addNote() {
+        perform { try NoteEditing.addVisitNote(newNote, to: visit, in: context) }
+        if errorMessage == nil { newNote = "" }
+    }
+
+    private func deleteNotes(at offsets: IndexSet) {
+        let notes = visitNotes
+        perform { for index in offsets { try NoteEditing.delete(notes[index], in: context) } }
     }
 
     private func endVisit() {

@@ -59,3 +59,48 @@ public final class PlaceSubtype {
         self.modifiedAt = now
     }
 }
+
+/// Typed notes about a visit (not tied to a dish), added on the visit's wrap-up.
+@MainActor
+public enum NoteEditing {
+    /// Live notes about the visit itself (dish notes excluded), oldest first.
+    public static func visitNotes(for visit: Visit, in context: ModelContext) throws -> [Note] {
+        let visitId = visit.id
+        return try context.fetch(FetchDescriptor<Note>(
+            predicate: #Predicate { $0.visitId == visitId && $0.visitItemId == nil && $0.deletedAt == nil },
+            sortBy: [SortDescriptor(\.createdAt)]
+        ))
+    }
+
+    @discardableResult
+    public static func addVisitNote(_ text: String, to visit: Visit, in context: ModelContext, now: Date = .now) throws -> Note? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let place = visit.place else { return nil }
+        let note = Note(placeId: place.id, text: trimmed, origin: "typed", now: now)
+        note.visitId = visit.id
+        context.insert(note)
+        try context.save()
+        SyncEngine.shared.scheduleSync()
+        return note
+    }
+
+    /// Changes a note's text; an empty text deletes it.
+    public static func update(_ note: Note, text: String, in context: ModelContext, now: Date = .now) throws {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            note.deletedAt = now
+        } else {
+            note.text = trimmed
+        }
+        note.modifiedAt = now
+        try context.save()
+        SyncEngine.shared.scheduleSync()
+    }
+
+    public static func delete(_ note: Note, in context: ModelContext, now: Date = .now) throws {
+        note.deletedAt = now
+        note.modifiedAt = now
+        try context.save()
+        SyncEngine.shared.scheduleSync()
+    }
+}

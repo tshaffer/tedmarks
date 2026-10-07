@@ -10,7 +10,7 @@ export const TED = '00000000-0000-4000-8000-000000000001';
 export const LORI = '00000000-0000-4000-8000-000000000002';
 
 type Doc = Record<string, unknown> & { id: string; modifiedAt: string };
-export type Changes = Partial<Record<'places' | 'people' | 'placeItems' | 'visits' | 'visitItems' | 'ratings' | 'notes', Doc[]>>;
+export type Changes = Partial<Record<'places' | 'people' | 'placeItems' | 'visits' | 'visitItems' | 'ratings' | 'notes' | 'menus', Doc[]>>;
 
 /** One dish row: one rating for both of us, or one each when we disagree. */
 export interface DishRow {

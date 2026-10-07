@@ -1,4 +1,4 @@
-import type { NearbyPlace } from '@tedmarks/shared';
+import type { MenuReadItem, MenuReadJob, NearbyPlace } from '@tedmarks/shared';
 
 /** Calls the Tedmarks API on the same origin; the session cookie comes along. */
 export class ApiError extends Error {
@@ -43,4 +43,22 @@ export async function placeDetails(googlePlaceId: string, origin: google.maps.La
 /** Asks the server to fetch a place's hours and details from Google (fire and forget). */
 export function refreshPlace(placeId: string): void {
   void api(`/places/${placeId}/refresh`, { method: 'POST' }).catch(() => {});
+}
+
+export interface MenuPage { mediaType: string; data: string }
+
+/**
+ * Has Claude read a menu: starts the reading, then checks every few seconds until it's done
+ * (a long PDF can take longer than one request may run on Heroku).
+ */
+export async function readMenu(placeName: string, pages: MenuPage[]): Promise<MenuReadItem[]> {
+  const { jobId } = await api<{ jobId: string }>('/ai/menu/jobs', { method: 'POST', body: JSON.stringify({ placeName, pages }) });
+  const deadline = Date.now() + 6 * 60_000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    const job = await api<MenuReadJob>(`/ai/menu/jobs/${jobId}`);
+    if (job.status === 'done') return job.items;
+    if (job.status === 'failed') throw new ApiError(502, job.message);
+  }
+  throw new ApiError(504, 'Reading the menu is taking too long. Try fewer pages.');
 }

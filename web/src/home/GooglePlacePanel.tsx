@@ -1,4 +1,4 @@
-import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, Button, IconButton, Stack, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import type { Interest } from '../data/placeWrites.js';
 import { WantToGoForm } from './WantToGoForm.js';
@@ -20,8 +20,9 @@ export function GoogleCard({ googlePlaceId }: { googlePlaceId: string }) {
 }
 
 /** Figma W1b · a Google restaurant we've never been to. */
-export function GooglePlacePanel({ googlePlaceId, onClose, onAddVisit, onSaveWantToGo }: {
+export function GooglePlacePanel({ googlePlaceId, onClose, onAddVisit, onSaveWantToGo, onAddMenu }: {
   googlePlaceId: string;
+  onAddMenu: () => void;
   onClose: () => void;
   onAddVisit: () => void;
   onSaveWantToGo: (interest: Interest) => Promise<void>;
@@ -40,7 +41,7 @@ export function GooglePlacePanel({ googlePlaceId, onClose, onAddVisit, onSaveWan
         ) : (
         <Stack direction="row" spacing={1}>
           <Button variant="contained" size="small" onClick={() => setSaving(true)}>★ Save as want to go</Button>
-          <Tooltip title="Coming next: menus (W4)"><span><Button size="small" disabled sx={{ bgcolor: '#fff' }}>Add a menu</Button></span></Tooltip>
+          <Button size="small" onClick={onAddMenu} sx={{ bgcolor: '#fff', border: '1px solid #e3e3e8' }}>Add a menu</Button>
           <Button size="small" onClick={onAddVisit} sx={{ bgcolor: '#fff', border: '1px solid #e3e3e8' }}>Add a past visit</Button>
         </Stack>
         )}

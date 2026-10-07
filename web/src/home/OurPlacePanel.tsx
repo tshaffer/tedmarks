@@ -16,10 +16,11 @@ interface Props {
   onSaveInterest: (interest: Interest) => Promise<void>;
   onDeletePlace: () => void;
   onClearInterest: () => void;
+  onMenu: () => void;
 }
 
 /** Figma W1 · chosen restaurant we've been to (or saved as want to go). */
-export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit, onDeleteVisit, onSaveInterest, onDeletePlace, onClearInterest }: Props) {
+export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit, onDeleteVisit, onSaveInterest, onDeletePlace, onClearInterest, onMenu }: Props) {
   const { place } = summary;
   const dishes = dishesAt(data, place.id);
   const [openVisits, setOpenVisits] = useState<Set<string>>(() => new Set(summary.visits.slice(0, 1).map((v) => v.id)));
@@ -88,7 +89,7 @@ export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit,
             {summary.visits.length > 0 ? '★ Want to go back' : '★ Save as want to go'}
           </Button>
         )}
-        <Tooltip title="Coming next: menus (W4)"><span><Button size="small" disabled sx={{ bgcolor: '#f2f2f5' }}>Menu</Button></span></Tooltip>
+        <Button size="small" onClick={onMenu} sx={{ bgcolor: '#f2f2f5', color: 'text.primary' }}>{place.latestMenuId ? 'Menu' : 'Add a menu'}</Button>
         <Tooltip title="Coming next: the place page (W2)"><span><Button size="small" disabled sx={{ bgcolor: '#f2f2f5' }}>Place page ›</Button></span></Tooltip>
       </Stack>
 

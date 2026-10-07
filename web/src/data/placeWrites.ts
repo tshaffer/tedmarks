@@ -49,13 +49,15 @@ export function planClearInterest(placeId: string, now = new Date().toISOString(
   return { places: [patch(placeId, now, { interest: null })] };
 }
 
-/** Deletes a place with every visit to it (their dishes, ratings and notes) and its dish list; returns the undo. */
+/** Deletes a place with every visit to it (their dishes, ratings and notes), its dish list and menus; returns the undo. */
 export function planPlaceDelete(data: TedmarksRecords, placeId: string, now = new Date().toISOString()): { changes: Changes; undo: (later: string) => Changes } {
   const visits = [...data.visits.values()].filter((v) => v.placeId === placeId).map((v) => planVisitDelete(data, v.id, now, { includePlace: false }));
   const items = [...data.placeItems.values()].filter((i) => i.placeId === placeId);
+  const menus = [...data.menus.values()].filter((m) => m.placeId === placeId);
   const own = (fields: Record<string, unknown>, at: string): Changes => ({
     places: [patch(placeId, at, fields)],
     placeItems: items.map((i) => patch(i.id, at, fields)),
+    menus: menus.map((m) => patch(m.id, at, fields)),
   });
   return {
     changes: merge([own({ deletedAt: now }, now), ...visits.map((v) => v.changes)]),

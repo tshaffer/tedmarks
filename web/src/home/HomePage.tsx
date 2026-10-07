@@ -3,6 +3,8 @@ import { placeDetails, pushChanges, refreshPlace } from '../api.js';
 import { planClearInterest, planInterest, planPlaceDelete, planSaveWantToGo, type Interest } from '../data/placeWrites.js';
 import { TED, planVisitDelete, type Changes } from '../data/visitWrites.js';
 import { VisitDialog, type VisitTarget } from '../visit/VisitDialog.js';
+import { MenuDialog, type MenuTarget } from '../menu/MenuDialog.js';
+import { planMenuDelete } from '../data/menuWrites.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { distanceMeters, latLngOf, summarize } from '../data/insights.js';
 import { useTedmarksData } from '../data/TedmarksData.js';
@@ -22,6 +24,7 @@ const FILTERS_KEY = 'tedmarks.filters';
 export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   const { data, error, reload } = useTedmarksData();
   const [visitTarget, setVisitTarget] = useState<VisitTarget | null>(null);
+  const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null);
   const [toast, setToast] = useState<{ message: string; undo?: () => Promise<void> } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [maps, setMaps] = useState<MapsConfig | null>(null);
@@ -134,6 +137,20 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
     }
   }, [data, reload]);
 
+  /** Delete a menu immediately, with Undo; the one before it (if any) becomes the latest again. */
+  const deleteMenu = useCallback(async (menuId: string) => {
+    if (!data) return;
+    const { changes, undo } = planMenuDelete(data, menuId);
+    try {
+      await pushChanges(changes);
+      setMenuTarget(null);
+      await reload();
+      setToast({ message: 'Menu deleted', undo: async () => { await pushChanges(undo(new Date().toISOString())); await reload(); } });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Couldn’t delete the menu.');
+    }
+  }, [data, reload]);
+
   /** A been-there place we no longer want to go back to: immediate, with Undo. */
   const clearInterest = useCallback(async (placeId: string) => {
     const previous = data?.places.get(placeId)?.interest;
@@ -197,11 +214,13 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
                     onDeleteVisit={(visitId) => void deleteVisit(visitId)}
                     onSaveInterest={(interest) => saveInterest(selected.place.id, interest)}
                     onDeletePlace={() => void deletePlace(selected.place.id)}
-                    onClearInterest={() => void clearInterest(selected.place.id)} />
+                    onClearInterest={() => void clearInterest(selected.place.id)}
+                    onMenu={() => setMenuTarget({ kind: 'ours', placeId: selected.place.id, mode: selected.place.latestMenuId ? 'view' : 'add' })} />
                 : selection.kind === 'google'
                   ? <GooglePlacePanel key={selection.googlePlaceId} googlePlaceId={selection.googlePlaceId} onClose={() => setSelection(null)}
                       onAddVisit={() => setVisitTarget({ kind: 'google', googlePlaceId: selection.googlePlaceId, origin })}
-                      onSaveWantToGo={(interest) => saveWantToGo(selection.googlePlaceId, interest)} />
+                      onSaveWantToGo={(interest) => saveWantToGo(selection.googlePlaceId, interest)}
+                      onAddMenu={() => setMenuTarget({ kind: 'google', googlePlaceId: selection.googlePlaceId, origin })} />
                   : <Typography color="text.secondary">That place isn’t available.</Typography>}
             </Paper>
           )}
@@ -215,6 +234,15 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
             await reload();
             setSelection({ kind: 'ours', placeId });
             setToast({ message: 'Visit saved' });
+          }} />
+      )}
+      {data && menuTarget && (
+        <MenuDialog data={data} target={menuTarget} onClose={() => setMenuTarget(null)}
+          onDelete={(menuId) => void deleteMenu(menuId)}
+          onSaved={async (placeId) => {
+            await reload();
+            if (!filters.includes('wantToGo')) setFilters([...filters, 'wantToGo']);
+            setSelection({ kind: 'ours', placeId });
           }} />
       )}
       <Snackbar open={Boolean(toast)} autoHideDuration={toast?.undo ? 8000 : 3000} onClose={() => setToast(null)} message={toast?.message}

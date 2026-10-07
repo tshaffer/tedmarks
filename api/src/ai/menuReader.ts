@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { MenuReadResponse, normalizeItemName, type MenuReadItem, type MenuReadRequest } from '@tedmarks/shared';
 
-/** Reads dishes from menu page photos. A fake in tests. */
+/** Reads dishes from menu pages (photos, screenshots or a PDF). A fake in tests. */
 export interface MenuReader {
   read(request: MenuReadRequest): Promise<MenuReadItem[]>;
 }
@@ -12,9 +12,9 @@ export class MenuDeclinedError extends Error {}
 const MODEL = 'claude-opus-5-5';
 const MAX_ITEMS = 400;
 
-const SYSTEM_PROMPT = `You read restaurant menus from photos for Tedmarks, an app where a couple records what they ordered and how it was. The dish names you return become tappable choices when they say what they ordered, so they should read the way the menu names them.
+const SYSTEM_PROMPT = `You read restaurant menus — photos, screenshots or a PDF — for Tedmarks, an app where a couple records what they ordered and how it was. The dish names you return become tappable choices when they say what they ordered, so they should read the way the menu names them.
 
-Return every orderable dish and drink on the pages, in menu order, with the menu's own section heading for each (null if the page has none) and its price as printed (null if none). Use the dish name only — leave descriptions and ingredient lists out unless the name alone would be ambiguous ("Margherita" under Pizza is fine as is). Fix obvious capitalization, but keep the menu's spelling of foreign names. Skip things that aren't orderable, like hours, notes about allergens, or "add chicken +4" style modifiers. If the photos aren't a menu or can't be read, return an empty list.`;
+Return every orderable dish and drink on the pages, in menu order, with the menu's own section heading for each (null if the page has none) and its price as printed (null if none). Use the dish name only — leave descriptions and ingredient lists out unless the name alone would be ambiguous ("Margherita" under Pizza is fine as is). Fix obvious capitalization, but keep the menu's spelling of foreign names. Skip things that aren't orderable, like hours, notes about allergens, or "add chicken +4" style modifiers. If the pages aren't a menu or can't be read, return an empty list.`;
 
 /** Trims, drops blanks and repeats (same name in the same section), and caps the list. */
 export function cleanMenuItems(items: MenuReadItem[]): MenuReadItem[] {
@@ -42,10 +42,11 @@ export class ClaudeMenuReader implements MenuReader {
   }
 
   async read(request: MenuReadRequest): Promise<MenuReadItem[]> {
-    const images: Anthropic.Beta.BetaContentBlockParam[] = request.pages.map((page) => ({
-      type: 'image',
-      source: { type: 'base64', media_type: page.mediaType as 'image/jpeg', data: page.data },
-    }));
+    const images: Anthropic.Beta.BetaContentBlockParam[] = request.pages.map((page) =>
+      page.mediaType === 'application/pdf'
+        ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: page.data } }
+        : { type: 'image', source: { type: 'base64', media_type: page.mediaType as 'image/jpeg', data: page.data } },
+    );
     // Streamed: a long menu can produce a lot of output.
     const stream = this.client.beta.messages.stream({
       model: MODEL,

@@ -18,7 +18,7 @@ export function GoogleCard({ googlePlaceId }: { googlePlaceId: string }) {
 }
 
 /** Figma W1b · a Google restaurant we've never been to. */
-export function GooglePlacePanel({ googlePlaceId, onClose }: { googlePlaceId: string; onClose: () => void }) {
+export function GooglePlacePanel({ googlePlaceId, onClose, onAddVisit }: { googlePlaceId: string; onClose: () => void; onAddVisit: () => void }) {
   return (
     <Stack spacing={0}>
       <Stack direction="row" justifyContent="flex-end" sx={{ mb: -1 }}>
@@ -30,7 +30,7 @@ export function GooglePlacePanel({ googlePlaceId, onClose }: { googlePlaceId: st
         <Stack direction="row" spacing={1}>
           <Tooltip title="Coming next"><span><Button variant="contained" size="small" disabled>★ Save as want to go</Button></span></Tooltip>
           <Tooltip title="Coming next: menus (W4)"><span><Button size="small" disabled sx={{ bgcolor: '#fff' }}>Add a menu</Button></span></Tooltip>
-          <Tooltip title="Coming next: the visit form (W3)"><span><Button size="small" disabled sx={{ bgcolor: '#fff' }}>Add a past visit</Button></span></Tooltip>
+          <Button size="small" onClick={onAddVisit} sx={{ bgcolor: '#fff', border: '1px solid #e3e3e8' }}>Add a past visit</Button>
         </Stack>
       </Stack>
     </Stack>

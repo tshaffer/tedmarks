@@ -21,3 +21,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 export interface Me { signedIn: boolean; appleUserId: string | null; configured: boolean }
 export const getMe = () => api<Me>('/auth/me');
 export const signOut = () => api<Me>('/auth/logout', { method: 'POST' });
+
+interface PushResult { accepted: { id: string }[]; rejected: { collection: string; id: string; reason: string }[] }
+
+/** Saves records through sync (the same path the phone uses), so changes reach the phones too. */
+export async function pushChanges(changes: Record<string, unknown[] | undefined>): Promise<void> {
+  const result = await api<PushResult>('/sync/push', { method: 'POST', body: JSON.stringify({ changes }) });
+  if (result.rejected.length > 0) {
+    throw new ApiError(422, `The server refused ${result.rejected.length} change(s): ${result.rejected[0]!.reason}`);
+  }
+}

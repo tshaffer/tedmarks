@@ -29,6 +29,7 @@ const server = createApp({
   accessKey: config.accessKey,
   voice: config.anthropicApiKey ? new ClaudeVoiceStructurer(config.anthropicApiKey) : undefined,
   menu: config.anthropicApiKey ? new ClaudeMenuReader(config.anthropicApiKey) : undefined,
+  web: { googleMapsBrowserKey: config.googleMapsBrowserKey, googleMapId: config.googleMapId },
   auth: {
     servicesId: config.appleServicesId,
     publicUrl: config.publicUrl,

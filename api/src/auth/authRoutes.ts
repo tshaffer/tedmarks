@@ -11,6 +11,8 @@ export interface AuthConfig {
   allowedAppleUserIds: string[];
   sessionSecret: string | undefined;
   verifier: AppleTokenVerifier;
+  /** Local development with no access key: the API is open, so the website counts as signed in. */
+  openForDevelopment?: boolean;
 }
 
 interface AppleState { state: string; nonce: string; exp: number }
@@ -31,6 +33,10 @@ export function authRoutes(config: AuthConfig): Router {
   /** GET /auth/me — who's signed in (for the web app). */
   router.get('/me', (req, res) => {
     const session = sessionFrom(req.get('cookie'), config.sessionSecret);
+    if (!session && config.openForDevelopment) {
+      res.json({ signedIn: true, appleUserId: 'local-development', configured });
+      return;
+    }
     res.json({ signedIn: Boolean(session), appleUserId: session?.appleUserId ?? null, configured });
   });
 

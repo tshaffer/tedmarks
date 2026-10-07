@@ -5,7 +5,6 @@ export interface Config {
   port: number;
   mongoUri: string | undefined;
   mongoDbName: string;
-  appleBundleId: string | undefined;
   /** Services ID for Sign in with Apple on the website. */
   appleServicesId: string;
   /** This server's public origin (Apple's return URL is built from it). */
@@ -16,6 +15,10 @@ export interface Config {
   anthropicApiKey: string | undefined;
   /** Server default for the nearby search radius when the app doesn't send one. */
   nearbyRadiusMeters: number;
+  /** Google Maps key for the website (public by design; restricted to the site's address). */
+  googleMapsBrowserKey: string | undefined;
+  /** Map ID (Google Cloud → Map management) for the website's map. */
+  googleMapId: string | undefined;
   /** Interim shared key required on every request except /health (until Sign in with Apple). */
   accessKey: string | undefined;
 }
@@ -30,7 +33,6 @@ export function loadConfig(): Config {
     port: Number(optional('PORT') ?? 4200),
     mongoUri: optional('MONGODB_URI'),
     mongoDbName: optional('MONGODB_DB') ?? 'tedmarks',
-    appleBundleId: optional('APPLE_BUNDLE_ID'),
     appleServicesId: optional('APPLE_SERVICES_ID') ?? 'com.tedshaffer.tedmarks.web',
     publicUrl: optional('PUBLIC_URL')?.replace(/\/$/, ''),
     allowedAppleUserIds: (optional('ALLOWED_APPLE_USER_IDS') ?? '')
@@ -42,6 +44,8 @@ export function loadConfig(): Config {
     anthropicApiKey: optional('ANTHROPIC_API_KEY'),
     nearbyRadiusMeters: Number(optional('NEARBY_RADIUS_METERS') ?? DEFAULT_NEARBY_RADIUS_METERS),
     accessKey: optional('API_ACCESS_KEY'),
+    googleMapsBrowserKey: optional('GOOGLE_MAPS_BROWSER_KEY'),
+    googleMapId: optional('GOOGLE_MAP_ID'),
   };
 }
 

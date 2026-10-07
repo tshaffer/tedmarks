@@ -33,11 +33,13 @@ export interface AppDeps {
     sessionSecret?: string | undefined;
     verifier?: AppleTokenVerifier;
   };
+  /** What the website needs to show Google's map (signed-in pages only). */
+  web?: { googleMapsBrowserKey?: string | undefined; googleMapId?: string | undefined };
   /** Built web app to serve (web/dist); found automatically when omitted. */
   webDist?: string | undefined;
 }
 
-const API_PREFIXES = ['/sync', '/places', '/ai', '/auth', '/health'];
+const API_PREFIXES = ['/sync', '/places', '/ai', '/auth', '/health', '/config'];
 
 export function createApp(deps: AppDeps = {}): Express {
   const app = express();
@@ -55,6 +57,7 @@ export function createApp(deps: AppDeps = {}): Express {
     allowedAppleUserIds: deps.auth?.allowedAppleUserIds ?? [],
     sessionSecret: deps.auth?.sessionSecret,
     verifier: deps.auth?.verifier ?? new AppleTokenVerifier(),
+    openForDevelopment: !deps.accessKey,
   }));
 
   // The API: the phone's access key or the website's session.
@@ -63,6 +66,10 @@ export function createApp(deps: AppDeps = {}): Express {
   app.use('/sync', access, syncRoutes(store));
   app.use('/places', access, placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS, store));
   app.use('/ai', access, aiRoutes(deps.voice, deps.menu));
+  /** GET /config — the website's Google Maps key and Map ID. */
+  app.get('/config', access, (_req, res) => {
+    res.json({ googleMapsKey: deps.web?.googleMapsBrowserKey ?? null, mapId: deps.web?.googleMapId ?? null });
+  });
 
   // The website (static files; any other page path gets index.html for the app's own routing).
   const webDist = deps.webDist ?? fileURLToPath(new URL('../../web/dist', import.meta.url));

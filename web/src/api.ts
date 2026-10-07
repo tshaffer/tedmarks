@@ -1,3 +1,5 @@
+import type { NearbyPlace } from '@tedmarks/shared';
+
 /** Calls the Tedmarks API on the same origin; the session cookie comes along. */
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string) {
@@ -30,4 +32,15 @@ export async function pushChanges(changes: Record<string, unknown[] | undefined>
   if (result.rejected.length > 0) {
     throw new ApiError(422, `The server refused ${result.rejected.length} change(s): ${result.rejected[0]!.reason}`);
   }
+}
+
+/** A Google restaurant's name, address and location (distance measured from `origin`). */
+export async function placeDetails(googlePlaceId: string, origin: google.maps.LatLngLiteral): Promise<NearbyPlace> {
+  const { place } = await api<{ place: NearbyPlace }>(`/places/details/${encodeURIComponent(googlePlaceId)}?lat=${origin.lat}&lng=${origin.lng}`);
+  return place;
+}
+
+/** Asks the server to fetch a place's hours and details from Google (fire and forget). */
+export function refreshPlace(placeId: string): void {
+  void api(`/places/${placeId}/refresh`, { method: 'POST' }).catch(() => {});
 }

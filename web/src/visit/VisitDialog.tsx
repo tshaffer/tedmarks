@@ -4,7 +4,7 @@ import {
   IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
-import { api, pushChanges } from '../api.js';
+import { placeDetails, pushChanges, refreshPlace } from '../api.js';
 import { DISH, VERDICT, visitSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
 import { LORI, TED, planVisitSave, type DishRow, type VisitForm } from '../data/visitWrites.js';
@@ -48,9 +48,8 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
   // A Google restaurant: look it up (name, address, location) to save it as ours.
   useEffect(() => {
     if (target.kind !== 'google' || place) return;
-    const { lat, lng } = target.origin;
-    api<{ place: NearbyPlace }>(`/places/details/${encodeURIComponent(target.googlePlaceId)}?lat=${lat}&lng=${lng}`)
-      .then((r) => setGoogle(r.place)).catch(() => setError('Couldn’t look up this restaurant on Google.'));
+    placeDetails(target.googlePlaceId, target.origin)
+      .then(setGoogle).catch(() => setError('Couldn’t look up this restaurant on Google.'));
   }, [target, place]);
 
   const placeName = place?.name ?? google?.name ?? '…';
@@ -88,7 +87,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
       const { changes, placeId: savedPlace, visitId } = planVisitSave(data, form);
       await pushChanges(changes);
       // A newly saved Google restaurant: fetch its hours and details for next time.
-      if (!place) void api(`/places/${savedPlace}/refresh`, { method: 'POST' }).catch(() => {});
+      if (!place) refreshPlace(savedPlace);
       onSaved(savedPlace, visitId);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Couldn’t save the visit.');

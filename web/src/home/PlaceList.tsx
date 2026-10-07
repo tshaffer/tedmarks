@@ -39,7 +39,7 @@ export function PlaceList({ items, filters, onFilters, selectedPlaceId, onSelect
                 )}
               </Box>
               <Typography sx={{ fontSize: 20, ml: 1, color: '#ff9500' }}>
-                {summary.place.status === 'wantToGo' ? '★' : summary.verdict.kind === 'joint' ? VERDICT[summary.verdict.value].emoji : summary.verdict.kind === 'split' ? '↔' : ''}
+                {summary.place.status === 'wantToGo' ? (summary.place.interest?.level === 'curious' ? '☆' : '★') : summary.verdict.kind === 'joint' ? VERDICT[summary.verdict.value].emoji : summary.verdict.kind === 'split' ? '↔' : ''}
               </Typography>
             </ListItemButton>
           );

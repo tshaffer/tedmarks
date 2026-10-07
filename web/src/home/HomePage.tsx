@@ -1,6 +1,7 @@
 import { Alert, Box, Button, CircularProgress, Paper, Snackbar, Typography } from '@mui/material';
-import { pushChanges } from '../api.js';
-import { planVisitDelete, type Changes } from '../data/visitWrites.js';
+import { placeDetails, pushChanges, refreshPlace } from '../api.js';
+import { planClearInterest, planInterest, planPlaceDelete, planSaveWantToGo, type Interest } from '../data/placeWrites.js';
+import { TED, planVisitDelete, type Changes } from '../data/visitWrites.js';
 import { VisitDialog, type VisitTarget } from '../visit/VisitDialog.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { distanceMeters, latLngOf, summarize } from '../data/insights.js';
@@ -93,6 +94,69 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
     }
   }, [data, reload]);
 
+  const origin = view?.center ?? { lat: 37.3861, lng: -122.0839 };
+
+  const saveWantToGo = useCallback(async (googlePlaceId: string, interest: Interest) => {
+    if (!data) return;
+    try {
+      const details = await placeDetails(googlePlaceId, origin);
+      const { changes, placeId } = planSaveWantToGo(data, details, interest);
+      const isNew = !data.places.has(placeId);
+      await pushChanges(changes);
+      if (isNew) refreshPlace(placeId);
+      await reload();
+      if (!filters.includes('wantToGo')) setFilters([...filters, 'wantToGo']);
+      setSelection({ kind: 'ours', placeId });
+      setToast({ message: `${details.name} saved as want to go` });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Couldn’t save the restaurant.');
+    }
+  }, [data, origin, reload, filters]);
+
+  const saveInterest = useCallback(async (placeId: string, interest: Interest) => {
+    if (!data) return;
+    try {
+      await pushChanges(planInterest(data, placeId, interest));
+      await reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Couldn’t save.');
+    }
+  }, [data, reload]);
+
+  /** A been-there place we no longer want to go back to: immediate, with Undo. */
+  const clearInterest = useCallback(async (placeId: string) => {
+    const previous = data?.places.get(placeId)?.interest;
+    if (!previous) return;
+    try {
+      await pushChanges(planClearInterest(placeId));
+      await reload();
+      setToast({
+        message: 'Removed from want to go',
+        undo: async () => { await pushChanges({ places: [{ id: placeId, modifiedAt: new Date().toISOString(), modifiedBy: TED, interest: previous }] }); await reload(); },
+      });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Couldn’t save.');
+    }
+  }, [data, reload]);
+
+  /** Delete immediately, with Undo — the place with its visits and dish list. */
+  const deletePlace = useCallback(async (placeId: string) => {
+    if (!data) return;
+    const name = data.places.get(placeId)?.name ?? 'Place';
+    const { changes, undo } = planPlaceDelete(data, placeId);
+    try {
+      await pushChanges(changes);
+      setSelection(null);
+      await reload();
+      setToast({
+        message: `${name} deleted`,
+        undo: async () => { await pushChanges(undo(new Date().toISOString())); await reload(); setSelection({ kind: 'ours', placeId }); },
+      });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Couldn’t delete the place.');
+    }
+  }, [data, reload]);
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} onResult={onSearch} /> : null} />
@@ -118,10 +182,14 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
                 ? <OurPlacePanel key={selected.place.id} data={data} summary={selected} onClose={() => setSelection(null)}
                     onAddVisit={() => setVisitTarget({ kind: 'ours', placeId: selected.place.id })}
                     onEditVisit={(visitId) => setVisitTarget({ kind: 'ours', placeId: selected.place.id, visitId })}
-                    onDeleteVisit={(visitId) => void deleteVisit(visitId)} />
+                    onDeleteVisit={(visitId) => void deleteVisit(visitId)}
+                    onSaveInterest={(interest) => saveInterest(selected.place.id, interest)}
+                    onDeletePlace={() => void deletePlace(selected.place.id)}
+                    onClearInterest={() => void clearInterest(selected.place.id)} />
                 : selection.kind === 'google'
                   ? <GooglePlacePanel key={selection.googlePlaceId} googlePlaceId={selection.googlePlaceId} onClose={() => setSelection(null)}
-                      onAddVisit={() => setVisitTarget({ kind: 'google', googlePlaceId: selection.googlePlaceId, origin: view?.center ?? { lat: 37.3861, lng: -122.0839 } })} />
+                      onAddVisit={() => setVisitTarget({ kind: 'google', googlePlaceId: selection.googlePlaceId, origin })}
+                      onSaveWantToGo={(interest) => saveWantToGo(selection.googlePlaceId, interest)} />
                   : <Typography color="text.secondary">That place isn’t available.</Typography>}
             </Paper>
           )}

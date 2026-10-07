@@ -2,7 +2,9 @@ import { Box, Button, Collapse, IconButton, Link, Stack, Tooltip, Typography } f
 import { useState } from 'react';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
 import { DISH, dishesAt, ratingText, VERDICT, visitSummary, type PlaceSummary } from '../data/insights.js';
+import type { Interest } from '../data/placeWrites.js';
 import { GoogleCard } from './GooglePlacePanel.js';
+import { WantToGoForm } from './WantToGoForm.js';
 
 interface Props {
   data: TedmarksRecords;
@@ -11,14 +13,18 @@ interface Props {
   onAddVisit: () => void;
   onEditVisit: (visitId: string) => void;
   onDeleteVisit: (visitId: string) => void;
+  onSaveInterest: (interest: Interest) => Promise<void>;
+  onDeletePlace: () => void;
+  onClearInterest: () => void;
 }
 
 /** Figma W1 · chosen restaurant we've been to (or saved as want to go). */
-export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit, onDeleteVisit }: Props) {
+export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit, onDeleteVisit, onSaveInterest, onDeletePlace, onClearInterest }: Props) {
   const { place } = summary;
   const dishes = dishesAt(data, place.id);
   const [openVisits, setOpenVisits] = useState<Set<string>>(() => new Set(summary.visits.slice(0, 1).map((v) => v.id)));
   const [showGoogle, setShowGoogle] = useState(false);
+  const [editingInterest, setEditingInterest] = useState(false);
   const toggle = (id: string) => setOpenVisits((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const directions = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place.name)}${place.google?.placeId ? `&destination_place_id=${place.google.placeId}` : ''}`;
   const verdict = summary.verdict;
@@ -33,7 +39,7 @@ export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit,
         <IconButton size="small" onClick={onClose} aria-label="Close">✕</IconButton>
       </Stack>
 
-      {place.status === 'beenThere' ? (
+      {place.status === 'beenThere' && (
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ p: 1.5, borderRadius: 3, bgcolor: verdict.kind === 'joint' ? VERDICT[verdict.value].bg : '#f2f2f5' }}>
           <Typography sx={{ fontSize: 28 }}>{verdict.kind === 'joint' ? VERDICT[verdict.value].emoji : verdict.kind === 'split' ? '↔' : '–'}</Typography>
           <Box sx={{ flex: 1 }}>
@@ -45,10 +51,27 @@ export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit,
             </Typography>
           </Box>
         </Stack>
-      ) : (
+      )}
+
+      {(place.status === 'wantToGo' || place.interest || editingInterest) && (
         <Box sx={{ p: 1.5, borderRadius: 3, bgcolor: '#fff6ea' }}>
-          <Typography fontWeight={600} color="#c26a00">★ {place.interest?.level === 'reallyWantToGo' ? 'Really want to go' : 'Want to go'}</Typography>
-          {place.interest?.why && <Typography variant="body2">{place.interest.why}</Typography>}
+          {editingInterest ? (
+            <WantToGoForm saveLabel="Save" initial={place.interest && { level: place.interest.level, why: place.interest.why ?? '' }}
+              onSave={async (interest) => { await onSaveInterest(interest); setEditingInterest(false); }} onCancel={() => setEditingInterest(false)} />
+          ) : (
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <Box sx={{ flex: 1 }}>
+                <Typography fontWeight={600} color="#c26a00">
+                  {place.interest?.level === 'curious' ? '☆ Curious' : place.interest ? '★ Really want to go' : '★ Want to go'}{place.status === 'beenThere' ? ' back' : ''}
+                </Typography>
+                {place.interest?.why && <Typography variant="body2">{place.interest.why}</Typography>}
+                {place.interest?.savedAt && <Typography variant="caption" color="text.secondary">Saved {new Date(place.interest.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Typography>}
+              </Box>
+              <Button size="small" onClick={() => setEditingInterest(true)} sx={{ bgcolor: '#fff', color: 'text.primary', minWidth: 0 }}>Edit</Button>
+              {/* Want to go: the place itself. Been there: just the wish to go back. */}
+              <Button size="small" onClick={place.status === 'wantToGo' ? onDeletePlace : onClearInterest} sx={{ bgcolor: '#fdecec', color: 'error.main', minWidth: 0 }}>Delete</Button>
+            </Stack>
+          )}
         </Box>
       )}
 
@@ -58,8 +81,13 @@ export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit,
         <Link href={directions} target="_blank" rel="noopener" variant="body2" fontWeight={500} underline="hover">Directions ↗</Link>
       </Stack>
 
-      <Stack direction="row" spacing={1}>
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
         <Button variant="contained" size="small" onClick={onAddVisit}>+ Add a past visit</Button>
+        {place.status === 'beenThere' && !place.interest && !editingInterest && (
+          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ bgcolor: '#fff6ea', color: '#c26a00' }}>
+            {summary.visits.length > 0 ? '★ Want to go back' : '★ Save as want to go'}
+          </Button>
+        )}
         <Tooltip title="Coming next: menus (W4)"><span><Button size="small" disabled sx={{ bgcolor: '#f2f2f5' }}>Menu</Button></span></Tooltip>
         <Tooltip title="Coming next: the place page (W2)"><span><Button size="small" disabled sx={{ bgcolor: '#f2f2f5' }}>Place page ›</Button></span></Tooltip>
       </Stack>

@@ -1,5 +1,7 @@
 import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { Interest } from '../data/placeWrites.js';
+import { WantToGoForm } from './WantToGoForm.js';
 
 /** Google's own place card (Places UI Kit): the same information as Google Maps. */
 export function GoogleCard({ googlePlaceId }: { googlePlaceId: string }) {
@@ -18,7 +20,13 @@ export function GoogleCard({ googlePlaceId }: { googlePlaceId: string }) {
 }
 
 /** Figma W1b · a Google restaurant we've never been to. */
-export function GooglePlacePanel({ googlePlaceId, onClose, onAddVisit }: { googlePlaceId: string; onClose: () => void; onAddVisit: () => void }) {
+export function GooglePlacePanel({ googlePlaceId, onClose, onAddVisit, onSaveWantToGo }: {
+  googlePlaceId: string;
+  onClose: () => void;
+  onAddVisit: () => void;
+  onSaveWantToGo: (interest: Interest) => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
   return (
     <Stack spacing={0}>
       <Stack direction="row" justifyContent="flex-end" sx={{ mb: -1 }}>
@@ -27,11 +35,15 @@ export function GooglePlacePanel({ googlePlaceId, onClose, onAddVisit }: { googl
       <Box sx={{ mx: -2.5 }}><GoogleCard googlePlaceId={googlePlaceId} /></Box>
       <Stack spacing={1} sx={{ mx: -2.5, mb: -2.5, mt: 1, p: 2.5, bgcolor: '#fffaf2', borderTop: '1px solid #ffe1b0' }}>
         <Typography variant="caption" fontWeight={600} color="text.secondary">Not in Tedmarks yet</Typography>
+        {saving ? (
+          <WantToGoForm saveLabel="Save as want to go" onSave={onSaveWantToGo} onCancel={() => setSaving(false)} />
+        ) : (
         <Stack direction="row" spacing={1}>
-          <Tooltip title="Coming next"><span><Button variant="contained" size="small" disabled>★ Save as want to go</Button></span></Tooltip>
+          <Button variant="contained" size="small" onClick={() => setSaving(true)}>★ Save as want to go</Button>
           <Tooltip title="Coming next: menus (W4)"><span><Button size="small" disabled sx={{ bgcolor: '#fff' }}>Add a menu</Button></span></Tooltip>
           <Button size="small" onClick={onAddVisit} sx={{ bgcolor: '#fff', border: '1px solid #e3e3e8' }}>Add a past visit</Button>
         </Stack>
+        )}
       </Stack>
     </Stack>
   );

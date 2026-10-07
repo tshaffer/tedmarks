@@ -1,44 +1,6 @@
-import { collectionSchemas, type CollectionName } from '@tedmarks/shared';
 import { describe, expect, test } from 'vitest';
-import type { TedmarksRecords } from './TedmarksData.js';
-import { LORI, TED, planVisitDelete, planVisitSave, startedAtIso, type Changes, type Ids, type VisitForm } from './visitWrites.js';
-
-const T0 = '2026-10-01T18:00:00.000Z';
-const NOW = '2026-10-07T18:00:00.000Z';
-const PLACE = '11111111-1111-4111-8111-111111111111';
-
-function counter(): Ids {
-  let n = 0;
-  return { next: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` };
-}
-
-const meta = (id: string) => ({ id, createdAt: T0, createdBy: TED, modifiedAt: T0, modifiedBy: TED });
-
-function records(): TedmarksRecords {
-  const map = <T extends { id: string }>(items: T[]) => new Map(items.map((i) => [i.id, i]));
-  return {
-    places: map([{ ...meta(PLACE), kind: 'restaurant', status: 'wantToGo', name: 'Doppio Zero', tags: [], location: { type: 'Point', coordinates: [-122.08, 37.39] }, google: { placeId: 'g-doppio', name: 'Doppio Zero', fetchedAt: T0 } }]),
-    people: map([{ ...meta(TED), displayName: 'Ted', kind: 'household' }, { ...meta(LORI), displayName: 'Lori', kind: 'household' }]),
-    placeItems: map([{ ...meta('22222222-2222-4222-8222-222222222222'), placeId: PLACE, name: 'Burrata', normalizedName: 'burrata', sources: ['order'] }]),
-    visits: new Map(), visitItems: new Map(), ratings: new Map(), notes: new Map(), menus: new Map(), placeSubtypes: new Map(),
-  } as unknown as TedmarksRecords;
-}
-
-/** Applies changes as the server does (patch merge, null clears) and validates every result. */
-function apply(data: TedmarksRecords, changes: Changes): TedmarksRecords {
-  const next = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, new Map(v as Map<string, unknown>)])) as unknown as TedmarksRecords;
-  for (const [collection, docs] of Object.entries(changes)) {
-    const store = (next as unknown as Record<string, Map<string, Record<string, unknown>>>)[collection]!;
-    for (const doc of docs ?? []) {
-      const merged: Record<string, unknown> = { ...(store.get(doc.id) ?? {}) };
-      for (const [k, v] of Object.entries(doc)) { if (v === null) delete merged[k]; else if (v !== undefined) merged[k] = v; }
-      const parsed = collectionSchemas[collection as CollectionName].safeParse(merged);
-      expect(parsed.success, `${collection} ${doc.id}: ${parsed.error?.issues[0]?.path.join('.')} ${parsed.error?.issues[0]?.message}`).toBe(true);
-      if (merged.deletedAt) store.delete(doc.id); else store.set(doc.id, merged);
-    }
-  }
-  return next;
-}
+import { NOW, PLACE, T0, apply, counter, records } from './testRecords.js';
+import { LORI, TED, planVisitDelete, planVisitSave, startedAtIso, type VisitForm } from './visitWrites.js';
 
 const baseForm: VisitForm = {
   place: { kind: 'ours', placeId: PLACE }, date: '2026-09-20', participantIds: [TED, LORI], newGuests: [],

@@ -86,22 +86,52 @@ describe('editing a visit', () => {
 });
 
 describe('deleting a visit', () => {
-  test('deletes the visit with its dishes, ratings and notes; undo brings them back', () => {
+  const ids = counter();
+  const visitAt = (data: ReturnType<typeof records>, date: string, at: string) => planVisitSave(data, {
+    ...baseForm, date, dishes: [{ name: 'Burrata', ratingMode: 'us', us: 'loved', note: 'yum' }], verdict: 'wouldReturn', notes: [{ text: 'nice' }],
+  }, at, ids);
+
+  test('deletes the visit with its dishes, ratings and notes; the place keeps its other visits; undo restores', () => {
     let data = records();
-    const saved = planVisitSave(data, {
-      ...baseForm, dishes: [{ name: 'Burrata', ratingMode: 'us', us: 'loved', note: 'yum' }], verdict: 'wouldReturn', notes: [{ text: 'nice' }],
-    }, T0, counter());
+    data = apply(data, visitAt(data, '2026-09-01', T0).changes);
+    const second = visitAt(data, '2026-09-20', T0);
+    data = apply(data, second.changes);
+    const before = [data.visits.size, data.visitItems.size, data.ratings.size, data.notes.size];
+
+    const graveyard = new Map<string, Record<string, unknown>>();
+    const { changes, undo, placeAction } = planVisitDelete(data, second.visitId, NOW);
+    expect(placeAction).toBe('keep');
+    const deleted = apply(data, changes, graveyard);
+    expect([deleted.visits.size, deleted.visitItems.size, deleted.ratings.size, deleted.notes.size]).toEqual([1, 1, 2, 2]);   // the first visit's: dish + verdict ratings; dish + visit notes
+    expect(deleted.places.get(PLACE)?.status).toBe('beenThere');
+
+    const restored = apply(deleted, undo('2026-10-07T18:00:05.000Z'), graveyard);
+    expect([restored.visits.size, restored.visitItems.size, restored.ratings.size, restored.notes.size]).toEqual(before);
+  });
+
+  test('the last visit to a place with nothing else: the place goes too (undo brings it back)', () => {
+    let data = records();
+    const saved = visitAt(data, '2026-09-20', T0);
     data = apply(data, saved.changes);
-    const before = { visits: data.visits.size, lines: data.visitItems.size, ratings: data.ratings.size, notes: data.notes.size };
+    const graveyard = new Map<string, Record<string, unknown>>();
+    const { changes, undo, placeAction } = planVisitDelete(data, saved.visitId, NOW);
+    expect(placeAction).toBe('delete');
+    const deleted = apply(data, changes, graveyard);
+    expect([deleted.places.size, deleted.placeItems.size, deleted.visits.size]).toEqual([0, 0, 0]);
+    const restored = apply(deleted, undo('2026-10-07T18:00:05.000Z'), graveyard);
+    expect([restored.places.get(PLACE)?.status, restored.placeItems.size, restored.visits.size]).toEqual(['beenThere', 1, 1]);
+  });
 
-    const { changes, undo } = planVisitDelete(data, saved.visitId, NOW);
-    const deleted = apply(data, changes);
-    expect([deleted.visits.size, deleted.visitItems.size, deleted.ratings.size, deleted.notes.size]).toEqual([0, 0, 0, 0]);
-    expect(deleted.placeItems.size).toBe(1);   // the place keeps its dish list
-
-    // Undo patches deletedAt away on the server's copies (the records still exist there).
-    const restored = apply(data, undo('2026-10-07T18:00:05.000Z'));
-    expect([restored.visits.size, restored.visitItems.size, restored.ratings.size, restored.notes.size])
-      .toEqual([before.visits, before.lines, before.ratings, before.notes]);
+  test('the last visit to a place we want to go to: it becomes want to go again', () => {
+    let data = records();
+    data.places.set(PLACE, { ...data.places.get(PLACE)!, interest: { level: 'curious', savedAt: T0 } });
+    const saved = visitAt(data, '2026-09-20', T0);
+    data = apply(data, saved.changes);
+    const { changes, undo, placeAction } = planVisitDelete(data, saved.visitId, NOW);
+    expect(placeAction).toBe('wantToGo');
+    const graveyard = new Map<string, Record<string, unknown>>();
+    const deleted = apply(data, changes, graveyard);
+    expect(deleted.places.get(PLACE)?.status).toBe('wantToGo');
+    expect(apply(deleted, undo('2026-10-07T18:00:05.000Z'), graveyard).places.get(PLACE)?.status).toBe('beenThere');
   });
 });

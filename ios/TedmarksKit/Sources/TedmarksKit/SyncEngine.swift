@@ -104,6 +104,8 @@ public final class SyncEngine {
                 }
                 try await push(transport: transport, context: context)
                 try await pull(transport: transport, context: context)
+                // Now every visit is known: places left been there with nothing go up next round.
+                if try PlaceEditing.settlePlacesWithoutVisits(in: context) > 0 { syncAgain = true }
                 lastSyncedAt = .now
                 defaults.set(lastSyncedAt, forKey: Self.lastSyncedKey)
                 lastError = nil

@@ -100,3 +100,28 @@ private func load<T: Decodable>(_ type: T.Type, _ name: String) throws -> T {
         #expect(actual.ratedVisitCount == testCase.expected.ratedVisitCount, "\(testCase.name)")
     }
 }
+
+private struct PlaceWithoutVisitsFixture: Decodable {
+    struct Input: Decodable {
+        var status: PlaceStatus
+        var hasInterest: Bool
+        var hasReview: Bool
+        var hasMenuOrNotes: Bool
+    }
+    struct Case: Decodable {
+        var name: String
+        var input: Input
+        var expected: PlaceWithoutVisitsAction
+    }
+    var cases: [Case]
+}
+
+@Test func placeWithoutVisitsMatchesSharedFixtures() throws {
+    let fixture = try load(PlaceWithoutVisitsFixture.self, "place-without-visits-cases.json")
+    #expect(!fixture.cases.isEmpty)
+    for testCase in fixture.cases {
+        let input = testCase.input
+        let actual = placeWithoutVisits(status: input.status, hasInterest: input.hasInterest, hasReview: input.hasReview, hasMenuOrNotes: input.hasMenuOrNotes)
+        #expect(actual == testCase.expected, "\(testCase.name)")
+    }
+}

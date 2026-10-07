@@ -51,7 +51,7 @@ export function planClearInterest(placeId: string, now = new Date().toISOString(
 
 /** Deletes a place with every visit to it (their dishes, ratings and notes) and its dish list; returns the undo. */
 export function planPlaceDelete(data: TedmarksRecords, placeId: string, now = new Date().toISOString()): { changes: Changes; undo: (later: string) => Changes } {
-  const visits = [...data.visits.values()].filter((v) => v.placeId === placeId).map((v) => planVisitDelete(data, v.id, now));
+  const visits = [...data.visits.values()].filter((v) => v.placeId === placeId).map((v) => planVisitDelete(data, v.id, now, { includePlace: false }));
   const items = [...data.placeItems.values()].filter((i) => i.placeId === placeId);
   const own = (fields: Record<string, unknown>, at: string): Changes => ({
     places: [patch(placeId, at, fields)],

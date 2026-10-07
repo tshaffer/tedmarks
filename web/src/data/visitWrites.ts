@@ -1,4 +1,4 @@
-import { normalizeItemName, type ItemRatingValue, type NearbyPlace, type Rating, type VerdictValue } from '@tedmarks/shared';
+import { normalizeItemName, placeWithoutVisits, type ItemRatingValue, type NearbyPlace, type Rating, type VerdictValue } from '@tedmarks/shared';
 import type { TedmarksRecords } from './TedmarksData.js';
 
 // Turning the visit form (Figma W3) into synced records. Pure: returns the changes to push
@@ -155,8 +155,14 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
   return { changes, visitId, placeId };
 }
 
-/** Deleting a visit: the visit, its dishes, ratings and notes get deletedAt. Returns the changes and their undo. */
-export function planVisitDelete(data: TedmarksRecords, visitId: string, now = new Date().toISOString()): { changes: Changes; undo: (later: string) => Changes } {
+/**
+ * Deleting a visit: the visit, its dishes, ratings and notes get deletedAt. If it was the place's
+ * last visit, the place follows the shared rule (placeWithoutVisits): it may become want to go,
+ * or be deleted with its dish list. Returns the changes, their undo, and what happened to the place.
+ */
+export function planVisitDelete(
+  data: TedmarksRecords, visitId: string, now = new Date().toISOString(), { includePlace = true } = {},
+): { changes: Changes; undo: (later: string) => Changes; placeAction: 'keep' | 'wantToGo' | 'delete' } {
   const lines = [...data.visitItems.values()].filter((l) => l.visitId === visitId);
   const targets: [keyof Changes, string][] = [
     ['visits', visitId],
@@ -164,12 +170,35 @@ export function planVisitDelete(data: TedmarksRecords, visitId: string, now = ne
     ...[...data.ratings.values()].filter((r) => r.visitId === visitId).map((r) => ['ratings', r.id] as [keyof Changes, string]),
     ...[...data.notes.values()].filter((n) => n.visitId === visitId).map((n) => ['notes', n.id] as [keyof Changes, string]),
   ];
-  const build = (fields: (at: string) => Record<string, unknown>) => (at: string) => {
+
+  // The place, if this was its last visit.
+  const placeId = data.visits.get(visitId)?.placeId;
+  const place = placeId ? data.places.get(placeId) : undefined;
+  const lastVisit = place && ![...data.visits.values()].some((v) => v.placeId === place.id && v.id !== visitId);
+  const placeAction = includePlace && place && lastVisit
+    ? placeWithoutVisits({
+        status: place.status,
+        hasInterest: Boolean(place.interest),
+        hasReview: Boolean(place.review) || place.refinedRating !== undefined,
+        hasMenuOrNotes: [...data.menus.values()].some((m) => m.placeId === place.id)
+          || [...data.notes.values()].some((n) => n.placeId === place.id && !n.visitId),
+      })
+    : 'keep';
+  if (place && placeAction === 'delete') {
+    targets.push(['places', place.id], ...[...data.placeItems.values()].filter((i) => i.placeId === place.id).map((i) => ['placeItems', i.id] as [keyof Changes, string]));
+  }
+
+  const build = (fields: (at: string) => Record<string, unknown>, status: string) => (at: string) => {
     const changes: Changes = {};
     for (const [collection, id] of targets) (changes[collection] ??= []).push(patch(id, at, fields(at)));
+    if (place && placeAction === 'wantToGo') (changes.places ??= []).push(patch(place.id, at, { status }));
     return changes;
   };
-  return { changes: build((at) => ({ deletedAt: at }))(now), undo: build(() => ({ deletedAt: null })) };
+  return {
+    changes: build((at) => ({ deletedAt: at }), 'wantToGo')(now),
+    undo: build(() => ({ deletedAt: null }), 'beenThere'),
+    placeAction,
+  };
 }
 
 // MARK: - Helpers

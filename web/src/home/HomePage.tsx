@@ -78,17 +78,28 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
 
   const selected = selection?.kind === 'ours' ? summaries.find((s) => s.place.id === selection.placeId) : undefined;
 
-  /** Delete immediately, with Undo (no confirmation — decision). */
+  /** Delete immediately, with Undo (no confirmation — decision). A place left with nothing may go too. */
   const deleteVisit = useCallback(async (visitId: string) => {
     if (!data) return;
     const visit = data.visits.get(visitId);
-    const { changes, undo } = planVisitDelete(data, visitId);
+    const place = visit ? data.places.get(visit.placeId) : undefined;
+    const { changes, undo, placeAction } = planVisitDelete(data, visitId);
     try {
       await pushChanges(changes as Changes);
       setVisitTarget(null);
+      if (placeAction === 'delete') setSelection(null);
       await reload();
       const day = visit ? new Date(visit.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-      setToast({ message: `Visit on ${day} deleted`, undo: async () => { await pushChanges(undo(new Date().toISOString())); await reload(); } });
+      setToast({
+        message: placeAction === 'delete' ? `Visit on ${day} deleted — and ${place?.name ?? 'the place'}, which had nothing else`
+          : placeAction === 'wantToGo' ? `Visit on ${day} deleted — ${place?.name ?? 'the place'} is want to go again`
+          : `Visit on ${day} deleted`,
+        undo: async () => {
+          await pushChanges(undo(new Date().toISOString()));
+          await reload();
+          if (place) setSelection({ kind: 'ours', placeId: place.id });
+        },
+      });
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Couldn’t delete the visit.');
     }
@@ -143,13 +154,14 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   const deletePlace = useCallback(async (placeId: string) => {
     if (!data) return;
     const name = data.places.get(placeId)?.name ?? 'Place';
+    const visits = [...data.visits.values()].filter((v) => v.placeId === placeId).length;
     const { changes, undo } = planPlaceDelete(data, placeId);
     try {
       await pushChanges(changes);
       setSelection(null);
       await reload();
       setToast({
-        message: `${name} deleted`,
+        message: visits ? `${name} deleted, with ${visits} visit${visits === 1 ? '' : 's'}` : `${name} deleted`,
         undo: async () => { await pushChanges(undo(new Date().toISOString())); await reload(); setSelection({ kind: 'ours', placeId }); },
       });
     } catch (e) {

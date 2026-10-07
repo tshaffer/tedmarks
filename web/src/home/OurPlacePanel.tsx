@@ -172,6 +172,14 @@ export function OurPlacePanel({ data, summary, onClose, onAddVisit, onEditVisit,
           {showGoogle && <Box sx={{ mt: 1, mx: -2.5 }}><GoogleCard googlePlaceId={place.google.placeId} /></Box>}
         </Box>
       )}
+
+      {place.status === 'beenThere' && (
+        <Box sx={{ borderTop: '1px solid #efeff3', pt: 1.5 }}>
+          <Button size="small" onClick={onDeletePlace} sx={{ bgcolor: '#fdecec', color: 'error.main' }}>
+            Delete place{summary.visits.length ? ` and its ${summary.visits.length === 1 ? 'visit' : `${summary.visits.length} visits`}` : ''}
+          </Button>
+        </Box>
+      )}
     </Stack>
   );
 }

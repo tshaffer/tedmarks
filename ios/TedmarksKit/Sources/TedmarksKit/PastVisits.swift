@@ -72,6 +72,8 @@ public enum PastVisits {
         }
         visit.deletedAt = now
         visit.modifiedAt = now
+        // Its place's last visit: the place may become want to go, or go too (placeWithoutVisits).
+        if let place = visit.place { try PlaceEditing.settleIfNoVisits(place, in: context, now: now) }
         try context.save()
         VisitSideEffects.reconcile(in: context)
     }
@@ -217,6 +219,52 @@ public enum PlaceEditing {
         place.modifiedAt = now
         try context.save()
         SyncEngine.shared.scheduleSync()
+    }
+
+    /// A been-there place with no live visits left follows the shared rule (placeWithoutVisits):
+    /// stays, becomes want to go, or is deleted with its dish list. Doesn't save.
+    @discardableResult
+    public static func settleIfNoVisits(_ place: Place, in context: ModelContext, now: Date = .now) throws -> PlaceWithoutVisitsAction {
+        guard place.deletedAt == nil, place.status == .beenThere, !place.visits.contains(where: { $0.deletedAt == nil }) else { return .keep }
+        let placeId = place.id
+        let menus = try context.fetchCount(FetchDescriptor<PlaceMenu>(predicate: #Predicate { $0.placeId == placeId && $0.deletedAt == nil }))
+        let notes = try context.fetchCount(FetchDescriptor<Note>(predicate: #Predicate { $0.placeId == placeId && $0.visitId == nil && $0.deletedAt == nil }))
+        let action = placeWithoutVisits(
+            status: place.status,
+            hasInterest: place.interestLevel != nil,
+            hasReview: !(place.review ?? "").isEmpty || place.refinedRating != nil,
+            hasMenuOrNotes: menus + notes > 0
+        )
+        switch action {
+        case .keep:
+            break
+        case .wantToGo:
+            place.status = .wantToGo
+            place.modifiedAt = now
+        case .delete:
+            for item in place.items where item.deletedAt == nil {
+                item.deletedAt = now
+                item.modifiedAt = now
+            }
+            place.deletedAt = now
+            place.modifiedAt = now
+        }
+        return action
+    }
+
+    /// Tidies places whose visits were all deleted or discarded before this rule existed. Places
+    /// that never had a visit (imported, or marked been there by hand) are left alone. Run after
+    /// a complete pull, so every visit is known. Returns how many changed.
+    @discardableResult
+    public static func settlePlacesWithoutVisits(in context: ModelContext, now: Date = .now) throws -> Int {
+        let beenThere = PlaceStatus.beenThere.rawValue
+        let places = try context.fetch(FetchDescriptor<Place>(predicate: #Predicate { $0.deletedAt == nil && $0.statusRaw == beenThere }))
+        var changed = 0
+        for place in places where place.visits.contains(where: { $0.deletedAt != nil }) {
+            if try settleIfNoVisits(place, in: context, now: now) != .keep { changed += 1 }
+        }
+        if changed > 0 { try context.save() }
+        return changed
     }
 
     /// Deletes a place (tombstoned) with every visit to it — their dishes and ratings too — and

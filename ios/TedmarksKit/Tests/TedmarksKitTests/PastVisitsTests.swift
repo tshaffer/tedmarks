@@ -38,7 +38,9 @@ private func visit(_ name: String, lat: Double, daysAgo: Double, in context: Mod
 @Test func deletingAVisitRemovesItsDishesAndRatings() throws {
     let (container, context) = try makeContext()
     _ = container
+    let earlier = try visit("Doppio Zero", lat: 37.39, daysAgo: 5, in: context)
     let doomed = try visit("Doppio Zero", lat: 37.39, daysAgo: 1, in: context)
+    #expect(doomed.place?.id == earlier.place?.id)
     let dish = try #require(try DishCapture.addItem(named: "Burrata", to: doomed, addedVia: .order, in: context))
     try DishCapture.rate(dish, .loved, for: .us, enteredBy: nil, in: context)
     try DishCapture.setVerdict(doomed, .wouldReturn, for: .us, enteredBy: nil, in: context)
@@ -49,8 +51,57 @@ private func visit(_ name: String, lat: Double, daysAgo: Double, in context: Mod
     #expect(DishCapture.orderItems(for: doomed).isEmpty)
     #expect(try DishCapture.ratings(for: dish.id, in: context).isEmpty)
     #expect(try DishCapture.ratings(for: doomed.id, in: context).isEmpty)
-    // The place keeps its dish names for "Ordered before" on later visits.
-    #expect(doomed.place?.items.count == 1)
+    // The place (it has another visit) keeps its dish names for "Ordered before" on later visits.
+    #expect(doomed.place?.deletedAt == nil)
+    #expect(doomed.place?.items.filter { $0.deletedAt == nil }.count == 1)
+}
+
+@MainActor
+@Test func deletingAPlacesOnlyVisitDeletesThePlaceUnlessItHasMore() throws {
+    let (container, context) = try makeContext()
+    _ = container
+    // Nothing but the visit: the place goes too.
+    let only = try visit("Kibler Elf", lat: 37.41, daysAgo: 1, in: context)
+    _ = try DishCapture.addItem(named: "Croissant", to: only, addedVia: .order, in: context)
+    try PastVisits.delete(only, in: context)
+    let kibler = try #require(only.place)
+    #expect(kibler.deletedAt != nil)
+    #expect(kibler.items.allSatisfy { $0.deletedAt != nil })
+
+    // We wanted to go: it's want to go again.
+    let wanted = try PlaceEditing.saveToTry(NearbyPlace(googlePlaceId: "xanh", name: "Xanh", latitude: 37.39, longitude: -122.0, distanceMeters: 0),
+                                            level: .curious, why: nil, in: context)
+    let tried = try VisitStarter.startVisit(at: wanted, participantIds: [], in: context)
+    #expect(wanted.status == .beenThere)
+    try PastVisits.delete(tried, in: context)
+    #expect(wanted.deletedAt == nil)
+    #expect(wanted.status == .wantToGo)
+
+    // A review: still been there.
+    let reviewed = try visit("Tamarine", lat: 37.44, daysAgo: 2, in: context)
+    reviewed.place?.review = "Shaking beef"
+    try PastVisits.delete(reviewed, in: context)
+    #expect(reviewed.place?.deletedAt == nil)
+    #expect(reviewed.place?.status == .beenThere)
+}
+
+@MainActor
+@Test func tidyingAfterSyncOnlyTouchesPlacesWhoseVisitsWereDeleted() throws {
+    let (container, context) = try makeContext()
+    _ = container
+    // Left behind by a visit deleted before the rule (simulated: the visit is gone, the place stayed).
+    let discarded = try visit("Cafe Pro Bono", lat: 37.42, daysAgo: 1, in: context)
+    discarded.deletedAt = .now
+    let orphan = try #require(discarded.place)
+    // Imported (or marked been there by hand) with no visits ever: left alone.
+    let imported = Place(status: .beenThere, name: "Old favorite", latitude: 37.4, longitude: -122.0)
+    context.insert(imported)
+    try context.save()
+
+    #expect(try PlaceEditing.settlePlacesWithoutVisits(in: context) == 1)
+    #expect(orphan.deletedAt != nil)
+    #expect(imported.deletedAt == nil)
+    #expect(try PlaceEditing.settlePlacesWithoutVisits(in: context) == 0)
 }
 
 @MainActor

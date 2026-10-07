@@ -1,0 +1,10 @@
+{
+  "cases": [
+    { "name": "want to go already", "input": { "status": "wantToGo", "hasInterest": false, "hasReview": false, "hasMenuOrNotes": false }, "expected": "keep" },
+    { "name": "nothing but the visit", "input": { "status": "beenThere", "hasInterest": false, "hasReview": false, "hasMenuOrNotes": false }, "expected": "delete" },
+    { "name": "we want to go", "input": { "status": "beenThere", "hasInterest": true, "hasReview": false, "hasMenuOrNotes": true }, "expected": "wantToGo" },
+    { "name": "reviewed (been there, visits not recorded)", "input": { "status": "beenThere", "hasInterest": false, "hasReview": true, "hasMenuOrNotes": true }, "expected": "keep" },
+    { "name": "reviewed and want to go back: still been there", "input": { "status": "beenThere", "hasInterest": true, "hasReview": true, "hasMenuOrNotes": false }, "expected": "keep" },
+    { "name": "a menu or notes are kept", "input": { "status": "beenThere", "hasInterest": false, "hasReview": false, "hasMenuOrNotes": true }, "expected": "wantToGo" }
+  ]
+}

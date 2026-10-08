@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
-import express, { type Express } from 'express';
+import express, { type Express, type Request, type Response } from 'express';
 import type { Db } from 'mongodb';
 import { DEFAULT_NEARBY_RADIUS_METERS } from '@tedmarks/shared';
 import { aiRoutes } from './ai/aiRoutes.js';
@@ -40,6 +40,8 @@ export interface AppDeps {
 }
 
 const API_PREFIXES = ['/sync', '/places', '/ai', '/auth', '/health', '/config'];
+/** Website pages (exact paths) — the app, never the API. */
+const WEB_PAGES = ['/places', '/visits', '/help'];
 
 export function createApp(deps: AppDeps = {}): Express {
   const app = express();
@@ -60,6 +62,13 @@ export function createApp(deps: AppDeps = {}): Express {
     openForDevelopment: !deps.accessKey,
   }));
 
+  // The website's top-level pages that share a name with an API prefix (GET /places is a page;
+  // the API only uses paths under it). Served before the API so they get the app.
+  const webDist = deps.webDist ?? fileURLToPath(new URL('../../web/dist', import.meta.url));
+  const hasWeb = existsSync(webDist);
+  const sendApp = (_req: Request, res: Response) => res.sendFile('index.html', { root: webDist, headers: { 'Cache-Control': 'no-cache' } });
+  if (hasWeb) app.get(WEB_PAGES, sendApp);
+
   // The API: the phone's access key or the website's session.
   const access = requireAccess(deps.accessKey, deps.auth?.sessionSecret);
   const store = deps.db ? new SyncStore(deps.db) : undefined;
@@ -72,12 +81,11 @@ export function createApp(deps: AppDeps = {}): Express {
   });
 
   // The website (static files; any other page path gets index.html for the app's own routing).
-  const webDist = deps.webDist ?? fileURLToPath(new URL('../../web/dist', import.meta.url));
-  if (existsSync(webDist)) {
+  if (hasWeb) {
     app.use(express.static(webDist, { index: false, maxAge: '1h' }));
     app.get(/.*/, (req, res, next) => {
       if (API_PREFIXES.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`))) return next();
-      res.sendFile('index.html', { root: webDist, headers: { 'Cache-Control': 'no-cache' } });
+      sendApp(req, res);
     });
   }
 

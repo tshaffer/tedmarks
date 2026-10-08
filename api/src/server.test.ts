@@ -116,3 +116,25 @@ test('every collection gets id and serverSeq indexes', () => {
   assert.ok(keys.includes('{"serverSeq":1}'));
   assert.ok(keys.includes('{"subjectType":1,"subjectId":1,"scope":1,"personId":1}'));
 });
+
+test('website pages named like API prefixes get the app; API paths under them still reach the API', async () => {
+  const { mkdtempSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const webDist = mkdtempSync(join(tmpdir(), 'tedmarks-web-'));
+  writeFileSync(join(webDist, 'index.html'), '<!doctype html><title>Tedmarks</title>');
+  const server = createApp({ webDist }).listen(0);
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    for (const page of ['/places', '/visits', '/help', '/place/abc']) {
+      const res = await fetch(`${base}${page}`);
+      assert.equal(res.status, 200, page);
+      assert.match(await res.text(), /Tedmarks/, page);
+    }
+    const api = await fetch(`${base}/places/nearby?lat=1&lng=2`);
+    assert.notEqual(api.headers.get('content-type')?.includes('text/html'), true);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

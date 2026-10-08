@@ -1,6 +1,6 @@
 import { Alert, Box, Button, Chip, CircularProgress, Link, Paper, Stack, Typography } from '@mui/material';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { usePlaceActions, useShowPlace } from '../actions/PlaceActions.js';
 import { summarize } from '../data/insights.js';
 import { mergeSuggestions } from '../data/dishes.js';
@@ -17,6 +17,8 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
   const { data, error } = useTedmarksData();
   const actions = usePlaceActions();
   const navigate = useNavigate();
+  // Opened from the Places list: back goes there (keeping its search and scroll).
+  const fromPlaces = (useLocation().state as { from?: string } | null)?.from === 'places';
   const [editingInterest, setEditingInterest] = useState(false);
 
   // After a change: deleted → back to the map; another place (e.g. Undo) → its page.
@@ -50,7 +52,9 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
       <Card>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems={{ md: 'center' }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Link component={RouterLink} to="/" state={{ placeId: place.id }} variant="body2" underline="hover">‹ Map</Link>
+            {fromPlaces
+              ? <Link component="button" onClick={() => navigate(-1)} variant="body2" underline="hover">‹ Places</Link>
+              : <Link component={RouterLink} to="/" state={{ placeId: place.id }} variant="body2" underline="hover">‹ Map</Link>}
             <Typography variant="h4" fontWeight={700} sx={{ mt: 0.5 }}>{place.name}</Typography>
             <Typography color="text.secondary">{[summary.subtype, address].filter(Boolean).join(' · ')}</Typography>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap divider={<Typography color="text.secondary">·</Typography>}>

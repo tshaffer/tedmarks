@@ -6,6 +6,7 @@ import { TedmarksDataProvider } from './data/TedmarksData.js';
 import { PlaceActionsProvider } from './actions/PlaceActions.js';
 import { HomePage } from './home/HomePage.js';
 import { PlacePage } from './place/PlacePage.js';
+import { PlacesPage } from './places/PlacesPage.js';
 import { SignInPage } from './SignInPage.js';
 
 export function App() {
@@ -34,6 +35,7 @@ function SignedIn({ onSignedOut }: { onSignedOut: () => void }) {
       <PlaceActionsProvider>
         <Routes>
           <Route path="/place/:placeId" element={<PlacePage onSignedOut={onSignedOut} />} />
+          <Route path="/places" element={<PlacesPage onSignedOut={onSignedOut} />} />
           <Route path="*" element={<HomePage onSignedOut={onSignedOut} />} />
         </Routes>
       </PlaceActionsProvider>

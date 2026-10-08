@@ -9,7 +9,7 @@ import { TopBar } from '../TopBar.js';
 import { GooglePlacePanel } from './GooglePlacePanel.js';
 import { MapLegend, MapView } from './MapView.js';
 import { OurPlacePanel } from './OurPlacePanel.js';
-import { matchesCuisine, matchesExceptCuisine, loadFilters, NOT_SET, saveFilters, type PlaceFilters } from './filters.js';
+import { cuisineCounts, matchesCuisine, matchesExceptCuisine, loadFilters, saveFilters, type PlaceFilters } from './filters.js';
 import { PlaceList } from './PlaceList.js';
 import { SearchBox, type SearchResult } from './SearchBox.js';
 
@@ -30,6 +30,10 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
     const placeId = (location.state as { placeId?: string } | null)?.placeId;
     return placeId ? { kind: 'ours', placeId } : null;
   });
+  // From the Places page: fit the map to its list (once the map is ready).
+  const [fitPlaceIds] = useState(() => (location.state as { fitPlaceIds?: string[] } | null)?.fitPlaceIds ?? null);
+  // …and show only those places until you clear it.
+  const [onlyIds, setOnlyIds] = useState<Set<string> | null>(() => (fitPlaceIds ? new Set(fitPlaceIds) : null));
   // Used once: a reload shouldn't bring it back.
   useEffect(() => { if (location.state) navigate('.', { replace: true, state: null }); }, [location.state, navigate]);
   const [filters, setFilters] = useState<PlaceFilters>(loadFilters);
@@ -40,17 +44,10 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   const summaries = useMemo(() => (data ? [...data.places.values()].map((p) => summarize(data, p)) : []), [data]);
   // The filters narrow our places; the chosen one always stays (e.g. one just saved as want to go).
   const chosenId = selection?.kind === 'ours' ? selection.placeId : null;
-  const beforeCuisine = useMemo(() => summaries.filter((s) => s.place.id === chosenId || matchesExceptCuisine(s, filters)), [summaries, filters, chosenId]);
+  const candidates = useMemo(() => (onlyIds ? summaries.filter((s) => onlyIds.has(s.place.id)) : summaries), [summaries, onlyIds]);
+  const beforeCuisine = useMemo(() => candidates.filter((s) => s.place.id === chosenId || matchesExceptCuisine(s, filters)), [candidates, filters, chosenId]);
   const shown = useMemo(() => beforeCuisine.filter((s) => s.place.id === chosenId || matchesCuisine(s, filters)), [beforeCuisine, filters, chosenId]);
-  const cuisines = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const s of beforeCuisine) {
-      if (!view || view.bounds.contains(latLngOf(s.place))) counts.set(s.cuisine ?? NOT_SET, (counts.get(s.cuisine ?? NOT_SET) ?? 0) + 1);
-    }
-    // Most common first; "Not set" last.
-    return [...counts.entries()].map(([name, count]) => ({ name, count }))
-      .sort((a, b) => Number(a.name === NOT_SET) - Number(b.name === NOT_SET) || b.count - a.count || a.name.localeCompare(b.name));
-  }, [beforeCuisine, view]);
+  const cuisines = useMemo(() => cuisineCounts(beforeCuisine.filter((s) => !view || view.bounds.contains(latLngOf(s.place)))), [beforeCuisine, view]);
   const byGoogleId = useMemo(() => new Map(summaries.flatMap((s) => (s.place.google?.placeId ? [[s.place.google.placeId, s.place.id] as const] : []))), [summaries]);
 
   const inView = useMemo(() => {
@@ -84,6 +81,16 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
     }
   }, [map, chooseGoogle]);
 
+  useEffect(() => {
+    if (!map || !data || !fitPlaceIds?.length) return;
+    const bounds = new google.maps.LatLngBounds();
+    for (const id of fitPlaceIds) { const p = data.places.get(id); if (p) bounds.extend(latLngOf(p)); }
+    if (bounds.isEmpty()) return;
+    map.fitBounds(bounds, 60);
+    // One place (or a tight cluster) would zoom right in; stop at street level.
+    google.maps.event.addListenerOnce(map, 'idle', () => { if ((map.getZoom() ?? 0) > 16) map.setZoom(16); });
+  }, [map, data, fitPlaceIds]);
+
   const onIdle = useCallback((m: google.maps.Map) => {
     const bounds = m.getBounds(), center = m.getCenter();
     if (bounds && center) setView({ bounds, center: center.toJSON() });
@@ -102,7 +109,8 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
       <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} onResult={onSearch} /> : null} />
       {error && <Alert severity="error">{error}</Alert>}
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <PlaceList items={inView} matching={inView.filter(({ summary }) => matchesExceptCuisine(summary, filters) && matchesCuisine(summary, filters)).length} filters={filters} onFilters={setFilters} cuisines={cuisines} selectedPlaceId={selected?.place.id ?? null} onSelect={(id) => chooseOurs(id, true)} />
+        <PlaceList items={inView} matching={inView.filter(({ summary }) => matchesExceptCuisine(summary, filters) && matchesCuisine(summary, filters)).length} filters={filters} onFilters={setFilters} cuisines={cuisines} selectedPlaceId={selected?.place.id ?? null} onSelect={(id) => chooseOurs(id, true)}
+          only={onlyIds ? { count: onlyIds.size, onClear: () => setOnlyIds(null) } : null} />
         <Box sx={{ position: 'relative', flex: 1, bgcolor: '#eef0ea' }}>
           {!maps && !mapsError && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}><CircularProgress /></Box>}
           {(mapsError || (maps && !maps.googleMapsKey)) && (

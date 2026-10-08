@@ -17,7 +17,7 @@ const HOME = { lat: 37.3861, lng: -122.0839 };   // Mountain View, until the bro
 
 const VIEW_KEY = 'tedmarks.mapView';
 
-function savedView(): { center: google.maps.LatLngLiteral; zoom: number } | null {
+export function savedView(): { center: google.maps.LatLngLiteral; zoom: number } | null {
   try { return JSON.parse(sessionStorage.getItem(VIEW_KEY) ?? 'null') as { center: google.maps.LatLngLiteral; zoom: number } | null; } catch { return null; }
 }
 

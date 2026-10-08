@@ -47,3 +47,11 @@ export function matchesCuisine(s: PlaceSummary, f: PlaceFilters): boolean {
 export function activeCount(f: PlaceFilters): number {
   return Number(f.openNow) + Number(f.breakfast) + (f.cuisines.length ? 1 : 0);
 }
+
+/** How many places have each cuisine, most common first and "Not set" last. */
+export function cuisineCounts(summaries: PlaceSummary[]): { name: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const s of summaries) counts.set(s.cuisine ?? NOT_SET, (counts.get(s.cuisine ?? NOT_SET) ?? 0) + 1);
+  return [...counts.entries()].map(([name, count]) => ({ name, count }))
+    .sort((a, b) => Number(a.name === NOT_SET) - Number(b.name === NOT_SET) || b.count - a.count || a.name.localeCompare(b.name));
+}

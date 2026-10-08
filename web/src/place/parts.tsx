@@ -5,6 +5,7 @@ import type { Interest } from '../data/placeWrites.js';
 import { DISH, dishesAt, ratingText, VERDICT, visitSummary, type PlaceSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
 import { WantToGoForm } from '../home/WantToGoForm.js';
+import { WANT } from '../theme.js';
 
 // Pieces shared by the map's place panel (W1) and the Place page (W2).
 
@@ -119,14 +120,14 @@ export function InterestBox({ place, editing, setEditing, onSave, onDelete }: {
 }) {
   if (!(place.status === 'wantToGo' || place.interest || editing)) return null;
   return (
-    <Box sx={{ p: 1.5, borderRadius: 3, bgcolor: '#fff6ea' }}>
+    <Box sx={{ p: 1.5, borderRadius: 3, bgcolor: WANT.bg }}>
       {editing ? (
         <WantToGoForm saveLabel="Save" initial={place.interest && { level: place.interest.level, why: place.interest.why ?? '' }}
           onSave={async (interest) => { await onSave(interest); setEditing(false); }} onCancel={() => setEditing(false)} />
       ) : (
         <Stack direction="row" spacing={1} alignItems="flex-start">
           <Box sx={{ flex: 1 }}>
-            <Typography fontWeight={600} color="#c26a00">
+            <Typography fontWeight={600} color={WANT.text}>
               {place.interest?.level === 'curious' ? '☆ Curious' : place.interest ? '★ Really want to go' : '★ Want to go'}{place.status === 'beenThere' ? ' back' : ''}
             </Typography>
             {place.interest?.why && <Typography variant="body2">{place.interest.why}</Typography>}

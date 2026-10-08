@@ -40,7 +40,7 @@ export function GooglePlacePanel({ googlePlaceId, onClose, onAddVisit, onSaveWan
           <WantToGoForm saveLabel="Save as want to go" onSave={onSaveWantToGo} onCancel={() => setSaving(false)} />
         ) : (
         <Stack direction="row" spacing={1}>
-          <Button variant="contained" size="small" onClick={() => setSaving(true)}>★ Save as want to go</Button>
+          <Button variant="contained" color="secondary" size="small" onClick={() => setSaving(true)}>★ Save as want to go</Button>
           <Button size="small" onClick={onAddMenu} sx={{ bgcolor: '#fff', border: '1px solid #e3e3e8' }}>Add a menu</Button>
           <Button size="small" onClick={onAddVisit} sx={{ bgcolor: '#fff', border: '1px solid #e3e3e8' }}>Add a past visit</Button>
         </Stack>

@@ -375,7 +375,7 @@ struct StatusBadge: View {
 
     var body: some View {
         let (text, color): (String, Color) = switch status {
-        case .wantToGo: ("Want to go", .orange)
+        case .wantToGo: ("Want to go", .purple)   // purple everywhere, apart from Google's orange
         case .beenThere: ("Been there", .green)
         }
         Text(text)

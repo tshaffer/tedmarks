@@ -21,14 +21,14 @@ export function WantToGoForm({ initial, saveLabel, onSave, onCancel }: {
 
   return (
     <Stack spacing={1.25}>
-      <ToggleButtonGroup exclusive size="small" value={level} onChange={(_, v: InterestLevel | null) => v && setLevel(v)} sx={{ bgcolor: '#fff' }}>
+      <ToggleButtonGroup exclusive size="small" color="secondary" value={level} onChange={(_, v: InterestLevel | null) => v && setLevel(v)} sx={{ bgcolor: '#fff' }}>
         <ToggleButton value="reallyWantToGo" sx={{ textTransform: 'none' }}>★ Really want to go</ToggleButton>
         <ToggleButton value="curious" sx={{ textTransform: 'none' }}>☆ Curious</ToggleButton>
       </ToggleButtonGroup>
       <TextField size="small" multiline minRows={2} autoFocus placeholder="Why? (a dish, who recommended it…)" value={why}
         onChange={(e) => setWhy(e.target.value)} sx={{ bgcolor: '#fff' }} />
       <Stack direction="row" spacing={1}>
-        <Button variant="contained" size="small" disabled={saving} onClick={() => void save()}>{saveLabel}</Button>
+        <Button variant="contained" color="secondary" size="small" disabled={saving} onClick={() => void save()}>{saveLabel}</Button>
         <Button size="small" onClick={onCancel}>Cancel</Button>
       </Stack>
     </Stack>

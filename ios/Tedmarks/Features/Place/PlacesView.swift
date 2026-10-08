@@ -127,7 +127,7 @@ struct PlacesView: View {
         if summary.place.status == .wantToGo {
             if let level = summary.place.interestLevelRaw.flatMap(InterestLevel.init) {
                 Image(systemName: level == .reallyWantToGo ? "star.fill" : "star")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.purple)
                     .accessibilityLabel(level.label)
             }
         } else if let text = displayText(summary.verdict, names: personNames) {

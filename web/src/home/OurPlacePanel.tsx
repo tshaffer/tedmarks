@@ -5,6 +5,7 @@ import { usePlaceActions } from '../actions/PlaceActions.js';
 import type { PlaceSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
 import { InterestBox, VerdictCard, VisitList, WhatToOrder } from '../place/parts.js';
+import { WANT } from '../theme.js';
 import { GoogleCard } from './GooglePlacePanel.js';
 
 /** Google Maps directions to a place (by its Google id when we have it). */
@@ -44,7 +45,7 @@ export function OurPlacePanel({ data, summary, onClose }: { data: TedmarksRecord
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
         <Button variant="contained" size="small" onClick={() => actions.openVisit({ kind: 'ours', placeId: place.id })}>+ Add a past visit</Button>
         {place.status === 'beenThere' && !place.interest && !editingInterest && (
-          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ bgcolor: '#fff6ea', color: '#c26a00' }}>
+          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ bgcolor: WANT.bg, color: WANT.text }}>
             {summary.visits.length > 0 ? '★ Want to go back' : '★ Save as want to go'}
           </Button>
         )}

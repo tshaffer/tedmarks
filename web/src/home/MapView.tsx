@@ -1,6 +1,7 @@
 import { Box, Paper, Stack, Typography } from '@mui/material';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { latLngOf, VERDICT, type PlaceSummary } from '../data/insights.js';
+import { WANT } from '../theme.js';
 
 interface Props {
   mapId: string;
@@ -90,7 +91,10 @@ export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs,
 /** Names show beside our pins from this zoom in (neighborhood level); further out they'd crowd. */
 const LABEL_ZOOM = 14;
 
-export const PIN = { beenThere: '#34c759', wantToGo: '#ff9500', beenThereText: '#1e7b34', wantToGoText: '#c26a00' } as const;
+/**
+ * Our pins' colors (want to go is purple everywhere — see WANT).
+ */
+export const PIN = { beenThere: '#34c759', wantToGo: WANT.main, beenThereText: '#1e7b34', wantToGoText: WANT.text, chosen: '#ff9500' } as const;
 
 type LabelSide = 'left' | 'right';
 
@@ -118,7 +122,7 @@ function labelSides(map: google.maps.Map, places: PlaceSummary[], selectedId: st
     .sort((a, b) => Number(b.place.status === 'beenThere') - Number(a.place.status === 'beenThere') || b.visits.length - a.visits.length);
   for (const s of order) {
     const { x, y } = at(s);
-    const width = Math.min(180, s.place.name.length * 6.6), top = y - 23, bottom = y - 7;
+    const width = Math.min(180, s.place.name.length * 6.6 + 12), top = y - 25, bottom = y - 5;
     const left = { x1: x - 20 - width, y1: top, x2: x - 18, y2: bottom };
     const right = { x1: x + 18, y1: top, x2: x + 20 + width, y2: bottom };
     if (!overlaps(left)) { taken.push(left); sides.set(s.place.id, 'left'); }
@@ -133,7 +137,7 @@ function markerContent(summary: PlaceSummary, selected: boolean, labelSide: Labe
   const ring = been ? PIN.beenThere : PIN.wantToGo;
   Object.assign(pin.style, {
     position: 'relative', display: 'flex', alignItems: 'center', gap: '6px', padding: selected ? '5px 12px 5px 7px' : '4px 6px',
-    borderRadius: '20px', background: selected ? PIN.wantToGo : '#fff', border: selected ? 'none' : `2px solid ${ring}`,
+    borderRadius: '20px', background: selected ? PIN.chosen : '#fff', border: selected ? 'none' : `2px solid ${ring}`,
     boxShadow: '0 2px 6px rgba(0,0,0,0.25)', font: '600 13px Inter, sans-serif', color: selected ? '#fff' : '#1d1d1f',
     cursor: 'pointer', whiteSpace: 'nowrap',
   });
@@ -152,7 +156,8 @@ function markerContent(summary: PlaceSummary, selected: boolean, labelSide: Labe
       position: 'absolute', [labelSide === 'left' ? 'right' : 'left']: 'calc(100% + 5px)', top: '50%', transform: 'translateY(-50%)',
       font: '600 12px Inter, sans-serif', color: been ? PIN.beenThereText : PIN.wantToGoText, whiteSpace: 'nowrap',
       maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis',
-      textShadow: '0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff',
+      // A small white tag, so it reads as ours and covers any Google label underneath.
+      background: '#fff', padding: '1px 6px', borderRadius: '6px', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
     });
     pin.append(label);
   }

@@ -1,6 +1,7 @@
 import { Box, Checkbox, Chip, Link, List, ListItemButton, ListItemText, Menu, MenuItem, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { useState } from 'react';
 import { miles, VERDICT, type PlaceSummary } from '../data/insights.js';
+import { PIN } from './MapView.js';
 import { activeCount, NO_FILTERS, NOT_SET, type PlaceFilters, type StatusFilter } from './filters.js';
 
 interface Props {
@@ -66,7 +67,7 @@ export function PlaceList({ items, matching, filters, onFilters, cuisines, selec
                   <Typography variant="caption" fontWeight={500} color={summary.open.isOpen ? 'success.main' : 'error.main'}>{summary.open.label}</Typography>
                 )}
               </Box>
-              <Typography sx={{ fontSize: 20, ml: 1, color: '#ff9500' }}>
+              <Typography sx={{ fontSize: 20, ml: 1, color: PIN.wantToGo }}>
                 {summary.place.status === 'wantToGo' ? (summary.place.interest?.level === 'curious' ? '☆' : '★') : summary.verdict.kind === 'joint' ? VERDICT[summary.verdict.value].emoji : summary.verdict.kind === 'split' ? '↔' : ''}
               </Typography>
             </ListItemButton>

@@ -135,15 +135,15 @@ struct PlaceDetailView: View {
         return Text(beenThere ? "Been there" : "Want to go")
             .font(.caption.weight(.semibold))
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .background((beenThere ? Color.green : Color.orange).opacity(0.15), in: Capsule())
-            .foregroundStyle(beenThere ? .green : .orange)
+            .background((beenThere ? Color.green : Color.purple).opacity(0.15), in: Capsule())
+            .foregroundStyle(beenThere ? .green : .purple)
     }
 
     private var interestSection: some View {
         Section("Why we want to go") {
             if let level = place.interestLevelRaw.flatMap(InterestLevel.init) {
                 Label(level.label, systemImage: level == .reallyWantToGo ? "star.fill" : "star")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.purple)
             }
             if let why = place.interestWhy, !why.isEmpty {
                 Text(why)

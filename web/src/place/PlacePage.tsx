@@ -7,6 +7,7 @@ import { mergeSuggestions } from '../data/dishes.js';
 import { menuSections } from '../data/menuWrites.js';
 import { useTedmarksData } from '../data/TedmarksData.js';
 import { directionsUrl } from '../home/OurPlacePanel.js';
+import { WANT } from '../theme.js';
 import { TopBar } from '../TopBar.js';
 import { InterestBox, longDate, VerdictCard, VisitList, WhatToOrder } from './parts.js';
 
@@ -58,7 +59,7 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
             </Stack>
             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
               <Chip size="small" label={place.status === 'beenThere' ? 'Been there' : 'Want to go'}
-                sx={place.status === 'beenThere' ? { bgcolor: '#e8f7ec', color: '#1e7b34', fontWeight: 600 } : { bgcolor: '#fff1dc', color: '#c26a00', fontWeight: 600 }} />
+                sx={place.status === 'beenThere' ? { bgcolor: '#e8f7ec', color: '#1e7b34', fontWeight: 600 } : { bgcolor: WANT.bg, color: WANT.text, fontWeight: 600 }} />
               {place.tags.map((tag) => <Chip key={tag} size="small" label={tag} />)}
             </Stack>
           </Box>
@@ -78,7 +79,7 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
           </Box>
         )}
         {place.status === 'beenThere' && !place.interest && !editingInterest && (
-          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ mt: 1.5, bgcolor: '#fff6ea', color: '#c26a00' }}>
+          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ mt: 1.5, bgcolor: WANT.bg, color: WANT.text }}>
             {summary.visits.length ? '★ Want to go back' : '★ Save as want to go'}
           </Button>
         )}

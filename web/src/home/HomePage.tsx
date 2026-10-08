@@ -16,6 +16,7 @@ import {
   saveFilters, type PlaceFilters,
 } from './filters.js';
 import { PlaceList, type ListItem } from './PlaceList.js';
+import { cityAndTagChoices } from '../places/placesQuery.js';
 import { SearchBox, type SearchResult } from './SearchBox.js';
 
 type Selection = { kind: 'ours'; placeId: string } | { kind: 'google'; googlePlaceId: string } | null;
@@ -69,6 +70,10 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
     ...oursBeforeCuisine.filter((s) => inViewNow(latLngOf(s.place))).map((s) => s.cuisine),
     ...googleBeforeCuisine.filter((r) => inViewNow({ lat: r.latitude, lng: r.longitude })).map(cuisineOfGoogle),
   ])), [oursBeforeCuisine, googleBeforeCuisine, inViewNow]);
+
+  // Tag choices: from the places the other filters leave (so a second tag can be added: OR).
+  const tags = useMemo(() => cityAndTagChoices(ours.filter((s) => inViewNow(latLngOf(s.place))
+    && matchesOursExceptCuisine(s, { ...filters, tags: [] }) && matchesCuisine(s.cuisine, filters))).tags, [ours, filters, inViewNow]);
 
   // Our list: ours nearest the center first, then Google's best rated.
   const inView = useMemo((): ListItem[] => {
@@ -172,7 +177,7 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
       <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} onResult={onSearch} /> : null} />
       {error && <Alert severity="error">{error}</Alert>}
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <PlaceList items={inView} matching={matching} filters={filters} onFilters={setFilters} cuisines={cuisines} selectedId={chosenId}
+        <PlaceList items={inView} matching={matching} filters={filters} onFilters={setFilters} cuisines={cuisines} tags={tags} onManageTags={actions.manageTags} selectedId={chosenId}
           onSelectOurs={(id) => chooseOurs(id, true)} onSelectGoogle={(id) => setSelection({ kind: 'google', googlePlaceId: id })}
           google={{ loading: googleSearch.loading, error: googleSearch.error, found: googleResults?.length ?? null, truncated: googleSearch.truncated, stale, onSearch: () => void searchGoogle() }}
           only={onlyIds ? { count: onlyIds.size, onClear: () => setOnlyIds(null) } : null} />

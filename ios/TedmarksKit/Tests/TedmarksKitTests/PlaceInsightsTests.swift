@@ -73,3 +73,21 @@ private let us = [Household.tedId, Household.loriId]
     #expect(nearest.map(\.place.name) == ["Anchor", "Bruno's", "Zola"])
     #expect(insights.summaries(of: all, filter: .all, search: "brun", sort: .name, from: nil).map(\.place.name) == ["Bruno's"])
 }
+
+@MainActor
+@Test func tagsAreSavedCleanAndSearchable() throws {
+    let (container, context) = try makeContext()
+    _ = container
+    let place = Place(status: .beenThere, name: "Doppio Zero", latitude: 37.39, longitude: -122.08)
+    context.insert(place)
+    try context.save()
+
+    var changes = PlaceEditing.Changes(place)
+    changes.tags = [" patio ", "date night", "patio", ""]
+    try PlaceEditing.update(place, with: changes, in: context)
+    #expect(place.tags == ["patio", "date night"])
+
+    let insights = try PlaceInsights(context: context)
+    #expect(insights.summaries(of: [place], filter: .all, search: "date", sort: .name, from: nil).map(\.place.name) == ["Doppio Zero"])
+    #expect(insights.summaries(of: [place], filter: .all, search: "brunch", sort: .name, from: nil).isEmpty)
+}

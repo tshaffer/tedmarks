@@ -4,6 +4,7 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePlaceActions } from '../actions/PlaceActions.js';
 import { miles, ratingText, summarize, VERDICT } from '../data/insights.js';
 import { useTedmarksData } from '../data/TedmarksData.js';
 import { FilterChips, MultiSelectChip } from '../home/FilterChips.js';
@@ -37,6 +38,7 @@ function loadQuery(): PlacesQuery {
 export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
   const { data, error } = useTedmarksData();
   const navigate = useNavigate();
+  const actions = usePlaceActions();
   const [savedFilters, setFilters] = useState<PlaceFilters>(loadFilters);
   // The map can show only Google's restaurants (no statuses); here that means all of ours.
   const filters = useMemo(() => (savedFilters.statuses.length ? savedFilters : { ...savedFilters, statuses: ['beenThere', 'wantToGo'] as StatusFilter[] }), [savedFilters]);
@@ -62,9 +64,11 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
   const rows = useMemo(() => (data ? placeRows(data, summaries, filters, query, query.sort === 'nearest' ? origin : null) : []), [data, summaries, filters, query, origin]);
   const choicesFrom = useMemo(() => summaries.filter((s) => matchesOursExceptCuisine(s, filters)), [summaries, filters]);
   const cuisines = useMemo(() => cuisineCounts(choicesFrom.map((s) => s.cuisine)), [choicesFrom]);
-  const { cities, tags } = useMemo(() => cityAndTagChoices(choicesFrom), [choicesFrom]);
+  const { cities } = useMemo(() => cityAndTagChoices(choicesFrom), [choicesFrom]);
+  // Tag choices ignore the tag filter itself, so a second tag can be added (OR).
+  const { tags } = useMemo(() => cityAndTagChoices(summaries.filter((s) => matchesOursExceptCuisine(s, { ...filters, tags: [] }))), [summaries, filters]);
   const counts = { all: summaries.length, been: summaries.filter((s) => s.place.status === 'beenThere').length };
-  const extraActive = query.cities.length + query.tags.length > 0;
+  const extraActive = query.cities.length > 0;
 
   const sortBy = (key: SortKey) => set(query.sort === key ? { reversed: !query.reversed } : { sort: key, reversed: false });
   const header = (label: string, key?: SortKey, width?: number) => (
@@ -102,10 +106,9 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
               </Select>
             </Stack>
             <FilterChips filters={filters} onFilters={setFilters} cuisines={cuisines} extraActive={extraActive}
-              onClearExtra={() => set({ cities: [], tags: [] })}
+              onClearExtra={() => set({ cities: [] })} tags={tags} onManageTags={actions.manageTags}
               extra={<>
                 <MultiSelectChip label="City" anyLabel="Any city" choices={cities} selected={query.cities} onChange={(v) => set({ cities: v })} />
-                <MultiSelectChip label="Tags" anyLabel="Any tag" choices={tags} selected={query.tags} onChange={(v) => set({ tags: v })} empty="No tags yet — add them in Edit place" />
               </>} />
           </Stack>
         </Paper>

@@ -196,6 +196,7 @@ public enum PlaceEditing {
         public var review: String
         public var interestLevel: InterestLevel?
         public var interestWhy: String
+        public var tags: [String]
 
         public init(_ place: Place) {
             name = place.name
@@ -204,6 +205,7 @@ public enum PlaceEditing {
             review = place.review ?? ""
             interestLevel = place.interestLevel
             interestWhy = place.interestWhy ?? ""
+            tags = place.tags
         }
     }
 
@@ -216,6 +218,7 @@ public enum PlaceEditing {
         place.interestLevel = changes.interestLevel
         place.interestWhy = changes.interestLevel == nil ? nil : changes.interestWhy.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         if changes.interestLevel != nil { place.interestSavedAt = place.interestSavedAt ?? now }
+        place.tags = cleanTags(changes.tags)
         place.modifiedAt = now
         try context.save()
         SyncEngine.shared.scheduleSync()
@@ -286,4 +289,10 @@ public enum PlaceEditing {
 
 extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+/// Tags trimmed, without blanks or repeats, in their order.
+public func cleanTags(_ tags: [String]) -> [String] {
+    var seen = Set<String>()
+    return tags.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty && seen.insert($0).inserted }
 }

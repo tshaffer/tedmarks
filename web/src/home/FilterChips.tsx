@@ -8,13 +8,15 @@ export const chipStyle = (on: boolean) => (on ? { bgcolor: '#fff1dc', color: '#c
 export interface Choice { value: string; label: string; count?: number }
 
 /** A chip that opens a menu of checkable choices ("Cuisine ▾", "City ▾"); none ticked = any. */
-export function MultiSelectChip({ label, choices, selected, onChange, anyLabel, empty = 'Nothing to choose' }: {
+export function MultiSelectChip({ label, choices, selected, onChange, anyLabel, empty = 'Nothing to choose', footer }: {
   label: string;
   choices: Choice[];
   selected: string[];
   onChange: (selected: string[]) => void;
   anyLabel: string;
   empty?: string;
+  /** A last menu item ("Manage tags…"). */
+  footer?: { label: string; onClick: () => void } | undefined;
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const toggle = (value: string) => onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
@@ -35,6 +37,8 @@ export function MultiSelectChip({ label, choices, selected, onChange, anyLabel, 
           </MenuItem>
         ))}
         {listed.length === 0 && <MenuItem disabled dense>{empty}</MenuItem>}
+        {footer && <Divider />}
+        {footer && <MenuItem dense onClick={() => { setAnchor(null); footer.onClick(); }}><ListItemText primary={footer.label} slotProps={{ primary: { color: 'primary', fontWeight: 500 } }} /></MenuItem>}
       </Menu>
     </>
   );
@@ -109,10 +113,13 @@ const VERDICTS: Choice[] = [
  * When · Cuisine · Price · Our verdict (· Google rating on the map), then any extra chips, then
  * Clear. Shared by the map and the Places page.
  */
-export function FilterChips({ filters, onFilters, cuisines, cuisineEmpty, google = false, extra, extraActive = false, onClearExtra }: {
+export function FilterChips({ filters, onFilters, cuisines, tags, onManageTags, cuisineEmpty, google = false, extra, extraActive = false, onClearExtra }: {
   filters: PlaceFilters;
   onFilters: (filters: PlaceFilters) => void;
   cuisines: { name: string; count: number }[];
+  /** Our tags among the places shown, with counts. */
+  tags: Choice[];
+  onManageTags: () => void;
   cuisineEmpty?: string;
   /** Show Google's own filters (the map). */
   google?: boolean;
@@ -129,6 +136,8 @@ export function FilterChips({ filters, onFilters, cuisines, cuisineEmpty, google
         choices={cuisines.map((c) => ({ value: c.name, label: c.name === NOT_SET ? 'Not set' : c.name, count: c.count }))} />
       <MultiSelectChip label="Price" anyLabel="Any price" choices={PRICES} selected={filters.prices.map(String)} onChange={(v) => set({ prices: v.map(Number) })} />
       <MultiSelectChip label="Our verdict" anyLabel="Any verdict" choices={VERDICTS} selected={filters.verdicts} onChange={(v) => set({ verdicts: v as VerdictChoice[] })} />
+      <MultiSelectChip label="Tags" anyLabel="Any tag" choices={tags} selected={filters.tags} onChange={(v) => set({ tags: v })}
+        empty="No tags yet — add them in Edit place" footer={{ label: 'Manage tags…', onClick: onManageTags }} />
       {google && <GoogleChip filters={filters} onChange={set} />}
       {extra}
       {filtered && (

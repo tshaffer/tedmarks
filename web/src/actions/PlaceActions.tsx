@@ -10,6 +10,8 @@ import { planVisitDelete } from '../data/visitWrites.js';
 import { MenuDialog, type MenuTarget } from '../menu/MenuDialog.js';
 import { EditPlaceDialog } from '../place/EditPlaceDialog.js';
 import { MergeDishesDialog } from '../place/MergeDishesDialog.js';
+import { ManageTagsDialog } from '../place/ManageTagsDialog.js';
+import { planTagDelete, planTagRename } from '../data/tagWrites.js';
 import { VisitDialog, type VisitTarget } from '../visit/VisitDialog.js';
 
 // Everything you can do to a place, shared by the map panel and the Place page: the visit, menu
@@ -20,6 +22,7 @@ export interface PlaceActions {
   openMenu(target: MenuTarget): void;
   editPlace(placeId: string): void;
   mergeDishes(placeId: string): void;
+  manageTags(): void;
   deleteVisit(visitId: string): Promise<void>;
   deletePlace(placeId: string): Promise<void>;
   deleteMenu(menuId: string): Promise<void>;
@@ -60,6 +63,7 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
   const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [merging, setMerging] = useState<string | null>(null);
+  const [managingTags, setManagingTags] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const showRef = useRef<(placeId: string | null) => void>(() => {});
@@ -77,6 +81,7 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
     openMenu: setMenuTarget,
     editPlace: setEditing,
     mergeDishes: setMerging,
+    manageTags: () => setManagingTags(true),
 
     deleteVisit: (visitId) => attempt(async () => {
       if (!data) return;
@@ -199,6 +204,21 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
             undoable(mergeIds.length === 1 ? `Merged “${data.placeItems.get(mergeIds[0]!)?.name}” into “${keep}”` : `Merged ${mergeIds.length + 1} dishes into “${keep}”`,
               async () => { await pushChanges(undo(now())); await reload(); });
           }, 'Couldn’t merge the dishes.')} />
+      )}
+      {data && managingTags && (
+        <ManageTagsDialog data={data} onClose={() => setManagingTags(false)}
+          onRename={(from, to) => attempt(async () => {
+            const { changes, undo, places } = planTagRename(data, from, to);
+            await pushChanges(changes);
+            await reload();
+            undoable(`Renamed “${from}” to “${to.trim()}” on ${places} place${places === 1 ? '' : 's'}`, async () => { await pushChanges(undo(now())); await reload(); });
+          }, 'Couldn’t rename the tag.')}
+          onDelete={(tag) => attempt(async () => {
+            const { changes, undo, places } = planTagDelete(data, tag);
+            await pushChanges(changes);
+            await reload();
+            undoable(`Removed “${tag}” from ${places} place${places === 1 ? '' : 's'}`, async () => { await pushChanges(undo(now())); await reload(); });
+          }, 'Couldn’t delete the tag.')} />
       )}
       <Snackbar open={Boolean(toast)} autoHideDuration={toast?.undo ? 8000 : 3000} onClose={(_, reason) => reason !== 'clickaway' && setToast(null)} message={toast?.message}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}

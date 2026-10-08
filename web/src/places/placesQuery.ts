@@ -11,13 +11,12 @@ export type { VerdictChoice };
 export interface PlacesQuery {
   search: string;
   cities: string[];
-  tags: string[];
   sort: SortKey;
   /** Reverses the sort's natural direction (newest, A–Z, highest, most, nearest, latest). */
   reversed: boolean;
 }
 
-export const NO_QUERY: PlacesQuery = { search: '', cities: [], tags: [], sort: 'lastVisit', reversed: false };
+export const NO_QUERY: PlacesQuery = { search: '', cities: [], sort: 'lastVisit', reversed: false };
 
 export interface PlaceRow {
   summary: PlaceSummary;
@@ -44,7 +43,6 @@ export function placeRows(
   for (const s of summaries) {
     if (!matchesOurs(s, filters)) continue;
     if (query.cities.length && !query.cities.includes(s.city ?? '')) continue;
-    if (query.tags.length && !query.tags.some((t) => s.place.tags.includes(t))) continue;
     let matchedDish: string | undefined;
     if (q) {
       const fields = [s.place.name, s.city, s.subtype, s.cuisine, s.place.google?.formattedAddress, s.place.review, s.place.interest?.why, ...s.place.tags];

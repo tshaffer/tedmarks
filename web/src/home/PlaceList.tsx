@@ -30,6 +30,9 @@ interface Props {
   onFilters: (filters: PlaceFilters) => void;
   /** Cuisines among the places in view, with how many of each (before the cuisine filter). */
   cuisines: { name: string; count: number }[];
+  /** Our tags among the places in view, with counts. */
+  tags: { value: string; label: string; count: number }[];
+  onManageTags: () => void;
   selectedId: string | null;
   onSelectOurs: (placeId: string) => void;
   onSelectGoogle: (googlePlaceId: string) => void;
@@ -41,7 +44,7 @@ interface Props {
 const price = (level: number | undefined) => (level ? '$'.repeat(level) : null);
 
 /** Left panel: our places and Google's restaurants in the map view, through the filters. */
-export function PlaceList({ items, matching, filters, onFilters, cuisines, selectedId, onSelectOurs, onSelectGoogle, google, only }: Props) {
+export function PlaceList({ items, matching, filters, onFilters, cuisines, tags, onManageTags, selectedId, onSelectOurs, onSelectGoogle, google, only }: Props) {
   const filtered = activeCount(filters) > 0;
   const showGoogle = filters.showGoogle && !only;
   const toggles = [...filters.statuses, ...(showGoogle ? ['google'] : [])];
@@ -60,7 +63,7 @@ export function PlaceList({ items, matching, filters, onFilters, cuisines, selec
           <ToggleButton value="wantToGo" sx={{ px: 1.5 }}>Want to go</ToggleButton>
           {!only && <ToggleButton value="google" sx={{ px: 1.5 }}>Google</ToggleButton>}
         </ToggleButtonGroup>
-        <FilterChips filters={filters} onFilters={onFilters} cuisines={cuisines} cuisineEmpty="No places in this map view" google={showGoogle} />
+        <FilterChips filters={filters} onFilters={onFilters} cuisines={cuisines} tags={tags} onManageTags={onManageTags} cuisineEmpty="No places in this map view" google={showGoogle} />
         <Typography variant="caption" color="text.secondary">
           {matching.ours + matching.google === 0
             ? (filtered ? 'Nothing in this map view matches.' : 'Nothing in this map view yet.')

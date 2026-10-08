@@ -23,6 +23,8 @@ export interface PlaceFilters {
   // Ours
   statuses: StatusFilter[];
   verdicts: VerdictChoice[];
+  /** Any of these tags ("patio", "date night"); empty = any. */
+  tags: string[];
   // Google's
   minGoogleRating: number | null;
   minReviews: number | null;
@@ -33,7 +35,7 @@ export const NOT_SET = '';
 
 export const NO_FILTERS: PlaceFilters = {
   showGoogle: true, when: { mode: 'any' }, cuisines: [], prices: [],
-  statuses: ['beenThere', 'wantToGo'], verdicts: [], minGoogleRating: null, minReviews: null,
+  statuses: ['beenThere', 'wantToGo'], verdicts: [], tags: [], minGoogleRating: null, minReviews: null,
 };
 
 const KEY = 'tedmarks.placeFilters';
@@ -75,6 +77,7 @@ export function matchesOursExceptCuisine(s: PlaceSummary, f: PlaceFilters): bool
   if (!openWhen(f.when, s.place.google?.openingHours, s.place.google?.utcOffsetMinutes, s.place.attributes?.mealsServed)) return false;
   if (f.prices.length && !f.prices.includes(s.place.google?.priceLevel ?? -1)) return false;
   if (f.verdicts.length && (s.place.status !== 'beenThere' || !f.verdicts.includes(verdictOf(s)))) return false;
+  if (f.tags.length && !f.tags.some((t) => s.place.tags.includes(t))) return false;
   return true;
 }
 
@@ -97,7 +100,7 @@ export const matchesGoogle = (r: AreaRestaurant, f: PlaceFilters) => matchesGoog
 
 /** How many filters beyond what's shown (the status toggles) are on. */
 export function activeCount(f: PlaceFilters): number {
-  return Number(f.when.mode !== 'any') + Number(f.cuisines.length > 0) + Number(f.prices.length > 0) + Number(f.verdicts.length > 0)
+  return Number(f.when.mode !== 'any') + Number(f.cuisines.length > 0) + Number(f.prices.length > 0) + Number(f.verdicts.length > 0) + Number(f.tags.length > 0)
     + Number(Boolean(f.minGoogleRating)) + Number(Boolean(f.minReviews));
 }
 

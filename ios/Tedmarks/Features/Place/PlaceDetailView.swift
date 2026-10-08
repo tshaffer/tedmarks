@@ -93,6 +93,16 @@ struct PlaceDetailView: View {
                 if !details.isEmpty {
                     Text(details.joined(separator: " · ")).font(.subheadline).foregroundStyle(.secondary)
                 }
+                if !place.tags.isEmpty {
+                    FlowLayout(spacing: 6) {
+                        ForEach(place.tags, id: \.self) { tag in
+                            Text(tag).font(.caption.weight(.medium))
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .overlay(Capsule().strokeBorder(Color(.separator)))
+                        }
+                    }
+                    .accessibilityLabel("Tags: \(place.tags.joined(separator: ", "))")
+                }
                 HStack(spacing: 8) {
                     statusChip
                     if let rating = place.googleRating {

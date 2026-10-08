@@ -110,7 +110,7 @@ public struct PlaceInsights {
         }
     }
 
-    /// Filtered by status and name, then sorted. Nearest needs `origin` (else it sorts by name).
+    /// Filtered by status and name (or tag), then sorted. Nearest needs `origin` (else it sorts by name).
     public func summaries(
         of places: [Place], filter: PlaceFilter, search: String, sort: PlaceSort,
         from origin: (latitude: Double, longitude: Double)?
@@ -123,7 +123,7 @@ public struct PlaceInsights {
             case .wantToGo: if place.status != .wantToGo { return false }
             case .all: break
             }
-            return query.isEmpty || place.name.localizedStandardContains(query)
+            return query.isEmpty || place.name.localizedStandardContains(query) || place.tags.contains { $0.localizedStandardContains(query) }
         }
         let summaries = matching.map(summary(for:))
         let byName = { (a: PlaceSummary, b: PlaceSummary) in a.place.name.localizedStandardCompare(b.place.name) == .orderedAscending }

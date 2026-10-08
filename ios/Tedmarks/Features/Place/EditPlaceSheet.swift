@@ -2,16 +2,18 @@ import SwiftData
 import SwiftUI
 import TedmarksKit
 
-/// Edit place: name, been there / want to go, type, our review, and why we want to go.
+/// Edit place: name, been there / want to go, type, tags, our review, and why we want to go.
 struct EditPlaceSheet: View {
     let place: Place
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \PlaceSubtype.sortOrder) private var subtypes: [PlaceSubtype]
+    @Query(filter: #Predicate<Place> { $0.deletedAt == nil }) private var allPlaces: [Place]
 
     @State private var changes: PlaceEditing.Changes
     @State private var errorMessage: String?
+    @State private var newTag = ""
 
     init(place: Place) {
         self.place = place
@@ -34,6 +36,8 @@ struct EditPlaceSheet: View {
                         }
                     }
                 }
+
+                tagsSection
 
                 Section("Our review") {
                     TextField("What we thought, what to order…", text: $changes.review, axis: .vertical)
@@ -64,6 +68,64 @@ struct EditPlaceSheet: View {
                 Button("OK") { errorMessage = nil }
             } message: { Text(errorMessage ?? "") }
         }
+    }
+
+    /// Tags on this place (tap ✕ to remove), a field to add one, and tags used on other places.
+    private var tagsSection: some View {
+        Section {
+            if !changes.tags.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(changes.tags, id: \.self) { tag in
+                        Button { changes.tags.removeAll { $0 == tag } } label: {
+                            HStack(spacing: 4) {
+                                Text(tag)
+                                Image(systemName: "xmark").font(.caption2.weight(.bold))
+                            }
+                            .font(.subheadline)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Color(.secondarySystemFill), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(tag)")
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            TextField("Add a tag (patio, date night…)", text: $newTag)
+                .textInputAutocapitalization(.never)
+                .submitLabel(.done)
+                .onSubmit { addTag(newTag) }
+            if !suggestions.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(suggestions, id: \.self) { tag in
+                        Button("+ \(tag)") { addTag(tag) }
+                            .font(.subheadline)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .overlay(Capsule().strokeBorder(Color(.separator)))
+                            .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Text("Tags")
+        }
+    }
+
+    /// Tags on other places that this one doesn't have (matching what's being typed), most used first.
+    private var suggestions: [String] {
+        var counts: [String: Int] = [:]
+        for other in allPlaces { for tag in other.tags { counts[tag, default: 0] += 1 } }
+        let typed = newTag.trimmingCharacters(in: .whitespaces)
+        return counts
+            .filter { !changes.tags.contains($0.key) && (typed.isEmpty || $0.key.localizedStandardContains(typed)) }
+            .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
+            .prefix(12).map(\.key)
+    }
+
+    private func addTag(_ tag: String) {
+        changes.tags = cleanTags(changes.tags + [tag])
+        newTag = ""
     }
 
     private func save() {

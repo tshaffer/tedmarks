@@ -14,23 +14,33 @@ export function looseDishKey(name: string): string {
     .join(' ');
 }
 
-/** Words that name a kind of dish, not a particular one ("Pizza" isn't the same as "Diavola pizza"). */
+/** Words that name a kind of dish or drink, not a particular one ("Pizza" isn't "Diavola pizza"). */
 const CATEGORY_WORDS = new Set([
   'pizza', 'pie', 'salad', 'soup', 'pasta', 'noodle', 'rice', 'sandwich', 'burger', 'taco', 'burrito', 'bowl', 'plate', 'roll',
-  'beer', 'wine', 'cocktail', 'coffee', 'tea', 'juice', 'soda', 'dessert', 'cake', 'special', 'combo', 'side', 'appetizer',
-  'small', 'large', 'regular', 'house', 'and', 'with', 'w',
+  'bagel', 'toast', 'croissant', 'muffin', 'wrap', 'dessert', 'cake', 'special', 'combo', 'side', 'appetizer',
+  'beer', 'wine', 'cocktail', 'coffee', 'tea', 'juice', 'soda', 'latte', 'cappuccino', 'espresso', 'mocha', 'americano',
+  'macchiato', 'cortado', 'smoothie', 'shake', 'lemonade',
+  'small', 'large', 'regular', 'house', 'and', 'with', 'w', 'of', 'on', 'in',
 ]);
 
+const distinctive = (words: string[]) => words.filter((w) => !CATEGORY_WORDS.has(w));
+
 /**
- * Likely the same dish, but not certain: one name's words are all in the other's (and say more
- * than a kind of dish), or they're a typo apart.
+ * Likely the same dish, but not certain: one name is the other with a word or two dropped
+ * ("Mortadella" / "Mortadella pizza", "Burrata" / "Burrata w/ peaches"), or a typo apart. An
+ * ingredient listed in a long name ("Cheddar" in "Bagel Sandwich with Egg, Cheddar & Pesto") or a
+ * bare kind of dish ("Latte" vs "Matcha Latte") isn't.
  */
 export function similarDishNames(a: string, b: string): boolean {
   const ka = looseDishKey(a), kb = looseDishKey(b);
   if (!ka || !kb || ka === kb) return Boolean(ka) && ka === kb;
   const wa = ka.split(' '), wb = kb.split(' ');
   const [short, long] = wa.length <= wb.length ? [wa, wb] : [wb, wa];
-  if (short.every((w) => long.includes(w)) && short.some((w) => !CATEGORY_WORDS.has(w))) return true;
+  if (short.every((w) => long.includes(w))) {
+    const [ds, dl] = [distinctive(short), distinctive(long)];
+    // Says which dish, and is at least half of what the longer name says.
+    if (ds.length > 0 && ds.length * 2 >= dl.length) return true;
+  }
   return Math.min(ka.length, kb.length) >= 6 && editDistance(ka, kb) <= 2;
 }
 

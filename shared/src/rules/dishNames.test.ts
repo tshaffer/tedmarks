@@ -20,4 +20,10 @@ test('similarDishNames suggests containment and near-typos, not different dishes
   assert.equal(similarDishNames('Pad thai', 'Pad see ew'), false);
   assert.equal(similarDishNames('Pizza', 'Doppio Zero pizza'), false);   // a kind of dish, not that one
   assert.equal(similarDishNames('Beer', 'IPA beer'), false);
+  // From the real data: a drink type, and ingredients in a long name.
+  assert.equal(similarDishNames('Latte', 'Matcha Latte'), false);
+  assert.equal(similarDishNames('Latte', 'London Fog Latte'), false);
+  assert.equal(similarDishNames('Cheddar', 'Roasted Garlic Bagel Sandwich with Egg, Cheddar & Pesto'), false);
+  assert.equal(similarDishNames('Pesto', 'Roasted Garlic Bagel Sandwich with Egg, Cheddar & Pesto'), false);
+  assert.equal(similarDishNames('Chai', 'Chai Latte'), true);
 });

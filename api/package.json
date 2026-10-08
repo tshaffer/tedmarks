@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "indexes:create": "tsx src/tools/createIndexes.ts",
     "clean": "rimraf dist",
-    "migrate:memorapp": "tsx src/tools/migrateMemorapp.ts"
+    "migrate:memorapp": "tsx src/tools/migrateMemorapp.ts",
+    "dishes:duplicates": "tsx src/tools/findDuplicateDishes.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

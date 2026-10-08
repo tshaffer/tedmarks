@@ -1,8 +1,10 @@
 import {
   displayRating,
+  mealsFromHours,
   openStatus,
   whatToOrder,
   type ItemRatingValue,
+  type MealsServed,
   type Note,
   type OpenStatus,
   type Place,
@@ -40,6 +42,29 @@ export interface PlaceSummary {
   open: OpenStatus | undefined;
   subtype: string | undefined;
   city: string | undefined;
+  /** For the cuisine filter: our type, else Google's minus "Restaurant" ("Thai"); undefined when Google's is generic. */
+  cuisine: string | undefined;
+  /** Meals served: as set on the place, else guessed from Google's hours (mealsFromHours). */
+  meals: (MealsServed & { source: 'set' | 'hours' }) | undefined;
+}
+
+/** Google types that say nothing about the food. */
+const GENERIC_TYPES = new Set(['restaurant', 'food', 'meal_takeaway', 'meal_delivery', 'establishment', 'point_of_interest', 'store', 'food_store']);
+
+export function cuisineOf(data: TedmarksRecords, place: Place): string | undefined {
+  const ours = place.subtypeId && data.placeSubtypes.get(place.subtypeId)?.name;
+  if (ours && !/^restaurants?$/i.test(ours)) return ours;
+  const g = place.google;
+  if (!g?.primaryTypeLabel || (g.primaryType && GENERIC_TYPES.has(g.primaryType)) || /^restaurant$/i.test(g.primaryTypeLabel)) return undefined;
+  return g.primaryTypeLabel.replace(/\s+Restaurant$/i, '') || undefined;
+}
+
+/** The place's meals as set by hand, or else as guessed from its hours. */
+export function mealsOf(place: Place): PlaceSummary['meals'] {
+  const set = place.attributes?.kind === 'restaurant' ? place.attributes.mealsServed : undefined;
+  if (set) return { ...set, source: 'set' };
+  const guessed = mealsFromHours(place.google?.openingHours?.periods);
+  return guessed && { ...guessed, source: 'hours' };
 }
 
 export function householdIds(data: TedmarksRecords): string[] {
@@ -78,6 +103,8 @@ export function summarize(data: TedmarksRecords, place: Place, now = new Date())
     open: openStatus(place.google?.openingHours?.periods, place.google?.utcOffsetMinutes, now),
     subtype: (place.subtypeId && data.placeSubtypes.get(place.subtypeId)?.name) || place.google?.primaryTypeLabel,
     city: cityOf(place),
+    cuisine: cuisineOf(data, place),
+    meals: mealsOf(place),
   };
 }
 

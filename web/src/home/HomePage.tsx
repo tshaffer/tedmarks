@@ -1,6 +1,6 @@
 import { Alert, Box, CircularProgress, Paper, Typography } from '@mui/material';
 import { usePlaceActions, useShowPlace } from '../actions/PlaceActions.js';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { distanceMeters, latLngOf, summarize } from '../data/insights.js';
 import { useTedmarksData } from '../data/TedmarksData.js';
@@ -9,12 +9,11 @@ import { TopBar } from '../TopBar.js';
 import { GooglePlacePanel } from './GooglePlacePanel.js';
 import { MapView } from './MapView.js';
 import { OurPlacePanel } from './OurPlacePanel.js';
-import { PlaceList, type StatusFilter } from './PlaceList.js';
+import { matchesCuisine, matchesExceptCuisine, loadFilters, NOT_SET, saveFilters, type PlaceFilters } from './filters.js';
+import { PlaceList } from './PlaceList.js';
 import { SearchBox, type SearchResult } from './SearchBox.js';
 
 type Selection = { kind: 'ours'; placeId: string } | { kind: 'google'; googlePlaceId: string } | null;
-
-const FILTERS_KEY = 'tedmarks.filters';
 
 /** Figma W1/W1b: choose a restaurant (search, a map pin, or a row), then act on it in the panel. */
 export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
@@ -26,19 +25,32 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   const [view, setView] = useState<{ bounds: google.maps.LatLngBounds; center: google.maps.LatLngLiteral } | null>(null);
   // Back from a Place page, that place stays chosen.
   const location = useLocation();
+  const navigate = useNavigate();
   const [selection, setSelection] = useState<Selection>(() => {
     const placeId = (location.state as { placeId?: string } | null)?.placeId;
     return placeId ? { kind: 'ours', placeId } : null;
   });
-  const [filters, setFilters] = useState<StatusFilter[]>(() => {
-    try { return JSON.parse(localStorage.getItem(FILTERS_KEY) ?? '') as StatusFilter[]; } catch { return ['beenThere', 'wantToGo']; }
-  });
+  // Used once: a reload shouldn't bring it back.
+  useEffect(() => { if (location.state) navigate('.', { replace: true, state: null }); }, [location.state, navigate]);
+  const [filters, setFilters] = useState<PlaceFilters>(loadFilters);
 
   useEffect(() => { loadGoogleMaps().then(setMaps).catch((e: unknown) => setMapsError(e instanceof Error ? e.message : 'Couldn’t load Google Maps')); }, []);
-  useEffect(() => { try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)); } catch { /* private mode */ } }, [filters]);
+  useEffect(() => saveFilters(filters), [filters]);
 
   const summaries = useMemo(() => (data ? [...data.places.values()].map((p) => summarize(data, p)) : []), [data]);
-  const shown = useMemo(() => summaries.filter((s) => filters.includes(s.place.status)), [summaries, filters]);
+  // The filters narrow our places; the chosen one always stays (e.g. one just saved as want to go).
+  const chosenId = selection?.kind === 'ours' ? selection.placeId : null;
+  const beforeCuisine = useMemo(() => summaries.filter((s) => s.place.id === chosenId || matchesExceptCuisine(s, filters)), [summaries, filters, chosenId]);
+  const shown = useMemo(() => beforeCuisine.filter((s) => s.place.id === chosenId || matchesCuisine(s, filters)), [beforeCuisine, filters, chosenId]);
+  const cuisines = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of beforeCuisine) {
+      if (!view || view.bounds.contains(latLngOf(s.place))) counts.set(s.cuisine ?? NOT_SET, (counts.get(s.cuisine ?? NOT_SET) ?? 0) + 1);
+    }
+    // Most common first; "Not set" last.
+    return [...counts.entries()].map(([name, count]) => ({ name, count }))
+      .sort((a, b) => Number(a.name === NOT_SET) - Number(b.name === NOT_SET) || b.count - a.count || a.name.localeCompare(b.name));
+  }, [beforeCuisine, view]);
   const byGoogleId = useMemo(() => new Map(summaries.flatMap((s) => (s.place.google?.placeId ? [[s.place.google.placeId, s.place.id] as const] : []))), [summaries]);
 
   const inView = useMemo(() => {
@@ -84,17 +96,13 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   // After a change, show the place it was about (or nothing, when it was deleted).
   useShowPlace(useCallback((placeId: string | null) => setSelection(placeId ? { kind: 'ours', placeId } : null), []));
 
-  // A place shown on the map is never hidden by the filters.
-  useEffect(() => {
-    if (selected && !filters.includes(selected.place.status)) setFilters((f) => [...f, selected.place.status]);
-  }, [selected, filters]);
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} onResult={onSearch} /> : null} />
       {error && <Alert severity="error">{error}</Alert>}
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <PlaceList items={inView} filters={filters} onFilters={setFilters} selectedPlaceId={selected?.place.id ?? null} onSelect={(id) => chooseOurs(id, true)} />
+        <PlaceList items={inView} matching={inView.filter(({ summary }) => matchesExceptCuisine(summary, filters) && matchesCuisine(summary, filters)).length} filters={filters} onFilters={setFilters} cuisines={cuisines} selectedPlaceId={selected?.place.id ?? null} onSelect={(id) => chooseOurs(id, true)} />
         <Box sx={{ position: 'relative', flex: 1, bgcolor: '#eef0ea' }}>
           {!maps && !mapsError && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}><CircularProgress /></Box>}
           {(mapsError || (maps && !maps.googleMapsKey)) && (

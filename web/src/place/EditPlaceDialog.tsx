@@ -1,6 +1,7 @@
-import type { Place } from '@tedmarks/shared';
+import { mealsFromHours, type MealsServed, type Place } from '@tedmarks/shared';
 import {
-  Autocomplete, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup,
+  Autocomplete, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, Link, MenuItem, Stack, TextField,
+  ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { placeEditOf, type PlaceEdit } from '../data/placeEdit.js';
@@ -21,6 +22,9 @@ export function EditPlaceDialog({ data, place, onClose, onSave, onDelete }: {
   const subtypes = useMemo(() => [...data.placeSubtypes.values()].filter((s) => s.kind === place.kind).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)), [data, place.kind]);
   const allTags = useMemo(() => [...new Set([...data.places.values()].flatMap((p) => p.tags))].sort(), [data]);
   const visits = [...data.visits.values()].filter((v) => v.placeId === place.id).length;
+  const guessed = mealsFromHours(place.google?.openingHours?.periods);
+  const meals = edit.meals ?? guessed;
+  const toggleMeal = (meal: keyof MealsServed) => set({ meals: { ...(meals ?? { breakfast: false, lunch: false, dinner: false }), [meal]: !meals?.[meal] } });
 
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
@@ -39,6 +43,20 @@ export function EditPlaceDialog({ data, place, onClose, onSave, onDelete }: {
           <Autocomplete multiple freeSolo options={allTags} value={edit.tags} onChange={(_, tags) => set({ tags: tags as string[] })}
             renderValue={(tags, getItemProps) => tags.map((tag, index) => { const { key, ...props } = getItemProps({ index }); return <Chip key={key} size="small" label={tag} {...props} />; })}
             renderInput={(params) => <TextField {...params} label="Tags" placeholder={edit.tags.length ? '' : 'patio, date night… (Enter to add)'} />} />
+          <Box>
+            <Typography variant="body2" fontWeight={600}>Serves</Typography>
+            <Stack direction="row" alignItems="center" flexWrap="wrap">
+              {(['breakfast', 'lunch', 'dinner'] as const).map((meal) => (
+                <FormControlLabel key={meal} control={<Checkbox size="small" checked={Boolean(meals?.[meal])} onChange={() => toggleMeal(meal)} />}
+                  label={meal[0]!.toUpperCase() + meal.slice(1)} />
+              ))}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              {edit.meals
+                ? <>Set by hand. {guessed && <Link component="button" variant="caption" onClick={() => set({ meals: null })}>Go by Google’s hours instead</Link>}</>
+                : guessed ? 'Guessed from Google’s hours — tick or untick to set it yourself.' : 'No hours from Google to guess from.'}
+            </Typography>
+          </Box>
           <TextField label="Our review" multiline minRows={3} value={edit.review} onChange={(e) => set({ review: e.target.value })} />
         </Stack>
       </DialogContent>

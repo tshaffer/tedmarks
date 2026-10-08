@@ -1,4 +1,4 @@
-import type { PlaceStatus } from '@tedmarks/shared';
+import type { MealsServed, PlaceStatus } from '@tedmarks/shared';
 import type { TedmarksRecords } from './TedmarksData.js';
 import { inverse } from './undo.js';
 import { TED, type Changes } from './visitWrites.js';
@@ -11,11 +11,14 @@ export interface PlaceEdit {
   status: PlaceStatus;
   tags: string[];
   review: string;
+  /** Set by hand, or null to go by Google's hours. */
+  meals: MealsServed | null;
 }
 
 export function placeEditOf(data: TedmarksRecords, placeId: string): PlaceEdit {
   const p = data.places.get(placeId)!;
-  return { name: p.name, subtypeId: p.subtypeId ?? null, status: p.status, tags: p.tags, review: p.review ?? '' };
+  const meals = p.attributes?.kind === 'restaurant' ? p.attributes.mealsServed : null;
+  return { name: p.name, subtypeId: p.subtypeId ?? null, status: p.status, tags: p.tags, review: p.review ?? '', meals };
 }
 
 /** Only the fields that changed; returns the changes and their undo. */
@@ -30,6 +33,7 @@ export function planPlaceEdit(data: TedmarksRecords, placeId: string, edit: Plac
   if (tags.join('\n') !== before.tags.join('\n')) fields.tags = tags;
   const review = edit.review.trim();
   if (review !== before.review) fields.review = review || null;
+  if (JSON.stringify(edit.meals) !== JSON.stringify(before.meals)) fields.attributes = edit.meals ? { kind: 'restaurant', mealsServed: edit.meals } : null;
   const changes: Changes = Object.keys(fields).length ? { places: [{ id: placeId, modifiedAt: now, modifiedBy: TED, ...fields }] } : {};
   return { changes, undo: (later) => inverse(data, changes, later) };
 }

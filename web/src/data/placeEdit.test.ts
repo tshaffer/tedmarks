@@ -3,6 +3,16 @@ import { placeEditOf, planPlaceEdit, planReviewDelete } from './placeEdit.js';
 import { NOW, PLACE, apply, records } from './testRecords.js';
 
 describe('editing a place', () => {
+  test('meals set by hand are stored; clearing them goes back to the hours', () => {
+    let data = records();
+    const meals = { breakfast: true, lunch: true, dinner: false };
+    data = apply(data, planPlaceEdit(data, PLACE, { ...placeEditOf(data, PLACE), meals }, NOW).changes);
+    expect(data.places.get(PLACE)!.attributes).toEqual({ kind: 'restaurant', mealsServed: meals });
+    expect(placeEditOf(data, PLACE).meals).toEqual(meals);
+    data = apply(data, planPlaceEdit(data, PLACE, { ...placeEditOf(data, PLACE), meals: null }, NOW).changes);
+    expect(data.places.get(PLACE)!.attributes).toBeUndefined();
+  });
+
   test('sends only what changed, trims, and undo puts it all back', () => {
     const data = records();
     const before = placeEditOf(data, PLACE);

@@ -74,7 +74,7 @@ export function MapView({ mapId, places, googlePlaces, selectedId, onReady, onSe
         const been = summary.place.status === 'beenThere';
         return {
           key: summary.place.id, name: summary.place.name, position: latLngOf(summary.place), kind: summary.place.status,
-          glyph: been ? (summary.verdict.kind === 'joint' ? VERDICT[summary.verdict.value].emoji : summary.verdict.kind === 'split' ? '↔' : '•') : '★',
+          glyph: been ? (summary.verdict.kind === 'joint' ? VERDICT[summary.verdict.value].emoji : summary.verdict.kind === 'split' ? '↔' : NO_VERDICT) : '★',
           priority: been ? 1000 + summary.visits.length : 500, selected: summary.place.id === selectedId,
           select: () => handlers.current.onSelectOurs(summary.place.id),
         };
@@ -111,6 +111,9 @@ export function MapView({ mapId, places, googlePlaces, selectedId, onReady, onSe
 
   return <Box ref={container} sx={{ position: 'absolute', inset: 0 }} />;
 }
+
+/** Inside a been-there pin when we haven't given a verdict yet. */
+const NO_VERDICT = '?';
 
 /** Names show beside our pins from this zoom in (neighborhood level); further out they'd crowd. */
 const LABEL_ZOOM = 14;
@@ -182,6 +185,7 @@ function markerContent(pin: Pin, labelSide: LabelSide | null): HTMLElement {
   const glyph = document.createElement('span');
   glyph.textContent = pin.glyph;
   if (pin.kind === 'wantToGo') Object.assign(glyph.style, { color: pin.selected ? '#fff' : PIN.wantToGo, fontSize: '15px' });
+  if (pin.glyph === NO_VERDICT) Object.assign(glyph.style, { color: pin.selected ? '#fff' : PIN.google, fontSize: '13px', fontWeight: '700', width: '16px', textAlign: 'center' });
   if (pin.kind === 'google') Object.assign(glyph.style, { color: pin.selected ? '#fff' : PIN.googleText, fontSize: '11px', fontWeight: '700' });
   el.append(glyph);
   if (pin.selected) {

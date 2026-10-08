@@ -14,6 +14,17 @@ interface Props {
 
 const HOME = { lat: 37.3861, lng: -122.0839 };   // Mountain View, until the browser shares its location
 
+const VIEW_KEY = 'tedmarks.mapView';
+
+function savedView(): { center: google.maps.LatLngLiteral; zoom: number } | null {
+  try { return JSON.parse(sessionStorage.getItem(VIEW_KEY) ?? 'null') as { center: google.maps.LatLngLiteral; zoom: number } | null; } catch { return null; }
+}
+
+function saveView(m: google.maps.Map) {
+  const center = m.getCenter();
+  try { if (center) sessionStorage.setItem(VIEW_KEY, JSON.stringify({ center: center.toJSON(), zoom: m.getZoom() ?? 14 })); } catch { /* private mode */ }
+}
+
 /**
  * Google's map (its restaurant icons are clickable) with our places on top: green ring = been
  * there (with our verdict), orange ★ = want to go; the chosen one is filled orange with its name.
@@ -27,8 +38,10 @@ export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs,
 
   useEffect(() => {
     if (!container.current || map.current) return;
+    // Coming back from a Place page: where the map was. Otherwise here, or near the browser.
+    const saved = savedView();
     const m = new google.maps.Map(container.current, {
-      center: HOME, zoom: 14, mapId, clickableIcons: true,
+      center: saved?.center ?? HOME, zoom: saved?.zoom ?? 14, mapId, clickableIcons: true,
       mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
     });
     map.current = m;
@@ -38,8 +51,8 @@ export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs,
         handlers.current.onSelectGoogle(event.placeId);
       }
     });
-    m.addListener('idle', () => handlers.current.onIdle(m));
-    navigator.geolocation?.getCurrentPosition((p) => m.setCenter({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { timeout: 8000 });
+    m.addListener('idle', () => { saveView(m); handlers.current.onIdle(m); });
+    if (!saved) navigator.geolocation?.getCurrentPosition((p) => m.setCenter({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { timeout: 8000 });
     onReady(m);
   }, [mapId, onReady]);
 

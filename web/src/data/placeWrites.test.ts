@@ -45,7 +45,7 @@ describe('want to go for a been-there place', () => {
     data = apply(data, planInterest(data, PLACE, { level: 'reallyWantToGo', why: 'New menu' }, NOW));
     expect(data.places.get(PLACE)!.status).toBe('beenThere');
     expect(data.places.get(PLACE)!.interest?.why).toBe('New menu');
-    data = apply(data, planClearInterest(PLACE, NOW));
+    data = apply(data, planClearInterest(data, PLACE, NOW).changes);
     expect(data.places.get(PLACE)!.interest).toBeUndefined();
     expect(data.places.get(PLACE)!.status).toBe('beenThere');
   });

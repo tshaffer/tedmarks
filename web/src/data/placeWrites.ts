@@ -1,5 +1,6 @@
 import type { InterestLevel, NearbyPlace } from '@tedmarks/shared';
 import type { TedmarksRecords } from './TedmarksData.js';
+import { inverse } from './undo.js';
 import { TED, planVisitDelete, randomIds, type Changes, type Ids } from './visitWrites.js';
 
 // Saving restaurants to try (want to go), editing why, and deleting places. Pure, like visitWrites.
@@ -44,9 +45,10 @@ export function planInterest(data: TedmarksRecords, placeId: string, interest: I
   };
 }
 
-/** No longer want to go back (a been-there place keeps everything else). */
-export function planClearInterest(placeId: string, now = new Date().toISOString()): Changes {
-  return { places: [patch(placeId, now, { interest: null })] };
+/** No longer want to go back (a been-there place keeps everything else); returns the undo too. */
+export function planClearInterest(data: TedmarksRecords, placeId: string, now = new Date().toISOString()): { changes: Changes; undo: (later: string) => Changes } {
+  const changes: Changes = { places: [patch(placeId, now, { interest: null })] };
+  return { changes, undo: (later) => inverse(data, changes, later) };
 }
 
 /** Deletes a place with every visit to it (their dishes, ratings and notes), its dish list and menus; returns the undo. */

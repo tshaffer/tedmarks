@@ -1,5 +1,6 @@
 import { normalizeItemName, type MenuReadItem, type NearbyPlace } from '@tedmarks/shared';
 import type { TedmarksRecords } from './TedmarksData.js';
+import { inverse } from './undo.js';
 import { TED, randomIds, type Changes, type Ids } from './visitWrites.js';
 
 // Menus read on the web (from a PDF or screenshots). Like the phone's MenuReading.apply: each
@@ -110,19 +111,4 @@ function dishChanges(data: TedmarksRecords, placeId: string, items: MenuReadItem
     if (!onMenu.has(item.normalizedName) && item.onLatestMenu !== false) docs.push(patch(item.id, now, { onLatestMenu: false }));
   }
   return docs;
-}
-
-/** Patches that put back each field the changes touched (deleted records come back too). */
-function inverse(data: TedmarksRecords, changes: Changes, later: string): Changes {
-  const out: Changes = {};
-  for (const [collection, docs] of Object.entries(changes) as [Collection, Doc[]][]) {
-    const store = (data as unknown as Record<string, Map<string, Record<string, unknown>>>)[collection]!;
-    for (const doc of docs) {
-      const before = store.get(doc.id) ?? {};
-      const fields: Record<string, unknown> = {};
-      for (const key of Object.keys(doc)) if (!['id', 'modifiedAt', 'modifiedBy'].includes(key)) fields[key] = before[key] ?? null;
-      (out[collection] ??= []).push(patch(doc.id, later, fields));
-    }
-  }
-  return out;
 }

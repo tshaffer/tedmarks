@@ -8,8 +8,10 @@ export const chipStyle = (on: boolean) => (on ? { bgcolor: '#fff1dc', color: '#c
 export interface Choice { value: string; label: string; count?: number }
 
 /** A chip that opens a menu of checkable choices ("Cuisine ▾", "City ▾"); none ticked = any. */
-export function MultiSelectChip({ label, choices, selected, onChange, anyLabel, empty = 'Nothing to choose', footer }: {
+export function MultiSelectChip({ label, plural, choices, selected, onChange, anyLabel, empty = 'Nothing to choose', footer }: {
   label: string;
+  /** "verdicts" for "2 verdicts" (default: the label, lowercased, plus s). */
+  plural?: string;
   choices: Choice[];
   selected: string[];
   onChange: (selected: string[]) => void;
@@ -26,7 +28,7 @@ export function MultiSelectChip({ label, choices, selected, onChange, anyLabel, 
   return (
     <>
       <Chip size="small" variant="outlined" onClick={(e) => setAnchor(e.currentTarget)} sx={{ ...chipStyle(selected.length > 0), maxWidth: 220 }}
-        label={selected.length === 0 ? `${label} ▾` : selected.length === 1 ? `${labelOf(selected[0]!)} ▾` : `${selected.length} ${label.toLowerCase()} ▾`} />
+        label={selected.length === 0 ? `${label} ▾` : selected.length === 1 ? `${labelOf(selected[0]!)} ▾` : `${selected.length} ${plural ?? `${label.toLowerCase()}s`} ▾`} />
       <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)} slotProps={{ paper: { sx: { maxHeight: 420 } } }}>
         {selected.length > 0 && <MenuItem dense onClick={() => onChange([])}><ListItemText primary={anyLabel} /></MenuItem>}
         {listed.map((choice) => (
@@ -132,11 +134,11 @@ export function FilterChips({ filters, onFilters, cuisines, tags, onManageTags, 
   return (
     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap alignItems="center">
       <WhenChip when={filters.when} onChange={(when) => set({ when })} />
-      <MultiSelectChip label="Cuisine" anyLabel="Any cuisine" empty={cuisineEmpty} selected={filters.cuisines} onChange={(cuisines) => set({ cuisines })}
+      <MultiSelectChip label="Cuisine" plural="cuisines" anyLabel="Any cuisine" empty={cuisineEmpty} selected={filters.cuisines} onChange={(cuisines) => set({ cuisines })}
         choices={cuisines.map((c) => ({ value: c.name, label: c.name === NOT_SET ? 'Not set' : c.name, count: c.count }))} />
-      <MultiSelectChip label="Price" anyLabel="Any price" choices={PRICES} selected={filters.prices.map(String)} onChange={(v) => set({ prices: v.map(Number) })} />
-      <MultiSelectChip label="Our verdict" anyLabel="Any verdict" choices={VERDICTS} selected={filters.verdicts} onChange={(v) => set({ verdicts: v as VerdictChoice[] })} />
-      <MultiSelectChip label="Tags" anyLabel="Any tag" choices={tags} selected={filters.tags} onChange={(v) => set({ tags: v })}
+      <MultiSelectChip label="Price" plural="prices" anyLabel="Any price" choices={PRICES} selected={filters.prices.map(String)} onChange={(v) => set({ prices: v.map(Number) })} />
+      <MultiSelectChip label="Our verdict" plural="verdicts" anyLabel="Any verdict" choices={VERDICTS} selected={filters.verdicts} onChange={(v) => set({ verdicts: v as VerdictChoice[] })} />
+      <MultiSelectChip label="Tags" plural="tags" anyLabel="Any tag" choices={tags} selected={filters.tags} onChange={(v) => set({ tags: v })}
         empty="No tags yet — add them in Edit place" footer={{ label: 'Manage tags…', onClick: onManageTags }} />
       {google && <GoogleChip filters={filters} onChange={set} />}
       {extra}

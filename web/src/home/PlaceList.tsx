@@ -1,6 +1,6 @@
 import type { AreaRestaurant } from '@tedmarks/shared';
 import { openStatus } from '@tedmarks/shared';
-import { Box, Button, CircularProgress, IconButton, List, ListItemButton, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, IconButton, Link, List, ListItemButton, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { miles, VERDICT, type PlaceSummary } from '../data/insights.js';
 import { FilterChips } from './FilterChips.js';
 import { activeCount, cuisineOfGoogle, type PlaceFilters, type StatusFilter } from './filters.js';
@@ -37,8 +37,8 @@ interface Props {
   onSelectOurs: (placeId: string) => void;
   onSelectGoogle: (googlePlaceId: string) => void;
   google: GoogleState;
-  /** Showing just the places sent from the Places page. */
-  only?: { count: number; onClear: () => void } | null;
+  /** Showing just the places sent from the Places page (one area of them at a time). */
+  only?: { count: number; area: string | null; next: { name: string; go: () => void } | null; onClear: () => void } | null;
 }
 
 const price = (level: number | undefined) => (level ? '$'.repeat(level) : null);
@@ -53,7 +53,12 @@ export function PlaceList({ items, matching, filters, onFilters, cuisines, tags,
       <Stack spacing={1} sx={{ p: 2, pb: 1.5 }}>
         {only && (
           <Stack direction="row" alignItems="center" sx={{ px: 1.25, py: 0.5, borderRadius: 2, bgcolor: '#fff1dc' }}>
-            <Typography variant="body2" fontWeight={600} color="#c26a00" sx={{ flex: 1 }}>Showing {only.count} place{only.count === 1 ? '' : 's'} from Places</Typography>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" fontWeight={600} color="#c26a00" noWrap>
+                {only.count} place{only.count === 1 ? '' : 's'} from Places{only.area ? ` · ${only.area}` : ''}
+              </Typography>
+              {only.next && <Link component="button" variant="caption" underline="hover" onClick={only.next.go}>Next area: {only.next.name} ›</Link>}
+            </Box>
             <IconButton size="small" onClick={only.onClear} aria-label="Show all places">✕</IconButton>
           </Stack>
         )}

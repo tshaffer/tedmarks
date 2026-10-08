@@ -91,9 +91,9 @@ export function VisitsPage({ onSignedOut }: { onSignedOut: () => void }) {
                 slotProps={{ input: { startAdornment: <InputAdornment position="start">🔍</InputAdornment> } }} sx={{ '& .MuiInputBase-root': { bgcolor: '#f5f5f7' } }} />
               <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap alignItems="center">
                 <YearChip years={years} year={q.year} onChange={(year) => set({ year })} />
-                <MultiSelectChip label="Who" anyLabel="Anyone" choices={people} selected={q.who} onChange={(who) => set({ who })} />
-                <MultiSelectChip label="Verdict" anyLabel="Any verdict" choices={VERDICTS} selected={q.verdicts} onChange={(v) => set({ verdicts: v as VerdictChoice[] })} />
-                <MultiSelectChip label="City" anyLabel="Any city" choices={cities} selected={q.cities} onChange={(v) => set({ cities: v })} />
+                <MultiSelectChip label="Who" plural="people" anyLabel="Anyone" choices={people} selected={q.who} onChange={(who) => set({ who })} />
+                <MultiSelectChip label="Verdict" plural="verdicts" anyLabel="Any verdict" choices={VERDICTS} selected={q.verdicts} onChange={(v) => set({ verdicts: v as VerdictChoice[] })} />
+                <MultiSelectChip label="City" plural="cities" anyLabel="Any city" choices={cities} selected={q.cities} onChange={(v) => set({ cities: v })} />
                 <Chip size="small" variant="outlined" label="Not rated yet" onClick={() => set({ notRated: !q.notRated })} sx={chipStyle(q.notRated)} />
                 {filtered && <Link component="button" variant="caption" underline="hover" onClick={() => set({ ...NO_VISITS_QUERY, year: q.year })}>Clear</Link>}
               </Stack>

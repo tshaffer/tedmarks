@@ -17,6 +17,7 @@ import {
 } from './filters.js';
 import { PlaceList, type ListItem } from './PlaceList.js';
 import { cityAndTagChoices } from '../places/placesQuery.js';
+import type { Area } from '../places/areas.js';
 import { SearchBox, type SearchResult } from './SearchBox.js';
 
 type Selection = { kind: 'ours'; placeId: string } | { kind: 'google'; googlePlaceId: string } | null;
@@ -32,14 +33,16 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   // Back from a Place page, that place stays chosen.
   const location = useLocation();
   const navigate = useNavigate();
-  const [selection, setSelection] = useState<Selection>(() => {
-    const placeId = (location.state as { placeId?: string } | null)?.placeId;
-    return placeId ? { kind: 'ours', placeId } : null;
-  });
-  // From the Places page: fit the map to its list (once the map is ready).
-  const [fitPlaceIds] = useState(() => (location.state as { fitPlaceIds?: string[] } | null)?.fitPlaceIds ?? null);
-  // …and show only those places until you clear it.
-  const [onlyIds, setOnlyIds] = useState<Set<string> | null>(() => (fitPlaceIds ? new Set(fitPlaceIds) : null));
+  const arrived = location.state as { placeId?: string; focus?: boolean; areas?: Area[]; areaIndex?: number } | null;
+  const [selection, setSelection] = useState<Selection>(() => (arrived?.placeId ? { kind: 'ours', placeId: arrived.placeId } : null));
+  // From a Places row's 📍: center the map on that place (once the map is ready).
+  const [focusId] = useState(() => (arrived?.focus ? arrived.placeId ?? null : null));
+  // From "Show these on the map": the list's places, one area at a time ("Bend", then "Golden"…),
+  // only those shown until you clear it.
+  const [areas, setAreas] = useState<{ list: Area[]; index: number } | null>(() => (arrived?.areas?.length ? { list: arrived.areas, index: arrived.areaIndex ?? 0 } : null));
+  const area = areas ? areas.list[areas.index] : undefined;
+  const onlyIds = useMemo(() => (area ? new Set(area.placeIds) : null), [area]);
+  const fitPlaceIds = area?.placeIds ?? null;
   // Used once: a reload shouldn't bring it back.
   useEffect(() => { if (location.state) navigate('.', { replace: true, state: null }); }, [location.state, navigate]);
   const [filters, setFilters] = useState<PlaceFilters>(loadFilters);
@@ -144,6 +147,14 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   }, [map, chooseGoogle]);
 
   useEffect(() => {
+    if (!map || !data || !focusId) return;
+    const place = data.places.get(focusId);
+    if (!place) return;
+    map.setCenter(latLngOf(place));
+    if ((map.getZoom() ?? 0) < 15) map.setZoom(15);
+  }, [map, data, focusId]);
+
+  useEffect(() => {
     if (!map || !data || !fitPlaceIds?.length) return;
     const bounds = new google.maps.LatLngBounds();
     for (const id of fitPlaceIds) { const p = data.places.get(id); if (p) bounds.extend(latLngOf(p)); }
@@ -180,7 +191,11 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
         <PlaceList items={inView} matching={matching} filters={filters} onFilters={setFilters} cuisines={cuisines} tags={tags} onManageTags={actions.manageTags} selectedId={chosenId}
           onSelectOurs={(id) => chooseOurs(id, true)} onSelectGoogle={(id) => setSelection({ kind: 'google', googlePlaceId: id })}
           google={{ loading: googleSearch.loading, error: googleSearch.error, found: googleResults?.length ?? null, truncated: googleSearch.truncated, stale, onSearch: () => void searchGoogle() }}
-          only={onlyIds ? { count: onlyIds.size, onClear: () => setOnlyIds(null) } : null} />
+          only={areas && area ? {
+            count: area.placeIds.length, area: areas.list.length > 1 ? `${area.name} (${areas.index + 1} of ${areas.list.length})` : null,
+            next: areas.list.length > 1 ? { name: areas.list[(areas.index + 1) % areas.list.length]!.name, go: () => setAreas({ ...areas, index: (areas.index + 1) % areas.list.length }) } : null,
+            onClear: () => setAreas(null),
+          } : null} />
         <Box sx={{ position: 'relative', flex: 1, bgcolor: '#eef0ea' }}>
           {!maps && !mapsError && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}><CircularProgress /></Box>}
           {(mapsError || (maps && !maps.googleMapsKey)) && (

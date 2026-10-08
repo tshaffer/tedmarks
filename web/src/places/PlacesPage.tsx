@@ -1,11 +1,12 @@
 import {
-  Alert, Box, Chip, CircularProgress, InputAdornment, Link, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow,
-  TableSortLabel, TextField, ToggleButton, ToggleButtonGroup, Typography,
+  Alert, Box, Chip, CircularProgress, IconButton, InputAdornment, Link, Menu, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow,
+  TableSortLabel, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePlaceActions } from '../actions/PlaceActions.js';
-import { miles, ratingText, summarize, VERDICT } from '../data/insights.js';
+import { latLngOf, miles, ratingText, summarize, VERDICT } from '../data/insights.js';
+import { areasOf } from './areas.js';
 import { useTedmarksData } from '../data/TedmarksData.js';
 import { FilterChips, MultiSelectChip } from '../home/FilterChips.js';
 import { cuisineCounts, loadFilters, matchesOursExceptCuisine, saveFilters, type PlaceFilters, type StatusFilter } from '../home/filters.js';
@@ -70,6 +71,11 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
   const counts = { all: summaries.length, been: summaries.filter((s) => s.place.status === 'beenThere').length };
   const extraActive = query.cities.length > 0;
 
+  // "Show these on the map": the rows grouped into areas, so the map never opens on the whole world.
+  const mapAreas = useMemo(() => areasOf(rows.map((r) => ({ id: r.summary.place.id, ...latLngOf(r.summary.place), city: r.summary.city }))), [rows]);
+  const [areaMenu, setAreaMenu] = useState<HTMLElement | null>(null);
+  const showAreas = (index: number) => { setAreaMenu(null); navigate('/', { state: { areas: mapAreas, areaIndex: index } }); };
+
   const sortBy = (key: SortKey) => set(query.sort === key ? { reversed: !query.reversed } : { sort: key, reversed: false });
   const header = (label: string, key?: SortKey, width?: number) => (
     <TableCell sx={{ width, fontSize: 12, fontWeight: 600, color: 'text.secondary', bgcolor: '#fafafb', whiteSpace: 'nowrap' }}>
@@ -87,7 +93,17 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
             <Typography color="text.secondary">{counts.all} places · {counts.been} been there · {counts.all - counts.been} want to go</Typography>
           </Box>
           <Link component="button" underline="hover" fontWeight={500} disabled={rows.length === 0}
-            onClick={() => navigate('/', { state: { fitPlaceIds: rows.map((r) => r.summary.place.id) } })}>Show these on the map ›</Link>
+            onClick={(e) => (mapAreas.length > 1 ? setAreaMenu(e.currentTarget) : showAreas(0))}>Show these on the map ›</Link>
+          <Menu anchorEl={areaMenu} open={Boolean(areaMenu)} onClose={() => setAreaMenu(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+            <MenuItem disabled dense><Typography variant="caption" fontWeight={600}>THESE ARE IN {mapAreas.length} AREAS — PICK ONE</Typography></MenuItem>
+            {mapAreas.slice(0, 15).map((a, i) => (
+              <MenuItem key={a.name} dense onClick={() => showAreas(i)}>
+                <Typography sx={{ flex: 1, mr: 3 }}>{a.name}</Typography>
+                <Typography variant="body2" color="text.secondary">{a.placeIds.length}</Typography>
+              </MenuItem>
+            ))}
+            {mapAreas.length > 15 && <MenuItem disabled dense>…and {mapAreas.length - 15} more (Next area on the map)</MenuItem>}
+          </Menu>
         </Stack>
 
         <Paper elevation={0} sx={{ p: 2, borderRadius: 4 }}>
@@ -108,7 +124,7 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
             <FilterChips filters={filters} onFilters={setFilters} cuisines={cuisines} extraActive={extraActive}
               onClearExtra={() => set({ cities: [] })} tags={tags} onManageTags={actions.manageTags}
               extra={<>
-                <MultiSelectChip label="City" anyLabel="Any city" choices={cities} selected={query.cities} onChange={(v) => set({ cities: v })} />
+                <MultiSelectChip label="City" plural="cities" anyLabel="Any city" choices={cities} selected={query.cities} onChange={(v) => set({ cities: v })} />
               </>} />
           </Stack>
         </Paper>
@@ -128,7 +144,8 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rows.map((row) => <PlaceTableRow key={row.summary.place.id} row={row} data={data} onOpen={() => navigate(`/place/${row.summary.place.id}`, { state: { from: 'places' } })} />)}
+                {rows.map((row) => <PlaceTableRow key={row.summary.place.id} row={row} data={data} onOpen={() => navigate(`/place/${row.summary.place.id}`, { state: { from: 'places' } })}
+                  onMap={() => navigate('/', { state: { placeId: row.summary.place.id, focus: true } })} />)}
               </TableBody>
             </Table>
             <Typography variant="body2" color="text.secondary" sx={{ px: 2.5, py: 1.5, borderTop: '1px solid #efeff3' }}>
@@ -141,7 +158,7 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
   );
 }
 
-function PlaceTableRow({ row, data, onOpen }: { row: PlaceRow; data: NonNullable<ReturnType<typeof useTedmarksData>['data']>; onOpen: () => void }) {
+function PlaceTableRow({ row, data, onOpen, onMap }: { row: PlaceRow; data: NonNullable<ReturnType<typeof useTedmarksData>['data']>; onOpen: () => void; onMap: () => void }) {
   const { summary: s, matchedDish, meters } = row;
   const { place } = s;
   const muted = (content: ReactNode) => <Typography variant="body2" color="text.secondary">{content}</Typography>;
@@ -151,6 +168,7 @@ function PlaceTableRow({ row, data, onOpen }: { row: PlaceRow; data: NonNullable
       <TableCell>
         <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography fontWeight={600}>{place.name}</Typography>
+          <Tooltip title="Show on the map"><IconButton size="small" aria-label={`Show ${place.name} on the map`} onClick={(e) => { e.stopPropagation(); onMap(); }} sx={{ p: 0.25, fontSize: 14 }}>📍</IconButton></Tooltip>
           {place.tags.map((t) => <Chip key={t} size="small" variant="outlined" label={t} sx={{ height: 20, fontSize: 11 }} />)}
         </Stack>
         {muted(<>{sub}{matchedDish && <> · <b>{matchedDish}</b></>}</>)}

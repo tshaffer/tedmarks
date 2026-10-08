@@ -1,6 +1,7 @@
 import { Alert, Button, Snackbar } from '@mui/material';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, placeDetails, pushChanges, refreshPlace } from '../api.js';
+import { planDishMerge } from '../data/dishes.js';
 import { planMenuDelete } from '../data/menuWrites.js';
 import { planClearInterest, planInterest, planPlaceDelete, planSaveWantToGo, type Interest } from '../data/placeWrites.js';
 import { planPlaceEdit, planReviewDelete, type PlaceEdit } from '../data/placeEdit.js';
@@ -8,6 +9,7 @@ import { useTedmarksData } from '../data/TedmarksData.js';
 import { planVisitDelete } from '../data/visitWrites.js';
 import { MenuDialog, type MenuTarget } from '../menu/MenuDialog.js';
 import { EditPlaceDialog } from '../place/EditPlaceDialog.js';
+import { MergeDishesDialog } from '../place/MergeDishesDialog.js';
 import { VisitDialog, type VisitTarget } from '../visit/VisitDialog.js';
 
 // Everything you can do to a place, shared by the map panel and the Place page: the visit, menu
@@ -17,6 +19,7 @@ export interface PlaceActions {
   openVisit(target: VisitTarget): void;
   openMenu(target: MenuTarget): void;
   editPlace(placeId: string): void;
+  mergeDishes(placeId: string): void;
   deleteVisit(visitId: string): Promise<void>;
   deletePlace(placeId: string): Promise<void>;
   deleteMenu(menuId: string): Promise<void>;
@@ -56,6 +59,7 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
   const [visitTarget, setVisitTarget] = useState<VisitTarget | null>(null);
   const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [merging, setMerging] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const showRef = useRef<(placeId: string | null) => void>(() => {});
@@ -72,6 +76,7 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
     openVisit: setVisitTarget,
     openMenu: setMenuTarget,
     editPlace: setEditing,
+    mergeDishes: setMerging,
 
     deleteVisit: (visitId) => attempt(async () => {
       if (!data) return;
@@ -183,6 +188,17 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
             await reload();
             undoable('Place saved', async () => { await pushChanges(undo(now())); await reload(); });
           }, 'Couldn’t save the place.')} />
+      )}
+      {data && merging && (
+        <MergeDishesDialog data={data} placeId={merging} onClose={() => setMerging(null)}
+          onMerge={(keepId, mergeIds) => attempt(async () => {
+            const { changes, undo } = planDishMerge(data, keepId, mergeIds);
+            await pushChanges(changes);
+            await reload();
+            const keep = data.placeItems.get(keepId)?.name ?? 'one dish';
+            undoable(mergeIds.length === 1 ? `Merged “${data.placeItems.get(mergeIds[0]!)?.name}” into “${keep}”` : `Merged ${mergeIds.length + 1} dishes into “${keep}”`,
+              async () => { await pushChanges(undo(now())); await reload(); });
+          }, 'Couldn’t merge the dishes.')} />
       )}
       <Snackbar open={Boolean(toast)} autoHideDuration={toast?.undo ? 8000 : 3000} onClose={(_, reason) => reason !== 'clickaway' && setToast(null)} message={toast?.message}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}

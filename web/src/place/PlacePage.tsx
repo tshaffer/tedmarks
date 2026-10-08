@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { usePlaceActions, useShowPlace } from '../actions/PlaceActions.js';
 import { summarize } from '../data/insights.js';
+import { mergeSuggestions } from '../data/dishes.js';
 import { menuSections } from '../data/menuWrites.js';
 import { useTedmarksData } from '../data/TedmarksData.js';
 import { directionsUrl } from '../home/OurPlacePanel.js';
@@ -37,6 +38,8 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
   const sections = menu ? menuSections(data, menu.id) : [];
   const dishCount = sections.reduce((n, s) => n + s.entries.length, 0);
   const hours = place.google?.openingHours?.weekdayText ?? [];
+  const dishCountAll = [...data.placeItems.values()].filter((i) => i.placeId === place.id).length;
+  const suggested = mergeSuggestions(data, place.id).length;
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const address = place.google?.formattedAddress?.replace(/, USA$/, '');
 
@@ -83,7 +86,8 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.6fr 1fr' }, gap: 2.5, alignItems: 'start' }}>
         <Stack spacing={2.5}>
-          <Card title={`What to order${summary.visits.length ? ` · from ${summary.visits.length === 1 ? '1 visit' : `all ${summary.visits.length} visits`}` : ''}`}>
+          <Card title={`What to order${summary.visits.length ? ` · from ${summary.visits.length === 1 ? '1 visit' : `all ${summary.visits.length} visits`}` : ''}`}
+            action={dishCountAll > 1 ? <Action onClick={() => actions.mergeDishes(place.id)}>Merge dishes…{suggested ? ` (${suggested})` : ''}</Action> : undefined}>
             {summary.visits.length
               ? <WhatToOrder data={data} placeId={place.id} visitCount={summary.visits.length} title={false} />
               : <Typography color="text.secondary">Dishes you rate on visits show up here.</Typography>}

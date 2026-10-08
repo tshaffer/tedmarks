@@ -12,7 +12,10 @@ export const PlaceItem = SyncedRecord.extend({
   price: z.string().optional(),
   sources: z.array(PlaceItemSource),
   onLatestMenu: z.boolean().optional(),
+  /** Set on a dish merged into another (and deleted). */
   mergedIntoId: Id.optional(),
+  /** Normalized names of dishes merged into this one, so they keep matching it ("beer (draft)"). */
+  aliases: z.array(z.string()).optional(),
 });
 export type PlaceItem = z.infer<typeof PlaceItem>;
 

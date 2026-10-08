@@ -1,4 +1,5 @@
 import { normalizeItemName, placeWithoutVisits, type ItemRatingValue, type NearbyPlace, type Rating, type VerdictValue } from '@tedmarks/shared';
+import { dishFinder } from './dishes.js';
 import type { TedmarksRecords } from './TedmarksData.js';
 
 // Turning the visit form (Figma W3) into synced records. Pure: returns the changes to push
@@ -105,13 +106,14 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
   }
 
   // Dishes: the place's dish list, our order lines, their ratings and notes.
-  const placeItems = new Map([...data.placeItems.values()].filter((i) => i.placeId === placeId).map((i) => [i.normalizedName, i.id]));
+  const find = dishFinder(data, placeId);
+  const placeItems = new Map<string, string>();   // dishes added by this form, by normalized name
   const existingLines = [...data.visitItems.values()].filter((l) => l.visitId === visitId);
   const keptLines = new Set<string>();
   form.dishes.filter((d) => d.name.trim()).forEach((dish, index) => {
     const name = dish.name.trim();
     const normalized = normalizeItemName(name);
-    let placeItemId = placeItems.get(normalized);
+    let placeItemId = find(name)?.id ?? placeItems.get(normalized);
     if (!placeItemId) {
       placeItemId = ids.next();
       placeItems.set(normalized, placeItemId);

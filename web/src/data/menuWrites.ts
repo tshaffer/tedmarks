@@ -1,5 +1,6 @@
 import { normalizeItemName, type MenuReadItem, type NearbyPlace } from '@tedmarks/shared';
 import type { TedmarksRecords } from './TedmarksData.js';
+import { dishFinder } from './dishes.js';
 import { inverse } from './undo.js';
 import { TED, randomIds, type Changes, type Ids } from './visitWrites.js';
 
@@ -78,11 +79,11 @@ export function menusOf(data: TedmarksRecords, placeId: string) {
 export function menuSections(data: TedmarksRecords, menuId: string): { title: string | null; entries: { name: string; price?: string | undefined; placeItemId?: string | undefined }[] }[] {
   const menu = data.menus.get(menuId);
   if (!menu?.extracted) return [];
-  const byName = new Map([...data.placeItems.values()].filter((i) => i.placeId === menu.placeId).map((i) => [i.normalizedName, i.id]));
+  const find = dishFinder(data, menu.placeId);
   const sections: ReturnType<typeof menuSections> = [];
   for (const entry of menu.extracted) {
     const title = entry.section ?? null;
-    const row = { name: entry.name, price: entry.price, placeItemId: byName.get(normalizeItemName(entry.name)) };
+    const row = { name: entry.name, price: entry.price, placeItemId: find(entry.name)?.id };
     const last = sections.at(-1);
     if (last && last.title === title) last.entries.push(row);
     else sections.push({ title, entries: [row] });
@@ -92,23 +93,30 @@ export function menuSections(data: TedmarksRecords, menuId: string): { title: st
 
 function dishChanges(data: TedmarksRecords, placeId: string, items: MenuReadItem[], now: string, ids: Ids): Doc[] {
   const docs: Doc[] = [];
-  const existing = new Map([...data.placeItems.values()].filter((i) => i.placeId === placeId).map((i) => [i.normalizedName, i]));
+  const find = dishFinder(data, placeId);
+  const created = new Map<string, string>();   // normalized name → new item id
   const onMenu = new Set<string>();
   for (const entry of items) {
     const normalized = normalizeItemName(entry.name);
-    if (!normalized || onMenu.has(normalized)) continue;
-    onMenu.add(normalized);
-    const item = existing.get(normalized);
+    if (!normalized) continue;
+    // One of ours, matched exactly or loosely ("Beer (draft)" is our "Beer").
+    const item = find(entry.name);
+    const id = item?.id ?? created.get(normalized);
+    if (id && onMenu.has(id)) continue;
     const fields = { section: entry.section ?? null, price: entry.price ?? null, onLatestMenu: true };
     if (item) {
       docs.push(patch(item.id, now, { ...fields, ...(item.sources.includes('menu') ? {} : { sources: [...item.sources, 'menu'] }) }));
+      onMenu.add(item.id);
     } else {
-      docs.push({ ...meta(ids.next(), now), placeId, name: entry.name.trim(), normalizedName: normalized, sources: ['menu'], onLatestMenu: true,
+      const newId = ids.next();
+      created.set(normalized, newId);
+      onMenu.add(newId);
+      docs.push({ ...meta(newId, now), placeId, name: entry.name.trim(), normalizedName: normalized, sources: ['menu'], onLatestMenu: true,
         ...(entry.section ? { section: entry.section } : {}), ...(entry.price ? { price: entry.price } : {}) });
     }
   }
-  for (const item of existing.values()) {
-    if (!onMenu.has(item.normalizedName) && item.onLatestMenu !== false) docs.push(patch(item.id, now, { onLatestMenu: false }));
+  for (const item of data.placeItems.values()) {
+    if (item.placeId === placeId && !onMenu.has(item.id) && item.onLatestMenu !== false) docs.push(patch(item.id, now, { onLatestMenu: false }));
   }
   return docs;
 }

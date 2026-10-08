@@ -7,7 +7,7 @@ import { useTedmarksData } from '../data/TedmarksData.js';
 import { loadGoogleMaps, type MapsConfig } from '../googleMaps.js';
 import { TopBar } from '../TopBar.js';
 import { GooglePlacePanel } from './GooglePlacePanel.js';
-import { MapView } from './MapView.js';
+import { MapLegend, MapView } from './MapView.js';
 import { OurPlacePanel } from './OurPlacePanel.js';
 import { matchesCuisine, matchesExceptCuisine, loadFilters, NOT_SET, saveFilters, type PlaceFilters } from './filters.js';
 import { PlaceList } from './PlaceList.js';
@@ -111,6 +111,9 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
                 {mapsError ?? 'The map needs a Google Maps browser key: set GOOGLE_MAPS_BROWSER_KEY and GOOGLE_MAP_ID on the server.'}
               </Alert>
             </Box>
+          )}
+          {maps?.googleMapsKey && (
+            <MapLegend />
           )}
           {maps?.googleMapsKey && (
             <MapView mapId={maps.mapId ?? 'DEMO_MAP_ID'} places={shown} selectedPlaceId={selected?.place.id ?? null}

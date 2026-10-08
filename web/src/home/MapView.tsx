@@ -1,5 +1,5 @@
-import { Box } from '@mui/material';
-import { useEffect, useRef } from 'react';
+import { Box, Paper, Stack, Typography } from '@mui/material';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { latLngOf, VERDICT, type PlaceSummary } from '../data/insights.js';
 
 interface Props {
@@ -33,6 +33,8 @@ export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs,
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const markers = useRef(new Map<string, google.maps.marker.AdvancedMarkerElement>());
+  const [zoom, setZoom] = useState(savedView()?.zoom ?? 14);
+  const [projectionReady, setProjectionReady] = useState(false);   // needed to place names
   const handlers = useRef({ onSelectOurs, onSelectGoogle, onIdle });
   handlers.current = { onSelectOurs, onSelectGoogle, onIdle };
 
@@ -52,6 +54,8 @@ export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs,
       }
     });
     m.addListener('idle', () => { saveView(m); handlers.current.onIdle(m); });
+    m.addListener('zoom_changed', () => setZoom(m.getZoom() ?? 14));
+    m.addListener('projection_changed', () => setProjectionReady(true));
     if (!saved) navigator.geolocation?.getCurrentPosition((p) => m.setCenter({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { timeout: 8000 });
     onReady(m);
   }, [mapId, onReady]);
@@ -60,11 +64,12 @@ export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs,
     const m = map.current;
     if (!m) return;
     const seen = new Set<string>();
+    const sides = zoom >= LABEL_ZOOM ? labelSides(m, places, selectedPlaceId, zoom) : new Map<string, LabelSide>();
     for (const summary of places) {
       const id = summary.place.id;
       seen.add(id);
       const selected = id === selectedPlaceId;
-      const content = markerContent(summary, selected);
+      const content = markerContent(summary, selected, sides.get(id) ?? null);
       let marker = markers.current.get(id);
       if (!marker) {
         marker = new google.maps.marker.AdvancedMarkerElement({ map: m, position: latLngOf(summary.place), title: summary.place.name, gmpClickable: true });
@@ -77,25 +82,94 @@ export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs,
     for (const [id, marker] of markers.current) {
       if (!seen.has(id)) { marker.map = null; markers.current.delete(id); }
     }
-  }, [places, selectedPlaceId]);
+  }, [places, selectedPlaceId, zoom, projectionReady]);
 
   return <Box ref={container} sx={{ position: 'absolute', inset: 0 }} />;
 }
 
-function markerContent(summary: PlaceSummary, selected: boolean): HTMLElement {
+/** Names show beside our pins from this zoom in (neighborhood level); further out they'd crowd. */
+const LABEL_ZOOM = 14;
+
+export const PIN = { beenThere: '#34c759', wantToGo: '#ff9500', beenThereText: '#1e7b34', wantToGoText: '#c26a00' } as const;
+
+type LabelSide = 'left' | 'right';
+
+/**
+ * Where each pin's name goes so names don't overlap: places in order (been there and most
+ * visited first), each on the pin's left if that's free, else its right, else no name (it
+ * appears as you zoom in). Sizes are estimates in screen pixels at this zoom.
+ */
+function labelSides(map: google.maps.Map, places: PlaceSummary[], selectedId: string | null, zoom: number): Map<string, LabelSide> {
+  const projection = map.getProjection();
+  const sides = new Map<string, LabelSide>();
+  if (!projection) return sides;
+  const scale = 2 ** zoom;
+  type Box = { x1: number; y1: number; x2: number; y2: number };
+  const taken: Box[] = [];
+  const overlaps = (b: Box) => taken.some((t) => b.x1 < t.x2 && b.x2 > t.x1 && b.y1 < t.y2 && b.y2 > t.y1);
+  const at = (s: PlaceSummary) => { const p = projection.fromLatLngToPoint(latLngOf(s.place))!; return { x: p.x * scale, y: p.y * scale }; };
+  // Pins themselves are obstacles (the chosen one is wide: it carries its name).
+  for (const s of places) {
+    const { x, y } = at(s);
+    const half = s.place.id === selectedId ? 10 + s.place.name.length * 4 : 15;
+    taken.push({ x1: x - half, y1: y - 30, x2: x + half, y2: y });
+  }
+  const order = [...places].filter((s) => s.place.id !== selectedId)
+    .sort((a, b) => Number(b.place.status === 'beenThere') - Number(a.place.status === 'beenThere') || b.visits.length - a.visits.length);
+  for (const s of order) {
+    const { x, y } = at(s);
+    const width = Math.min(180, s.place.name.length * 6.6), top = y - 23, bottom = y - 7;
+    const left = { x1: x - 20 - width, y1: top, x2: x - 18, y2: bottom };
+    const right = { x1: x + 18, y1: top, x2: x + 20 + width, y2: bottom };
+    if (!overlaps(left)) { taken.push(left); sides.set(s.place.id, 'left'); }
+    else if (!overlaps(right)) { taken.push(right); sides.set(s.place.id, 'right'); }
+  }
+  return sides;
+}
+
+function markerContent(summary: PlaceSummary, selected: boolean, labelSide: LabelSide | null): HTMLElement {
   const been = summary.place.status === 'beenThere';
   const pin = document.createElement('div');
-  const ring = been ? '#34c759' : '#ff9500';
+  const ring = been ? PIN.beenThere : PIN.wantToGo;
   Object.assign(pin.style, {
-    display: 'flex', alignItems: 'center', gap: '6px', padding: selected ? '5px 12px 5px 7px' : '4px 6px',
-    borderRadius: '20px', background: selected ? '#ff9500' : '#fff', border: selected ? 'none' : `2px solid ${ring}`,
+    position: 'relative', display: 'flex', alignItems: 'center', gap: '6px', padding: selected ? '5px 12px 5px 7px' : '4px 6px',
+    borderRadius: '20px', background: selected ? PIN.wantToGo : '#fff', border: selected ? 'none' : `2px solid ${ring}`,
     boxShadow: '0 2px 6px rgba(0,0,0,0.25)', font: '600 13px Inter, sans-serif', color: selected ? '#fff' : '#1d1d1f',
     cursor: 'pointer', whiteSpace: 'nowrap',
   });
   const glyph = document.createElement('span');
   glyph.textContent = been ? (summary.verdict.kind === 'joint' ? VERDICT[summary.verdict.value].emoji : summary.verdict.kind === 'split' ? '↔' : '•') : '★';
-  if (!been) Object.assign(glyph.style, { color: selected ? '#fff' : '#ff9500', fontSize: '15px' });
+  if (!been) Object.assign(glyph.style, { color: selected ? '#fff' : PIN.wantToGo, fontSize: '15px' });
   pin.append(glyph);
-  if (selected) pin.append(document.createTextNode(summary.place.name));
+  if (selected) {
+    pin.append(document.createTextNode(summary.place.name));
+  } else if (labelSide) {
+    // The name beside the pin — the left by default, since Google's own label for the restaurant
+    // is usually on the right — positioned outside the pin so the pin stays exactly on the place.
+    const label = document.createElement('span');
+    label.textContent = summary.place.name;
+    Object.assign(label.style, {
+      position: 'absolute', [labelSide === 'left' ? 'right' : 'left']: 'calc(100% + 5px)', top: '50%', transform: 'translateY(-50%)',
+      font: '600 12px Inter, sans-serif', color: been ? PIN.beenThereText : PIN.wantToGoText, whiteSpace: 'nowrap',
+      maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis',
+      textShadow: '0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff',
+    });
+    pin.append(label);
+  }
   return pin;
+}
+
+/** The key for our pins, in a corner of the map. */
+export function MapLegend() {
+  const item = (marker: ReactNode, label: string) => (
+    <Stack direction="row" spacing={0.75} alignItems="center">{marker}<Typography variant="caption" fontWeight={500}>{label}</Typography></Stack>
+  );
+  return (
+    <Paper elevation={0} sx={{ position: 'absolute', left: 10, bottom: 28, px: 1.25, py: 0.75, borderRadius: 2, boxShadow: '0 1px 4px rgba(0,0,0,0.2)', zIndex: 1 }}>
+      <Stack direction="row" spacing={1.5} alignItems="center">
+        {item(<Box sx={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${PIN.beenThere}`, bgcolor: '#fff' }} />, 'Been there')}
+        {item(<Typography sx={{ color: PIN.wantToGo, fontSize: 15, lineHeight: 1 }}>★</Typography>, 'Want to go')}
+      </Stack>
+    </Paper>
+  );
 }

@@ -54,9 +54,13 @@ const GENERIC_TYPES = new Set(['restaurant', 'food', 'meal_takeaway', 'meal_deli
 export function cuisineOf(data: TedmarksRecords, place: Place): string | undefined {
   const ours = place.subtypeId && data.placeSubtypes.get(place.subtypeId)?.name;
   if (ours && !/^restaurants?$/i.test(ours)) return ours;
-  const g = place.google;
-  if (!g?.primaryTypeLabel || (g.primaryType && GENERIC_TYPES.has(g.primaryType)) || /^restaurant$/i.test(g.primaryTypeLabel)) return undefined;
-  return g.primaryTypeLabel.replace(/\s+Restaurant$/i, '') || undefined;
+  return cuisineLabel(place.google?.primaryType, place.google?.primaryTypeLabel);
+}
+
+/** Google's type as a cuisine: "Thai Restaurant" → "Thai"; undefined when it's generic ("Restaurant"). */
+export function cuisineLabel(primaryType: string | undefined, primaryTypeLabel: string | undefined): string | undefined {
+  if (!primaryTypeLabel || (primaryType && GENERIC_TYPES.has(primaryType)) || /^restaurant$/i.test(primaryTypeLabel)) return undefined;
+  return primaryTypeLabel.replace(/\s+Restaurant$/i, '') || undefined;
 }
 
 /** The place's meals as set by hand, or else as guessed from its hours. */

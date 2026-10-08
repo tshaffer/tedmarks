@@ -36,3 +36,25 @@ export function mealsFromHours(periods: readonly OpeningPeriodInput[] | undefine
   };
   return { breakfast: serves('breakfast'), lunch: serves('lunch'), dinner: serves('dinner') };
 }
+
+export type Meal = keyof MealsServed;
+
+/**
+ * Whether a place is open at some point during a meal's window on a given day (0 = Sunday), in
+ * its own time. Undefined without hours. (For "where can we have breakfast on Saturday?")
+ */
+export function openForMeal(periods: readonly OpeningPeriodInput[] | undefined, day: number, meal: Meal): boolean | undefined {
+  if (!periods || periods.length === 0) return undefined;
+  if (periods.length === 1 && !periods[0]!.close && periods[0]!.open.time === '0000') return true;   // 24 hours
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(2, 4));
+  const WEEK = 7 * 1440;
+  const [from, to] = WINDOWS[meal];
+  const start = day * 1440 + from, end = day * 1440 + to;
+  return periods.some((p) => {
+    const open = p.open.day * 1440 + toMin(p.open.time);
+    let close = p.close ? p.close.day * 1440 + toMin(p.close.time) : open + 1440;
+    if (close <= open) close += WEEK;
+    // The period, or the same period a week earlier (for ones that wrap past Saturday night).
+    return [0, -WEEK].some((shift) => open + shift < end && close + shift > start);
+  });
+}

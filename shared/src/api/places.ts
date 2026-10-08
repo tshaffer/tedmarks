@@ -61,3 +61,52 @@ export const MorePlacesResponse = z.object({
   nextPageToken: z.string().optional(),
 });
 export type MorePlacesResponse = z.infer<typeof MorePlacesResponse>;
+
+/** POST /places/area-search — Google's restaurants inside a map area (cached on the server for a few days). */
+export const AreaSearchRequest = z.object({
+  bounds: z.object({
+    south: z.number().min(-90).max(90),
+    west: z.number().min(-180).max(180),
+    north: z.number().min(-90).max(90),
+    east: z.number().min(-180).max(180),
+  }),
+  /** Free text Google matches against the place and its reviews ("breakfast", "tacos"). */
+  query: z.string().trim().max(100).optional(),
+  /** Google cuisine types ("mexican_restaurant"); one search per type, results combined. */
+  cuisineTypes: z.array(z.string().regex(/^[a-z_]+$/)).max(4).optional(),
+  minRating: z.number().min(0).max(5).optional(),
+  /** 1–4 ($–$$$$). */
+  priceLevels: z.array(z.number().int().min(1).max(4)).max(4).optional(),
+  openNow: z.boolean().optional(),
+});
+export type AreaSearchRequest = z.infer<typeof AreaSearchRequest>;
+
+/** A Google restaurant from an area search, with what the map filters on. */
+export const AreaRestaurant = z.object({
+  googlePlaceId: z.string().min(1),
+  name: z.string().min(1),
+  latitude: z.number(),
+  longitude: z.number(),
+  address: z.string().optional(),
+  types: z.array(z.string()),
+  primaryType: z.string().optional(),
+  primaryTypeLabel: z.string().optional(),
+  rating: z.number().optional(),
+  ratingsCount: z.number().int().optional(),
+  priceLevel: z.number().int().optional(),
+  openingHours: z.object({
+    periods: z.array(z.object({ open: z.object({ day: z.number().int(), time: z.string() }), close: z.object({ day: z.number().int(), time: z.string() }).optional() })),
+    weekdayText: z.array(z.string()),
+  }).optional(),
+  utcOffsetMinutes: z.number().int().optional(),
+});
+export type AreaRestaurant = z.infer<typeof AreaRestaurant>;
+
+export const AreaSearchResponse = z.object({
+  restaurants: z.array(AreaRestaurant),
+  /** Google had more than we fetched (zoom in or narrow the filters to see others). */
+  truncated: z.boolean(),
+  /** When Google was asked (earlier than now when the answer came from the cache). */
+  fetchedAt: z.string(),
+});
+export type AreaSearchResponse = z.infer<typeof AreaSearchResponse>;

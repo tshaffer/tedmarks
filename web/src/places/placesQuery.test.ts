@@ -41,7 +41,7 @@ describe('the Places list', () => {
   });
 
   test('verdict, tag and status filters', () => {
-    expect(names(rows(data(), { verdicts: ['wouldReturn'] }))).toEqual(['Doppio Zero']);
+    expect(names(rows(data(), {}, { ...NO_FILTERS, verdicts: ['wouldReturn'] }))).toEqual(['Doppio Zero']);
     expect(names(rows(data(), { tags: ['patio'] }))).toEqual(['Amarin Thai']);
     expect(names(rows(data(), {}, { ...NO_FILTERS, statuses: ['wantToGo'] }))).toEqual(['Xanh', 'Doppio Zero'].slice(0, 1));
   });

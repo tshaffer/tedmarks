@@ -1,4 +1,4 @@
-import type { GooglePlaceSnapshot, MorePlacesResponse, NearbyPlace, PlaceSuggestion } from '@tedmarks/shared';
+import type { AreaRestaurant, AreaSearchRequest, GooglePlaceSnapshot, MorePlacesResponse, NearbyPlace, PlaceSuggestion } from '@tedmarks/shared';
 
 // Server-side wrapper around Google Places API (New). Called only from the API
 // so the key never reaches the phone (decision #7).
@@ -162,6 +162,38 @@ export class PlacesClient {
       suggestions.push(suggestion);
     }
     return suggestions;
+  }
+
+  /**
+   * Google's restaurants inside a map area, using Google's own filters where it has them
+   * (rating, price, open now, one cuisine type per search). Up to AREA_PAGES pages of 20; the
+   * Enterprise fields (rating, price, hours) make each page one billed request.
+   */
+  async areaSearch(request: AreaSearchRequest, cuisineType?: string): Promise<{ restaurants: AreaRestaurant[]; truncated: boolean }> {
+    const { bounds } = request;
+    const restaurants: AreaRestaurant[] = [];
+    let token: string | undefined;
+    for (let page = 0; page < AREA_PAGES; page++) {
+      const body: Record<string, unknown> = {
+        textQuery: request.query?.trim() || (cuisineType ? cuisineType.replace(/_/g, ' ') : 'restaurants'),
+        pageSize: 20,
+        locationRestriction: { rectangle: { low: { latitude: bounds.south, longitude: bounds.west }, high: { latitude: bounds.north, longitude: bounds.east } } },
+      };
+      if (cuisineType) Object.assign(body, { includedType: cuisineType, strictTypeFiltering: true });
+      if (request.minRating) body['minRating'] = request.minRating;
+      if (request.priceLevels?.length) body['priceLevels'] = request.priceLevels.map((level) => PRICE_LEVEL_NAMES[level]);
+      if (request.openNow) body['openNow'] = true;
+      if (token) body['pageToken'] = token;
+      const response = await this.request('places:searchText', { method: 'POST', body: JSON.stringify(body), fieldMask: AREA_FIELDS });
+      const payload = (await response.json()) as { places?: GoogleAreaPlace[]; nextPageToken?: string };
+      for (const place of payload.places ?? []) {
+        const r = toAreaRestaurant(place);
+        if (r) restaurants.push(r);
+      }
+      token = payload.nextPageToken;
+      if (!token) break;
+    }
+    return { restaurants, truncated: Boolean(token) };
   }
 
   /** The place picked from autocomplete (ends the billing session). */
@@ -331,3 +363,48 @@ export function toSnapshot(place: GoogleSnapshotPlace): Omit<GooglePlaceSnapshot
     utcOffsetMinutes: place.utcOffsetMinutes,
   };
 }
+
+/** Pages per area search (20 places each, one billed request each). */
+export const AREA_PAGES = 2;
+
+const AREA_FIELDS = [
+  'places.id', 'places.displayName', 'places.formattedAddress', 'places.location', 'places.types', 'places.primaryType',
+  'places.primaryTypeDisplayName', 'places.rating', 'places.userRatingCount', 'places.priceLevel', 'places.regularOpeningHours',
+  'places.utcOffsetMinutes', 'places.businessStatus', 'nextPageToken',
+].join(',');
+
+const PRICE_LEVEL_NAMES: Record<number, string> = {
+  1: 'PRICE_LEVEL_INEXPENSIVE', 2: 'PRICE_LEVEL_MODERATE', 3: 'PRICE_LEVEL_EXPENSIVE', 4: 'PRICE_LEVEL_VERY_EXPENSIVE',
+};
+
+interface GoogleAreaPlace extends GoogleSnapshotPlace {
+  types?: string[];
+  businessStatus?: string;
+}
+
+/** A search result as an AreaRestaurant (skipping places that have closed for good). */
+export function toAreaRestaurant(place: GoogleAreaPlace): AreaRestaurant | undefined {
+  const name = place.displayName?.text?.trim();
+  const latitude = place.location?.latitude, longitude = place.location?.longitude;
+  if (!place.id || !name || latitude === undefined || longitude === undefined) return undefined;
+  if (place.businessStatus === 'CLOSED_PERMANENTLY') return undefined;
+  // A text search for "restaurants" can return a landmark or a hotel; keep places that serve food or drink.
+  if (!(place.types ?? []).some(isFoodType)) return undefined;
+  const snapshot = toSnapshot(place);
+  const r: AreaRestaurant = { googlePlaceId: place.id, name, latitude, longitude, types: place.types ?? [] };
+  if (snapshot.formattedAddress) r.address = snapshot.formattedAddress;
+  if (snapshot.primaryType) r.primaryType = snapshot.primaryType;
+  if (snapshot.primaryTypeLabel) r.primaryTypeLabel = snapshot.primaryTypeLabel;
+  if (snapshot.rating !== undefined) r.rating = snapshot.rating;
+  if (snapshot.ratingsCount !== undefined) r.ratingsCount = snapshot.ratingsCount;
+  if (snapshot.priceLevel !== undefined) r.priceLevel = snapshot.priceLevel;
+  if (snapshot.openingHours) r.openingHours = snapshot.openingHours;
+  if (snapshot.utcOffsetMinutes !== undefined) r.utcOffsetMinutes = snapshot.utcOffsetMinutes;
+  return r;
+}
+
+const FOOD_TYPES = new Set(['restaurant', 'food', 'cafe', 'coffee_shop', 'bakery', 'bar', 'pub', 'wine_bar', 'meal_takeaway', 'meal_delivery',
+  'ice_cream_shop', 'dessert_shop', 'food_court', 'deli', 'sandwich_shop', 'tea_house', 'juice_shop', 'donut_shop', 'bagel_shop', 'steak_house', 'diner', 'bistro']);
+
+/** Google types that mean a place serves food or drink. */
+export const isFoodType = (type: string) => FOOD_TYPES.has(type) || type.endsWith('_restaurant');

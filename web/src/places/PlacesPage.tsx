@@ -7,21 +7,17 @@ import { useNavigate } from 'react-router-dom';
 import { miles, ratingText, summarize, VERDICT } from '../data/insights.js';
 import { useTedmarksData } from '../data/TedmarksData.js';
 import { FilterChips, MultiSelectChip } from '../home/FilterChips.js';
-import { cuisineCounts, loadFilters, matchesExceptCuisine, saveFilters, type PlaceFilters, type StatusFilter } from '../home/filters.js';
+import { cuisineCounts, loadFilters, matchesOursExceptCuisine, saveFilters, type PlaceFilters, type StatusFilter } from '../home/filters.js';
 import { savedView } from '../home/MapView.js';
 import { longDate } from '../place/parts.js';
 import { WANT } from '../theme.js';
 import { TopBar } from '../TopBar.js';
-import { cityAndTagChoices, NO_QUERY, placeRows, savedAt, type PlaceRow, type PlacesQuery, type SortKey, type VerdictChoice } from './placesQuery.js';
+import { cityAndTagChoices, NO_QUERY, placeRows, savedAt, type PlaceRow, type PlacesQuery, type SortKey } from './placesQuery.js';
 
 const QUERY_KEY = 'tedmarks.placesQuery';
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'lastVisit', label: 'Last visit' }, { key: 'name', label: 'Name' }, { key: 'rating', label: 'Our 0–10' },
   { key: 'visits', label: 'Most visits' }, { key: 'nearest', label: 'Nearest' }, { key: 'saved', label: 'Recently saved' },
-];
-const VERDICT_CHOICES: { value: VerdictChoice; label: string }[] = [
-  { value: 'wouldReturn', label: '👍 Would return' }, { value: 'tryAgain', label: '👌 Try again' }, { value: 'wontReturn', label: '👎 Won’t return' },
-  { value: 'disagree', label: '↔ We disagree' }, { value: 'none', label: 'No verdict yet' },
 ];
 const verdictEmoji = Object.fromEntries(Object.entries(VERDICT).map(([k, v]) => [k, v.emoji]));
 
@@ -41,13 +37,15 @@ function loadQuery(): PlacesQuery {
 export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
   const { data, error } = useTedmarksData();
   const navigate = useNavigate();
-  const [filters, setFilters] = useState<PlaceFilters>(loadFilters);
+  const [savedFilters, setFilters] = useState<PlaceFilters>(loadFilters);
+  // The map can show only Google's restaurants (no statuses); here that means all of ours.
+  const filters = useMemo(() => (savedFilters.statuses.length ? savedFilters : { ...savedFilters, statuses: ['beenThere', 'wantToGo'] as StatusFilter[] }), [savedFilters]);
   const [query, setQuery] = useState<PlacesQuery>(loadQuery);
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(() => savedView()?.center ?? null);
   const set = (change: Partial<PlacesQuery>) => setQuery((q) => ({ ...q, ...change }));
 
   // The map's filters are shared; the rest (sort, verdict, city, tags) are remembered for this page.
-  useEffect(() => saveFilters(filters), [filters]);
+  useEffect(() => saveFilters(savedFilters), [savedFilters]);
   useEffect(() => {
     try {
       localStorage.setItem(QUERY_KEY, JSON.stringify({ ...query, search: '' }));
@@ -62,11 +60,11 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
 
   const summaries = useMemo(() => (data ? [...data.places.values()].map((p) => summarize(data, p)) : []), [data]);
   const rows = useMemo(() => (data ? placeRows(data, summaries, filters, query, query.sort === 'nearest' ? origin : null) : []), [data, summaries, filters, query, origin]);
-  const choicesFrom = useMemo(() => summaries.filter((s) => matchesExceptCuisine(s, filters)), [summaries, filters]);
-  const cuisines = useMemo(() => cuisineCounts(choicesFrom), [choicesFrom]);
+  const choicesFrom = useMemo(() => summaries.filter((s) => matchesOursExceptCuisine(s, filters)), [summaries, filters]);
+  const cuisines = useMemo(() => cuisineCounts(choicesFrom.map((s) => s.cuisine)), [choicesFrom]);
   const { cities, tags } = useMemo(() => cityAndTagChoices(choicesFrom), [choicesFrom]);
   const counts = { all: summaries.length, been: summaries.filter((s) => s.place.status === 'beenThere').length };
-  const extraActive = query.verdicts.length + query.cities.length + query.tags.length > 0;
+  const extraActive = query.cities.length + query.tags.length > 0;
 
   const sortBy = (key: SortKey) => set(query.sort === key ? { reversed: !query.reversed } : { sort: key, reversed: false });
   const header = (label: string, key?: SortKey, width?: number) => (
@@ -104,9 +102,8 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
               </Select>
             </Stack>
             <FilterChips filters={filters} onFilters={setFilters} cuisines={cuisines} extraActive={extraActive}
-              onClearExtra={() => set({ verdicts: [], cities: [], tags: [] })}
+              onClearExtra={() => set({ cities: [], tags: [] })}
               extra={<>
-                <MultiSelectChip label="Our verdict" anyLabel="Any verdict" choices={VERDICT_CHOICES} selected={query.verdicts} onChange={(v) => set({ verdicts: v as VerdictChoice[] })} />
                 <MultiSelectChip label="City" anyLabel="Any city" choices={cities} selected={query.cities} onChange={(v) => set({ cities: v })} />
                 <MultiSelectChip label="Tags" anyLabel="Any tag" choices={tags} selected={query.tags} onChange={(v) => set({ tags: v })} empty="No tags yet — add them in Edit place" />
               </>} />

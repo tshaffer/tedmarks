@@ -1,12 +1,16 @@
 import { Box, Paper, Stack, Typography } from '@mui/material';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { AreaRestaurant } from '@tedmarks/shared';
 import { latLngOf, VERDICT, type PlaceSummary } from '../data/insights.js';
 import { WANT } from '../theme.js';
 
 interface Props {
   mapId: string;
   places: PlaceSummary[];
-  selectedPlaceId: string | null;
+  /** Google's restaurants from the area search (not ours). */
+  googlePlaces: AreaRestaurant[];
+  /** The chosen place: one of ours (its id) or Google's (its Google id). */
+  selectedId: string | null;
   onReady: (map: google.maps.Map) => void;
   onSelectOurs: (placeId: string) => void;
   onSelectGoogle: (googlePlaceId: string) => void;
@@ -30,10 +34,11 @@ function saveView(m: google.maps.Map) {
  * Google's map (its restaurant icons are clickable) with our places on top: green ring = been
  * there (with our verdict), orange ★ = want to go; the chosen one is filled orange with its name.
  */
-export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs, onSelectGoogle, onIdle }: Props) {
+export function MapView({ mapId, places, googlePlaces, selectedId, onReady, onSelectOurs, onSelectGoogle, onIdle }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const markers = useRef(new Map<string, google.maps.marker.AdvancedMarkerElement>());
+  const selectors = useRef(new Map<string, () => void>());
   const [zoom, setZoom] = useState(savedView()?.zoom ?? 14);
   const [projectionReady, setProjectionReady] = useState(false);   // needed to place names
   const handlers = useRef({ onSelectOurs, onSelectGoogle, onIdle });
@@ -64,26 +69,45 @@ export function MapView({ mapId, places, selectedPlaceId, onReady, onSelectOurs,
   useEffect(() => {
     const m = map.current;
     if (!m) return;
+    const pins: Pin[] = [
+      ...places.map((summary): Pin => {
+        const been = summary.place.status === 'beenThere';
+        return {
+          key: summary.place.id, name: summary.place.name, position: latLngOf(summary.place), kind: summary.place.status,
+          glyph: been ? (summary.verdict.kind === 'joint' ? VERDICT[summary.verdict.value].emoji : summary.verdict.kind === 'split' ? '↔' : '•') : '★',
+          priority: been ? 1000 + summary.visits.length : 500, selected: summary.place.id === selectedId,
+          select: () => handlers.current.onSelectOurs(summary.place.id),
+        };
+      }),
+      ...googlePlaces.map((r): Pin => ({
+        key: `g:${r.googlePlaceId}`, name: r.name, position: { lat: r.latitude, lng: r.longitude }, kind: 'google',
+        glyph: r.rating !== undefined ? r.rating.toFixed(1) : '•', priority: (r.rating ?? 0) * 10, selected: r.googlePlaceId === selectedId,
+        select: () => handlers.current.onSelectGoogle(r.googlePlaceId),
+      })),
+    ];
     const seen = new Set<string>();
-    const sides = zoom >= LABEL_ZOOM ? labelSides(m, places, selectedPlaceId, zoom) : new Map<string, LabelSide>();
-    for (const summary of places) {
-      const id = summary.place.id;
-      seen.add(id);
-      const selected = id === selectedPlaceId;
-      const content = markerContent(summary, selected, sides.get(id) ?? null);
-      let marker = markers.current.get(id);
+    const sides = zoom >= LABEL_ZOOM ? labelSides(m, pins, zoom) : new Map<string, LabelSide>();
+    for (const pin of pins) {
+      seen.add(pin.key);
+      let marker = markers.current.get(pin.key);
       if (!marker) {
-        marker = new google.maps.marker.AdvancedMarkerElement({ map: m, position: latLngOf(summary.place), title: summary.place.name, gmpClickable: true });
-        marker.addEventListener('gmp-click', () => handlers.current.onSelectOurs(id));
-        markers.current.set(id, marker);
+        marker = new google.maps.marker.AdvancedMarkerElement({ map: m, position: pin.position, title: pin.name, gmpClickable: true });
+        markers.current.set(pin.key, marker);
       }
-      marker.content = content;
-      marker.zIndex = selected ? 1000 : summary.place.status === 'beenThere' ? 10 : 5;
+      // A new listener each time would pile up; the select function is looked up at click time.
+      selectors.current.set(pin.key, pin.select);
+      if (!marker.dataset.listening) {
+        const key = pin.key;
+        marker.addEventListener('gmp-click', () => selectors.current.get(key)?.());
+        marker.dataset.listening = '1';
+      }
+      marker.content = markerContent(pin, sides.get(pin.key) ?? null);
+      marker.zIndex = pin.selected ? 1000 : pin.kind === 'beenThere' ? 10 : pin.kind === 'wantToGo' ? 5 : 1;
     }
-    for (const [id, marker] of markers.current) {
-      if (!seen.has(id)) { marker.map = null; markers.current.delete(id); }
+    for (const [key, marker] of markers.current) {
+      if (!seen.has(key)) { marker.map = null; markers.current.delete(key); selectors.current.delete(key); }
     }
-  }, [places, selectedPlaceId, zoom, projectionReady]);
+  }, [places, googlePlaces, selectedId, zoom, projectionReady]);
 
   return <Box ref={container} sx={{ position: 'absolute', inset: 0 }} />;
 }
@@ -94,16 +118,33 @@ const LABEL_ZOOM = 14;
 /**
  * Our pins' colors (want to go is purple everywhere — see WANT).
  */
-export const PIN = { beenThere: '#34c759', wantToGo: WANT.main, beenThereText: '#1e7b34', wantToGoText: WANT.text, chosen: '#ff9500' } as const;
+export const PIN = {
+  beenThere: '#34c759', wantToGo: WANT.main, beenThereText: '#1e7b34', wantToGoText: WANT.text, chosen: '#ff9500',
+  google: '#8e8e93', googleText: '#48484a',
+} as const;
 
 type LabelSide = 'left' | 'right';
 
+/** A pin on the map: one of ours, or one of Google's restaurants. */
+interface Pin {
+  key: string;
+  name: string;
+  position: google.maps.LatLngLiteral;
+  kind: 'beenThere' | 'wantToGo' | 'google';
+  /** Inside the pin: our verdict, ★, or Google's rating. */
+  glyph: string;
+  /** Who gets a name first where they crowd (ours before Google's). */
+  priority: number;
+  selected: boolean;
+  select: () => void;
+}
+
 /**
- * Where each pin's name goes so names don't overlap: places in order (been there and most
- * visited first), each on the pin's left if that's free, else its right, else no name (it
- * appears as you zoom in). Sizes are estimates in screen pixels at this zoom.
+ * Where each pin's name goes so names don't overlap: pins by priority (ours — been there and
+ * most visited first — then Google's best rated), each on the pin's left if that's free, else
+ * its right, else no name (it appears as you zoom in). Sizes are estimates in screen pixels.
  */
-function labelSides(map: google.maps.Map, places: PlaceSummary[], selectedId: string | null, zoom: number): Map<string, LabelSide> {
+function labelSides(map: google.maps.Map, pins: Pin[], zoom: number): Map<string, LabelSide> {
   const projection = map.getProjection();
   const sides = new Map<string, LabelSide>();
   if (!projection) return sides;
@@ -111,57 +152,56 @@ function labelSides(map: google.maps.Map, places: PlaceSummary[], selectedId: st
   type Box = { x1: number; y1: number; x2: number; y2: number };
   const taken: Box[] = [];
   const overlaps = (b: Box) => taken.some((t) => b.x1 < t.x2 && b.x2 > t.x1 && b.y1 < t.y2 && b.y2 > t.y1);
-  const at = (s: PlaceSummary) => { const p = projection.fromLatLngToPoint(latLngOf(s.place))!; return { x: p.x * scale, y: p.y * scale }; };
+  const at = (pin: Pin) => { const p = projection.fromLatLngToPoint(pin.position)!; return { x: p.x * scale, y: p.y * scale }; };
   // Pins themselves are obstacles (the chosen one is wide: it carries its name).
-  for (const s of places) {
-    const { x, y } = at(s);
-    const half = s.place.id === selectedId ? 10 + s.place.name.length * 4 : 15;
+  for (const pin of pins) {
+    const { x, y } = at(pin);
+    const half = pin.selected ? 10 + pin.name.length * 4 : 15;
     taken.push({ x1: x - half, y1: y - 30, x2: x + half, y2: y });
   }
-  const order = [...places].filter((s) => s.place.id !== selectedId)
-    .sort((a, b) => Number(b.place.status === 'beenThere') - Number(a.place.status === 'beenThere') || b.visits.length - a.visits.length);
-  for (const s of order) {
-    const { x, y } = at(s);
-    const width = Math.min(180, s.place.name.length * 6.6 + 12), top = y - 25, bottom = y - 5;
+  for (const pin of [...pins].filter((p) => !p.selected).sort((a, b) => b.priority - a.priority)) {
+    const { x, y } = at(pin);
+    const width = Math.min(180, pin.name.length * 6.6 + 12), top = y - 25, bottom = y - 5;
     const left = { x1: x - 20 - width, y1: top, x2: x - 18, y2: bottom };
     const right = { x1: x + 18, y1: top, x2: x + 20 + width, y2: bottom };
-    if (!overlaps(left)) { taken.push(left); sides.set(s.place.id, 'left'); }
-    else if (!overlaps(right)) { taken.push(right); sides.set(s.place.id, 'right'); }
+    if (!overlaps(left)) { taken.push(left); sides.set(pin.key, 'left'); }
+    else if (!overlaps(right)) { taken.push(right); sides.set(pin.key, 'right'); }
   }
   return sides;
 }
 
-function markerContent(summary: PlaceSummary, selected: boolean, labelSide: LabelSide | null): HTMLElement {
-  const been = summary.place.status === 'beenThere';
-  const pin = document.createElement('div');
-  const ring = been ? PIN.beenThere : PIN.wantToGo;
-  Object.assign(pin.style, {
-    position: 'relative', display: 'flex', alignItems: 'center', gap: '6px', padding: selected ? '5px 12px 5px 7px' : '4px 6px',
-    borderRadius: '20px', background: selected ? PIN.chosen : '#fff', border: selected ? 'none' : `2px solid ${ring}`,
-    boxShadow: '0 2px 6px rgba(0,0,0,0.25)', font: '600 13px Inter, sans-serif', color: selected ? '#fff' : '#1d1d1f',
+function markerContent(pin: Pin, labelSide: LabelSide | null): HTMLElement {
+  const el = document.createElement('div');
+  const ring = pin.kind === 'beenThere' ? PIN.beenThere : pin.kind === 'wantToGo' ? PIN.wantToGo : PIN.google;
+  Object.assign(el.style, {
+    position: 'relative', display: 'flex', alignItems: 'center', gap: '6px', padding: pin.selected ? '5px 12px 5px 7px' : '4px 6px',
+    borderRadius: '20px', background: pin.selected ? PIN.chosen : '#fff', border: pin.selected ? 'none' : `2px solid ${ring}`,
+    boxShadow: '0 2px 6px rgba(0,0,0,0.25)', font: '600 13px Inter, sans-serif', color: pin.selected ? '#fff' : '#1d1d1f',
     cursor: 'pointer', whiteSpace: 'nowrap',
   });
   const glyph = document.createElement('span');
-  glyph.textContent = been ? (summary.verdict.kind === 'joint' ? VERDICT[summary.verdict.value].emoji : summary.verdict.kind === 'split' ? '↔' : '•') : '★';
-  if (!been) Object.assign(glyph.style, { color: selected ? '#fff' : PIN.wantToGo, fontSize: '15px' });
-  pin.append(glyph);
-  if (selected) {
-    pin.append(document.createTextNode(summary.place.name));
+  glyph.textContent = pin.glyph;
+  if (pin.kind === 'wantToGo') Object.assign(glyph.style, { color: pin.selected ? '#fff' : PIN.wantToGo, fontSize: '15px' });
+  if (pin.kind === 'google') Object.assign(glyph.style, { color: pin.selected ? '#fff' : PIN.googleText, fontSize: '11px', fontWeight: '700' });
+  el.append(glyph);
+  if (pin.selected) {
+    el.append(document.createTextNode(pin.name));
   } else if (labelSide) {
     // The name beside the pin — the left by default, since Google's own label for the restaurant
     // is usually on the right — positioned outside the pin so the pin stays exactly on the place.
     const label = document.createElement('span');
-    label.textContent = summary.place.name;
+    label.textContent = pin.name;
     Object.assign(label.style, {
       position: 'absolute', [labelSide === 'left' ? 'right' : 'left']: 'calc(100% + 5px)', top: '50%', transform: 'translateY(-50%)',
-      font: '600 12px Inter, sans-serif', color: been ? PIN.beenThereText : PIN.wantToGoText, whiteSpace: 'nowrap',
+      font: `${pin.kind === 'google' ? 500 : 600} 12px Inter, sans-serif`,
+      color: pin.kind === 'beenThere' ? PIN.beenThereText : pin.kind === 'wantToGo' ? PIN.wantToGoText : PIN.googleText, whiteSpace: 'nowrap',
       maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis',
       // A small white tag, so it reads as ours and covers any Google label underneath.
       background: '#fff', padding: '1px 6px', borderRadius: '6px', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
     });
-    pin.append(label);
+    el.append(label);
   }
-  return pin;
+  return el;
 }
 
 /** The key for our pins, in a corner of the map. */
@@ -174,6 +214,7 @@ export function MapLegend() {
       <Stack direction="row" spacing={1.5} alignItems="center">
         {item(<Box sx={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${PIN.beenThere}`, bgcolor: '#fff' }} />, 'Been there')}
         {item(<Typography sx={{ color: PIN.wantToGo, fontSize: 15, lineHeight: 1 }}>★</Typography>, 'Want to go')}
+        {item(<Box sx={{ px: 0.5, borderRadius: 2, border: `2px solid ${PIN.google}`, fontSize: 10, fontWeight: 700, color: PIN.googleText, lineHeight: '14px' }}>4.6</Box>, 'Google (rating)')}
       </Stack>
     </Paper>
   );

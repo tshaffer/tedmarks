@@ -8,6 +8,7 @@ import { aiRoutes } from './ai/aiRoutes.js';
 import type { MenuReader } from './ai/menuReader.js';
 import type { VoiceStructurer } from './ai/voiceStructurer.js';
 import { requireAccess } from './auth/accessKey.js';
+import { AreaSearchCache } from './google/areaSearch.js';
 import { AppleTokenVerifier } from './auth/appleAuth.js';
 import { authRoutes } from './auth/authRoutes.js';
 import type { PlacesClient } from './google/placesClient.js';
@@ -73,7 +74,7 @@ export function createApp(deps: AppDeps = {}): Express {
   const access = requireAccess(deps.accessKey, deps.auth?.sessionSecret);
   const store = deps.db ? new SyncStore(deps.db) : undefined;
   app.use('/sync', access, syncRoutes(store));
-  app.use('/places', access, placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS, store));
+  app.use('/places', access, placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS, store, deps.db ? new AreaSearchCache(deps.db) : undefined));
   app.use('/ai', access, aiRoutes(deps.voice, deps.menu));
   /** GET /config — the website's Google Maps key and Map ID. */
   app.get('/config', access, (_req, res) => {

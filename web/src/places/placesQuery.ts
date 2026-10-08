@@ -1,16 +1,15 @@
 import type { PlaceSummary } from '../data/insights.js';
 import { distanceMeters, latLngOf } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
-import { matchesCuisine, matchesExceptCuisine, type PlaceFilters } from '../home/filters.js';
+import { matchesOurs, verdictOf, type PlaceFilters, type VerdictChoice } from '../home/filters.js';
 
 // The Places page (Figma W6): every saved place, searched, filtered and sorted.
 
 export type SortKey = 'lastVisit' | 'name' | 'rating' | 'visits' | 'nearest' | 'saved';
-export type VerdictChoice = 'wouldReturn' | 'tryAgain' | 'wontReturn' | 'disagree' | 'none';
+export type { VerdictChoice };
 
 export interface PlacesQuery {
   search: string;
-  verdicts: VerdictChoice[];
   cities: string[];
   tags: string[];
   sort: SortKey;
@@ -18,7 +17,7 @@ export interface PlacesQuery {
   reversed: boolean;
 }
 
-export const NO_QUERY: PlacesQuery = { search: '', verdicts: [], cities: [], tags: [], sort: 'lastVisit', reversed: false };
+export const NO_QUERY: PlacesQuery = { search: '', cities: [], tags: [], sort: 'lastVisit', reversed: false };
 
 export interface PlaceRow {
   summary: PlaceSummary;
@@ -26,9 +25,6 @@ export interface PlaceRow {
   matchedDish?: string | undefined;
   meters?: number | undefined;
 }
-
-export const verdictOf = (s: PlaceSummary): VerdictChoice =>
-  s.verdict.kind === 'joint' ? s.verdict.value : s.verdict.kind === 'split' ? 'disagree' : 'none';
 
 /** When it was saved to try (or added to Tedmarks). */
 export const savedAt = (s: PlaceSummary) => s.place.interest?.savedAt ?? s.place.createdAt;
@@ -46,8 +42,7 @@ export function placeRows(
   }
   const rows: PlaceRow[] = [];
   for (const s of summaries) {
-    if (!matchesExceptCuisine(s, filters) || !matchesCuisine(s, filters)) continue;
-    if (query.verdicts.length && (s.place.status !== 'beenThere' || !query.verdicts.includes(verdictOf(s)))) continue;
+    if (!matchesOurs(s, filters)) continue;
     if (query.cities.length && !query.cities.includes(s.city ?? '')) continue;
     if (query.tags.length && !query.tags.some((t) => s.place.tags.includes(t))) continue;
     let matchedDish: string | undefined;

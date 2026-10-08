@@ -1,4 +1,4 @@
-import type { MenuReadItem, MenuReadJob, NearbyPlace } from '@tedmarks/shared';
+import type { AreaSearchRequest, AreaSearchResponse, MenuReadItem, MenuReadJob, NearbyPlace } from '@tedmarks/shared';
 
 /** Calls the Tedmarks API on the same origin; the session cookie comes along. */
 export class ApiError extends Error {
@@ -61,4 +61,9 @@ export async function readMenu(placeName: string, pages: MenuPage[]): Promise<Me
     if (job.status === 'failed') throw new ApiError(502, job.message);
   }
   throw new ApiError(504, 'Reading the menu is taking too long. Try fewer pages.');
+}
+
+/** Google's restaurants inside a map area, through Google's own filters (cached on the server). */
+export function areaSearch(request: AreaSearchRequest): Promise<AreaSearchResponse> {
+  return api<AreaSearchResponse>('/places/area-search', { method: 'POST', body: JSON.stringify(request) });
 }

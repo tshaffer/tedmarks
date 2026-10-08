@@ -98,6 +98,8 @@ and for the web app).
 | Not on the web | Photos and menu page images (they're references into the iPhone Photos library); menus show as their dish list |
 | Main flow | **Choose a restaurant, then act on it.** Choose by name search, a map pin (Google's or ours) or a row in the list; the panel's actions depend on status (visited: edit/delete visits, add a past visit; never visited: save as want to go, add a menu, add a past visit). No global "+ Add". |
 | Deleting | **Wherever something can be edited, it can be deleted.** Deletes are immediate with an Undo banner (no confirmation dialog). |
+| Planning (2026-10-08) | The main use is planning where to eat in a place you'll be. The map lists **our places and Google's restaurants together**, through one set of filters: within a filter choices are OR (Mexican or Italian), different filters are AND. **When**: any time, open now, or a day's meal (planning a trip). Our-only filters (status, verdict) and Google-only ones (min rating, min reviews) make "ours that we'd return to, plus Google's 4.5+" one view. |
+| Google area search | Google's restaurants come from Places API Text Search (Enterprise fields: rating, price, hours), **only when asked** ("Search this area", or after searching a town), up to 2 pages (40) per cuisine, using Google's own filters where it has them (rating, price, open now, one cuisine type, a text query such as "breakfast"); the rest are applied to the results. Answers are **cached in MongoDB for 3 days** (`googleAreaSearches`, TTL). Non-food results (landmarks, hotels) are dropped. Cap the cost with a daily request quota and a budget alert in Google Cloud. |
 
 ## Still open (not blocking)
 

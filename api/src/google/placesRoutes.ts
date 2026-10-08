@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import {
+  AreaSearchRequest,
   MorePlacesRequest,
+  type AreaSearchResponse,
   type MorePlacesResponse,
   type NearbyPlacesResponse,
   type PlaceDetailsResponse,
@@ -9,6 +11,7 @@ import {
 import { MAX_SEARCH_RADIUS_METERS } from '@tedmarks/shared';
 import type { LatLng, PlacesClient } from './placesClient.js';
 import type { SyncStore } from '../sync/syncStore.js';
+import { combineResults, type AreaSearchCache } from './areaSearch.js';
 
 function parseOrigin(req: Request): LatLng | null {
   const latitude = Number(req.query['lat']);
@@ -31,7 +34,7 @@ function sendError(res: Response, error: unknown): void {
   res.status(502).json({ error: 'places_unavailable', message: 'Could not reach Google Places.' });
 }
 
-export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMeters: number, store?: SyncStore): Router {
+export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMeters: number, store?: SyncStore, areaCache?: AreaSearchCache): Router {
   const router = Router();
 
   router.use((_req, res, next) => {
@@ -122,6 +125,37 @@ export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMete
         return;
       }
       const body: PlaceDetailsResponse = { place };
+      res.json(body);
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  /**
+   * POST /places/area-search — Google's restaurants inside a map area, for planning where to eat.
+   * One search per cuisine type (Google takes one type at a time), combined; cached for a few days.
+   */
+  router.post('/area-search', async (req, res) => {
+    const parsed = AreaSearchRequest.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'bad_request', message: parsed.error.issues[0]?.message ?? 'Invalid request' });
+      return;
+    }
+    const request = parsed.data;
+    try {
+      const cached = await areaCache?.get(request).catch(() => null);
+      if (cached) {
+        res.json(cached);
+        return;
+      }
+      const types = request.cuisineTypes?.length ? request.cuisineTypes : [undefined];
+      const results = await Promise.all(types.map((type) => client!.areaSearch(request, type)));
+      const body: AreaSearchResponse = {
+        restaurants: combineResults(results.map((r) => r.restaurants)),
+        truncated: results.some((r) => r.truncated),
+        fetchedAt: new Date().toISOString(),
+      };
+      await areaCache?.put(request, body).catch((error: unknown) => console.error('[places] cache', error instanceof Error ? error.message : error));
       res.json(body);
     } catch (error) {
       sendError(res, error);

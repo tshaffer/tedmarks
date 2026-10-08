@@ -17,8 +17,9 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
   const { data, error } = useTedmarksData();
   const actions = usePlaceActions();
   const navigate = useNavigate();
-  // Opened from the Places list: back goes there (keeping its search and scroll).
-  const fromPlaces = (useLocation().state as { from?: string } | null)?.from === 'places';
+  // Opened from the Places or Visits list: back goes there (keeping its search).
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  const backTo = from === 'places' ? 'Places' : from === 'visits' ? 'Visits' : null;
   const [editingInterest, setEditingInterest] = useState(false);
 
   // After a change: deleted → back to the map; another place (e.g. Undo) → its page.
@@ -52,8 +53,8 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
       <Card>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems={{ md: 'center' }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            {fromPlaces
-              ? <Link component="button" onClick={() => navigate(-1)} variant="body2" underline="hover">‹ Places</Link>
+            {backTo
+              ? <Link component="button" onClick={() => navigate(-1)} variant="body2" underline="hover">‹ {backTo}</Link>
               : <Link component={RouterLink} to="/" state={{ placeId: place.id }} variant="body2" underline="hover">‹ Map</Link>}
             <Typography variant="h4" fontWeight={700} sx={{ mt: 0.5 }}>{place.name}</Typography>
             <Typography color="text.secondary">{[summary.subtype, address].filter(Boolean).join(' · ')}</Typography>

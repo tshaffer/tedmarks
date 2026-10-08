@@ -1,6 +1,6 @@
-import type { Place } from '@tedmarks/shared';
+import type { Place, Visit } from '@tedmarks/shared';
 import { Box, Button, Collapse, Stack, Typography } from '@mui/material';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Interest } from '../data/placeWrites.js';
 import { DISH, dishesAt, ratingText, VERDICT, visitSummary, type PlaceSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
@@ -54,44 +54,70 @@ export function VisitList({ data, summary, onEdit, onDelete, title = true }: {
   return (
     <Box>
       {title && <Typography variant="caption" fontWeight={600} color="text.secondary">VISITS · click to open</Typography>}
-      {summary.visits.map((visit) => {
-        const s = visitSummary(data, visit);
-        const isOpen = open.has(visit.id);
-        return (
-          <Box key={visit.id} sx={{ borderTop: '1px solid #efeff3' }}>
-            <Stack direction="row" spacing={1.25} alignItems="center" onClick={() => toggle(visit.id)} sx={{ py: 1, cursor: 'pointer' }}>
-              <Typography color="text.secondary" sx={{ width: 12 }}>{isOpen ? '▾' : '▸'}</Typography>
-              <Typography sx={{ width: 22 }}>{s.verdict.kind === 'joint' ? VERDICT[s.verdict.value].emoji : s.verdict.kind === 'split' ? '↔' : '–'}</Typography>
-              <Box>
-                <Typography variant="body2" fontWeight={600}>{longDate(visit.startedAt)}</Typography>
-                <Typography variant="caption" color="text.secondary">{s.participants.join(', ')} · {s.dishes.length} dish{s.dishes.length === 1 ? '' : 'es'}</Typography>
-              </Box>
-            </Stack>
-            <Collapse in={isOpen}>
-              <Stack spacing={0.5} sx={{ pl: 4.5, pb: 1.5 }}>
-                {s.dishes.map((d) => (
-                  <Box key={d.line.id}>
-                    <Typography variant="body2" color={d.rating.kind === 'none' ? 'text.secondary' : 'text.primary'}>
-                      {d.rating.kind === 'none' ? `– ${d.name} — not rated` : d.rating.kind === 'joint' ? `${DISH[d.rating.value]} ${d.name}` : `${d.name} — ${ratingText(data, d.rating, DISH)}`}
-                    </Typography>
-                    {d.notes.map((n) => <Typography key={n.id} variant="caption" color="text.secondary" display="block" sx={{ pl: 3 }}>{n.text}</Typography>)}
-                  </Box>
-                ))}
-                {s.verdict.kind !== 'none' && (
-                  <Typography variant="body2" color="text.secondary">
-                    Verdict: {s.verdict.kind === 'joint' ? `${VERDICT[s.verdict.value].emoji} ${VERDICT[s.verdict.value].label}` : ratingText(data, s.verdict, verdictEmoji)}
-                  </Typography>
-                )}
-                {s.notes.map((n) => <Typography key={n.id} variant="body2" sx={{ color: '#3c3c43' }}>“{n.text}”</Typography>)}
-                <Stack direction="row" spacing={1} sx={{ pt: 0.5 }}>
-                  <Button size="small" onClick={() => onEdit(visit.id)} sx={{ bgcolor: '#f2f2f5', color: 'text.primary' }}>Edit</Button>
-                  <Button size="small" onClick={() => onDelete(visit.id)} sx={{ bgcolor: '#fdecec', color: 'error.main' }}>Delete</Button>
-                </Stack>
-              </Stack>
-            </Collapse>
+      {summary.visits.map((visit) => (
+        <VisitRow key={visit.id} data={data} visit={visit} open={open.has(visit.id)} onToggle={() => toggle(visit.id)}
+          onEdit={() => onEdit(visit.id)} onDelete={() => onDelete(visit.id)} />
+      ))}
+    </Box>
+  );
+}
+
+/**
+ * One visit: verdict, date, who was there, dish count; click to open it in place (every dish with
+ * its rating and notes, the verdict, visit notes) with Edit and Delete. `place` adds the place's
+ * name (the Visits page lists visits from every place); `aside` goes at the row's right.
+ */
+export function VisitRow({ data, visit, open, onToggle, onEdit, onDelete, place, aside, dateFormat = longDate }: {
+  data: TedmarksRecords; visit: Visit; open: boolean; onToggle: () => void; onEdit: () => void; onDelete: () => void;
+  place?: ReactNode; aside?: ReactNode; dateFormat?: (iso: string) => string;
+}) {
+  const s = visitSummary(data, visit);
+  const firstNote = s.notes[0]?.text;
+  return (
+    <Box sx={{ borderTop: '1px solid #efeff3' }}>
+      <Stack direction="row" spacing={1.25} alignItems="center" onClick={onToggle} sx={{ py: 1, cursor: 'pointer' }}>
+        <Typography color="text.secondary" sx={{ width: 12 }}>{open ? '▾' : '▸'}</Typography>
+        <Typography sx={{ width: 22, textAlign: 'center' }}>{s.verdict.kind === 'joint' ? VERDICT[s.verdict.value].emoji : s.verdict.kind === 'split' ? '↔' : '–'}</Typography>
+        {place ? (
+          <>
+            <Typography variant="body2" fontWeight={600} sx={{ width: 64, flexShrink: 0 }}>{dateFormat(visit.startedAt)}</Typography>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              {place}
+              <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                {[s.participants.join(', '), `${s.dishes.length} dish${s.dishes.length === 1 ? '' : 'es'}`, firstNote && !open ? `“${firstNote}”` : ''].filter(Boolean).join(' · ')}
+              </Typography>
+            </Box>
+          </>
+        ) : (
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2" fontWeight={600}>{dateFormat(visit.startedAt)}</Typography>
+            <Typography variant="caption" color="text.secondary">{[s.participants.join(', '), `${s.dishes.length} dish${s.dishes.length === 1 ? '' : 'es'}`].filter(Boolean).join(' · ')}</Typography>
           </Box>
-        );
-      })}
+        )}
+        {aside}
+      </Stack>
+      <Collapse in={open}>
+        <Stack spacing={0.5} sx={{ pl: place ? 14 : 4.5, pb: 1.5 }}>
+          {s.dishes.map((d) => (
+            <Box key={d.line.id}>
+              <Typography variant="body2" color={d.rating.kind === 'none' ? 'text.secondary' : 'text.primary'}>
+                {d.rating.kind === 'none' ? `– ${d.name} — not rated` : d.rating.kind === 'joint' ? `${DISH[d.rating.value]} ${d.name}` : `${d.name} — ${ratingText(data, d.rating, DISH)}`}
+              </Typography>
+              {d.notes.map((n) => <Typography key={n.id} variant="caption" color="text.secondary" display="block" sx={{ pl: 3 }}>{n.text}</Typography>)}
+            </Box>
+          ))}
+          {s.verdict.kind !== 'none' && (
+            <Typography variant="body2" color="text.secondary">
+              Verdict: {s.verdict.kind === 'joint' ? `${VERDICT[s.verdict.value].emoji} ${VERDICT[s.verdict.value].label}` : ratingText(data, s.verdict, verdictEmoji)}
+            </Typography>
+          )}
+          {s.notes.map((n) => <Typography key={n.id} variant="body2" sx={{ color: '#3c3c43' }}>“{n.text}”</Typography>)}
+          <Stack direction="row" spacing={1} sx={{ pt: 0.5 }}>
+            <Button size="small" onClick={onEdit} sx={{ bgcolor: '#f2f2f5', color: 'text.primary' }}>Edit</Button>
+            <Button size="small" onClick={onDelete} sx={{ bgcolor: '#fdecec', color: 'error.main' }}>Delete</Button>
+          </Stack>
+        </Stack>
+      </Collapse>
     </Box>
   );
 }

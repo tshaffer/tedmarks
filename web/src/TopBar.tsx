@@ -3,10 +3,11 @@ import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { signOut } from './api.js';
 
-/** The app's top-level pages (Figma web designs); Visits and Help join as they're built. */
+/** The app's top-level pages (Figma web designs); Help joins when it's built. */
 const TABS = [
   { to: '/', label: 'Map' },
   { to: '/places', label: 'Places' },
+  { to: '/visits', label: 'Visits' },
 ];
 
 /** The top bar from the Figma web designs: logo, page tabs, the page's search, sign out. */

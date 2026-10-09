@@ -1,6 +1,7 @@
 import { loadConfig, missingSettings } from './config.js';
 import { ensureIndexes } from './db/indexes.js';
 import { closeMongo, connectMongo } from './db/mongo.js';
+import { ClaudeHelpAnswerer } from './ai/helpAnswerer.js';
 import { ClaudeMenuReader } from './ai/menuReader.js';
 import { ClaudeVoiceStructurer } from './ai/voiceStructurer.js';
 import { PlacesClient } from './google/placesClient.js';
@@ -29,6 +30,7 @@ const server = createApp({
   accessKey: config.accessKey,
   voice: config.anthropicApiKey ? new ClaudeVoiceStructurer(config.anthropicApiKey) : undefined,
   menu: config.anthropicApiKey ? new ClaudeMenuReader(config.anthropicApiKey) : undefined,
+  help: config.anthropicApiKey ? new ClaudeHelpAnswerer(config.anthropicApiKey) : undefined,
   web: { googleMapsBrowserKey: config.googleMapsBrowserKey, googleMapId: config.googleMapId },
   auth: {
     servicesId: config.appleServicesId,

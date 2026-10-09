@@ -5,6 +5,7 @@ import express, { type Express, type Request, type Response } from 'express';
 import type { Db } from 'mongodb';
 import { DEFAULT_NEARBY_RADIUS_METERS } from '@tedmarks/shared';
 import { aiRoutes } from './ai/aiRoutes.js';
+import type { HelpAnswerer } from './ai/helpAnswerer.js';
 import type { MenuReader } from './ai/menuReader.js';
 import type { VoiceStructurer } from './ai/voiceStructurer.js';
 import { requireAccess } from './auth/accessKey.js';
@@ -26,6 +27,8 @@ export interface AppDeps {
   voice?: VoiceStructurer | undefined;
   /** Claude for menu photos. Unset = /ai/menu reports not configured. */
   menu?: MenuReader | undefined;
+  /** Claude for the website's Help questions. Unset = /ai/help reports not configured. */
+  help?: HelpAnswerer | undefined;
   /** Sign in with Apple for the website. */
   auth?: {
     servicesId?: string | undefined;
@@ -75,7 +78,7 @@ export function createApp(deps: AppDeps = {}): Express {
   const store = deps.db ? new SyncStore(deps.db) : undefined;
   app.use('/sync', access, syncRoutes(store));
   app.use('/places', access, placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS, store, deps.db ? new AreaSearchCache(deps.db) : undefined));
-  app.use('/ai', access, aiRoutes(deps.voice, deps.menu));
+  app.use('/ai', access, aiRoutes(deps.voice, deps.menu, deps.help));
   /** GET /config — the website's Google Maps key and Map ID. */
   app.get('/config', access, (_req, res) => {
     res.json({ googleMapsKey: deps.web?.googleMapsBrowserKey ?? null, mapId: deps.web?.googleMapId ?? null });

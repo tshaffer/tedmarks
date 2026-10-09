@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { randomUUID } from 'node:crypto';
 import { Router, type Response } from 'express';
-import { MenuReadRequest, VoiceStructureRequest, type MenuReadJob, type MenuReadResponse, type VoiceStructureResponse } from '@tedmarks/shared';
+import { HelpAskRequest, MenuReadRequest, VoiceStructureRequest, type HelpAskResponse, type MenuReadJob, type MenuReadResponse, type VoiceStructureResponse } from '@tedmarks/shared';
+import type { HelpAnswerer } from './helpAnswerer.js';
 import { MenuDeclinedError, type MenuReader } from './menuReader.js';
 import { notImplemented } from '../notImplemented.js';
 import { VoiceDeclinedError, type VoiceStructurer } from './voiceStructurer.js';
@@ -9,7 +10,7 @@ import { VoiceDeclinedError, type VoiceStructurer } from './voiceStructurer.js';
 /** How long a finished menu read waits to be collected. */
 const JOB_TTL_MS = 15 * 60_000;
 
-export function aiRoutes(voice: VoiceStructurer | undefined, menu: MenuReader | undefined): Router {
+export function aiRoutes(voice: VoiceStructurer | undefined, menu: MenuReader | undefined, help?: HelpAnswerer): Router {
   const router = Router();
   // Menu reads in progress or waiting to be collected (one dyno, so memory is enough).
   const jobs = new Map<string, MenuReadJob>();
@@ -87,6 +88,25 @@ export function aiRoutes(voice: VoiceStructurer | undefined, menu: MenuReader | 
       res.json(body);
     } catch (error) {
       sendAiError(res, error, error instanceof VoiceDeclinedError ? 'Claude couldn’t turn this note into changes.' : undefined);
+    }
+  });
+
+  /** POST /ai/help — a question about using Tedmarks, answered from the help topics. */
+  router.post('/help', async (req, res) => {
+    if (!help) {
+      res.status(503).json({ error: 'ai_not_configured', message: 'ANTHROPIC_API_KEY is not set on the server.' });
+      return;
+    }
+    const parsed = HelpAskRequest.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'bad_request', message: parsed.error.issues[0]?.message ?? 'Invalid request' });
+      return;
+    }
+    try {
+      const body: HelpAskResponse = await help.answer(parsed.data);
+      res.json(body);
+    } catch (error) {
+      sendAiError(res, error, undefined);
     }
   });
   return router;

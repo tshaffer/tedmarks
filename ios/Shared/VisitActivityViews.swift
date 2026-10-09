@@ -56,7 +56,7 @@ struct RatedCount: View {
 }
 
 /// The question on its own line, then 😍 👍 👎 for the next unrated dish — or, once every
-/// dish is rated, 👎 👌 👍 for the verdict (which ends the visit).
+/// dish is rated, 👍 👌 👎 for the verdict (which ends the visit).
 struct QuickRate: View {
     let attributes: VisitActivityAttributes
     let state: VisitActivityContent
@@ -82,7 +82,7 @@ struct QuickRate: View {
             } else {
                 question("Would you come back?")
                 HStack(spacing: 8) {
-                    ForEach([VerdictValue.wontReturn, .tryAgain, .wouldReturn], id: \.self) { value in
+                    ForEach([VerdictValue.wouldReturn, .tryAgain, .wontReturn], id: \.self) { value in
                         Button(intent: SetVerdictIntent(visitId: attributes.visitId, verdict: value)) { emojiLabel(value.emoji) }
                             .buttonStyle(.plain)
                     }

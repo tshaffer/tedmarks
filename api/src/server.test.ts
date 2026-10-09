@@ -138,3 +138,25 @@ test('website pages named like API prefixes get the app; API paths under them st
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test('help questions: not configured without a key; validated; answered by the injected Claude', async () => {
+  await withServer(async (base) => {
+    const res = await fetch(`${base}/ai/help`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'How do I merge dishes?' }) });
+    assert.equal(res.status, 503);
+  });
+  let asked: unknown;
+  const help = { answer: async (request: unknown) => { asked = request; return { answer: 'Use **Merge dishes…**.', topics: ['merge-dishes'] }; } };
+  const server = createApp({ help }).listen(0);
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const post = (body: unknown) => fetch(`${base}/ai/help`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await post({ question: '  ' })).status, 400);
+    const ok = await post({ question: 'How do I merge dishes?' });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { answer: 'Use **Merge dishes…**.', topics: ['merge-dishes'] });
+    assert.deepEqual(asked, { question: 'How do I merge dishes?', history: [] });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

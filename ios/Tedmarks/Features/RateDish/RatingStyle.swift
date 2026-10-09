@@ -28,7 +28,7 @@ extension ItemRatingValue: RatingStyle {
 }
 
 extension VerdictValue: RatingStyle {
-    /// Display order on buttons: 👎 👌 👍
+    /// Display order on buttons: 👍 👌 👎
     static var buttonOrder: [VerdictValue] { [.wouldReturn, .tryAgain, .wontReturn] }
     var label: String {
         switch self {

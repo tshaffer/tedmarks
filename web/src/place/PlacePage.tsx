@@ -83,10 +83,9 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
               onDelete={() => void (place.status === 'wantToGo' ? actions.deletePlace(place.id) : actions.clearInterest(place.id))} />
           </Box>
         )}
-        {place.status === 'beenThere' && !place.interest && !editingInterest && (
-          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ mt: 1.5, bgcolor: WANT.bg, color: WANT.text }}>
-            {summary.visits.length ? '★ Want to go back' : '★ Save as want to go'}
-          </Button>
+        {/* Only for a place without visits: once we've been, the verdict says whether we'd go back. */}
+        {place.status === 'beenThere' && summary.visits.length === 0 && !place.interest && !editingInterest && (
+          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ mt: 1.5, bgcolor: WANT.bg, color: WANT.text }}>★ Save as want to go</Button>
         )}
       </Card>
 

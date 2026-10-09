@@ -23,7 +23,13 @@ struct SavePlaceSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                if let picked = model.picked {
+                if let picked = model.picked, alreadyBeen(picked) {
+                    pickedSection(picked)
+                    Section {
+                        Text("You've been here, so it's in Places as been there. Its verdict says whether you'd go back.")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let picked = model.picked {
                     pickedSection(picked)
                     Section("How much do you want to go?") {
                         Picker("Interest", selection: $level) {
@@ -35,10 +41,6 @@ struct SavePlaceSheet: View {
                     Section {
                         TextField("Why? (a dish, who recommended it…)", text: $why, axis: .vertical)
                             .lineLimit(2...5)
-                    } footer: {
-                        if let existing = existing(picked), existing.status == .beenThere, existing.deletedAt == nil {
-                            Text("You've been here already; this keeps it as been there and adds why you'd go back.")
-                        }
                     }
                 } else {
                     searchSection
@@ -49,7 +51,7 @@ struct SavePlaceSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save).disabled(model.picked == nil)
+                    Button("Save", action: save).disabled(model.picked.map(alreadyBeen) ?? true)
                 }
             }
             .alert("Couldn't save", isPresented: .constant(errorMessage != nil)) {
@@ -112,6 +114,12 @@ struct SavePlaceSheet: View {
 
     private func existing(_ picked: NearbyPlace) -> Place? {
         savedPlaces.first { $0.googlePlaceId == picked.googlePlaceId }
+    }
+
+    /// Places we've been to have a verdict instead (no "want to go back").
+    private func alreadyBeen(_ picked: NearbyPlace) -> Bool {
+        guard let place = existing(picked), place.deletedAt == nil, place.status == .beenThere else { return false }
+        return place.visits.contains { $0.deletedAt == nil }
     }
 
     private func save() {

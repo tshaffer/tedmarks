@@ -156,7 +156,7 @@ Notes are searchable on the Visits page. A voice note on the phone can add notes
     slug: 'want-to-go',
     title: 'Want to go',
     category: 'Planning',
-    keywords: ['want to go', 'save', 'try', 'wishlist', 'curious', 'really want to go', 'want to go back', 'purple', 'star', 'interest', 'why'],
+    keywords: ['want to go', 'save', 'try', 'wishlist', 'curious', 'really want to go', 'purple', 'star', 'interest', 'why'],
     body: `Save a restaurant you'd like to try so it shows up when you're nearby.
 
 - **On the website:** choose a Google restaurant, then **★ Save as want to go**. Pick **★ Really want to go** or **☆ Curious**, and say why (a dish, who recommended it…).
@@ -164,9 +164,9 @@ Notes are searchable on the Visits page. A voice note on the phone can add notes
 
 Want to go places are **purple** everywhere: a purple ★ (☆ for Curious) on the map and in lists.
 
-**Want to go back:** for a place we've already been, **★ Want to go back** keeps it as been there and adds why we'd return.
+Once we've been to a place, its verdict (👍 Would return…) says whether we'd go back, so want to go is only for places we haven't been.
 
-The purple box on a place shows how much and why, with **Edit** and **Delete**. Delete removes a want-to-go place entirely; for a been-there place it only removes the wish to go back.`,
+The purple box on a place shows how much and why, with **Edit** and **Delete**. Delete removes a want-to-go place entirely.`,
   },
   {
     slug: 'search-filters',

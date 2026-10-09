@@ -44,10 +44,9 @@ export function OurPlacePanel({ data, summary, onClose }: { data: TedmarksRecord
 
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ '& .MuiButton-root': { whiteSpace: 'nowrap' } }}>
         <Button variant="contained" size="small" onClick={() => actions.openVisit({ kind: 'ours', placeId: place.id })}>+ Add a past visit</Button>
-        {place.status === 'beenThere' && !place.interest && !editingInterest && (
-          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ bgcolor: WANT.bg, color: WANT.text }}>
-            {summary.visits.length > 0 ? '★ Want to go back' : '★ Save as want to go'}
-          </Button>
+        {/* Only for a place without visits: once we've been, the verdict says whether we'd go back. */}
+        {place.status === 'beenThere' && summary.visits.length === 0 && !place.interest && !editingInterest && (
+          <Button size="small" onClick={() => setEditingInterest(true)} sx={{ bgcolor: WANT.bg, color: WANT.text }}>★ Save as want to go</Button>
         )}
         <Button size="small" onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: place.latestMenuId ? 'view' : 'add' })} sx={{ bgcolor: '#f2f2f5', color: 'text.primary' }}>
           {place.latestMenuId ? 'Menu' : 'Add a menu'}

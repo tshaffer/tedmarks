@@ -143,7 +143,7 @@ export function VerdictCard({ data, summary }: { data: TedmarksRecords; summary:
   );
 }
 
-/** Want to go (or want to go back): how much and why, with Edit and Delete. */
+/** Want to go: how much and why, with Edit and Delete. (Been-there places may still have a want-to-go-back note from before.) */
 export function InterestBox({ place, editing, setEditing, onSave, onDelete }: {
   place: Place; editing: boolean; setEditing: (on: boolean) => void; onSave: (interest: Interest) => Promise<void>; onDelete: () => void;
 }) {

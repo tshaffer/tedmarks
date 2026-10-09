@@ -18,6 +18,10 @@ export interface DishRow {
   /** The existing order line when editing. */
   lineId?: string;
   name: string;
+  /** How many were ordered (default 1). */
+  quantity?: number;
+  /** The menu section it came from ("Bagels"), shown beside the name. */
+  section?: string | undefined;
   /** "us" = one joint rating; "split" = Ted's and Lori's own. */
   ratingMode: 'us' | 'split';
   us?: ItemRatingValue | undefined;
@@ -122,10 +126,15 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
     const line = dish.lineId ? data.visitItems.get(dish.lineId) : undefined;
     const lineId = line?.id ?? ids.next();
     keptLines.add(lineId);
+    const quantity = Math.max(1, dish.quantity ?? 1);
     if (line) {
-      if (line.placeItemId !== placeItemId || line.sortOrder !== index) add('visitItems', patch(lineId, now, { placeItemId, sortOrder: index }));
+      const fields: Record<string, unknown> = {};
+      if (line.placeItemId !== placeItemId) fields.placeItemId = placeItemId;
+      if (line.sortOrder !== index) fields.sortOrder = index;
+      if ((line.quantity ?? 1) !== quantity) fields.quantity = quantity > 1 ? quantity : null;
+      if (Object.keys(fields).length) add('visitItems', patch(lineId, now, fields));
     } else {
-      add('visitItems', { ...meta(lineId, now), visitId, placeItemId, ordered: true, addedVia: 'order', sortOrder: index });
+      add('visitItems', { ...meta(lineId, now), visitId, placeItemId, ordered: true, addedVia: 'order', sortOrder: index, ...(quantity > 1 ? { quantity } : {}) });
     }
     const wanted: { scope: 'joint' | 'person'; personId?: string; value?: ItemRatingValue }[] = dish.ratingMode === 'us'
       ? [{ scope: 'joint', value: dish.us }]

@@ -135,3 +135,25 @@ describe('deleting a visit', () => {
     expect(apply(deleted, undo('2026-10-07T18:00:05.000Z'), graveyard).places.get(PLACE)?.status).toBe('beenThere');
   });
 });
+
+describe('how many were ordered', () => {
+  test('a quantity is saved on the order line, changed on edit, and cleared back to one', () => {
+    let data = records();
+    const saved = planVisitSave(data, { ...baseForm, dishes: [{ name: 'Latte', quantity: 2, ratingMode: 'us', us: 'loved', note: '' }] }, T0, counter());
+    data = apply(data, saved.changes);
+    const line = [...data.visitItems.values()][0]!;
+    expect(line.quantity).toBe(2);
+    data = apply(data, planVisitSave(data, { ...baseForm, visitId: saved.visitId, dishes: [{ lineId: line.id, name: 'Latte', quantity: 1, ratingMode: 'us', us: 'loved', note: '' }] }, NOW, counter()).changes);
+    expect(data.visitItems.get(line.id)!.quantity).toBeUndefined();
+    expect([...data.ratings.values()].filter((r) => r.subjectId === line.id)).toHaveLength(1);   // rated once
+  });
+});
+
+test('editing a visit starts from its quantities', async () => {
+  const { initialForm } = await import('../visit/VisitDialog.js');
+  let data = records();
+  const saved = planVisitSave(data, { ...baseForm, dishes: [{ name: 'Burrata', quantity: 3, ratingMode: 'us', us: 'good', note: '' }] }, T0, counter());
+  data = apply(data, saved.changes);
+  const form = initialForm(data, saved.visitId);
+  expect(form.dishes.map((d) => [d.name, d.quantity, d.us])).toEqual([['Burrata', 3, 'good']]);
+});

@@ -1,9 +1,11 @@
 import type { ItemRatingValue, NearbyPlace, VerdictValue } from '@tedmarks/shared';
 import {
-  Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
+import { looseDishKey } from '@tedmarks/shared';
+import { OrderMenu } from './OrderMenu.js';
 import { placeDetails, pushChanges, refreshPlace } from '../api.js';
 import { DISH, VERDICT, visitSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
@@ -41,7 +43,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
   const [participants, setParticipants] = useState<string[]>(initial.participantIds);
   const [newGuests, setNewGuests] = useState<string[]>([]);
   const [guestName, setGuestName] = useState('');
-  const [dishes, setDishes] = useState<DishRow[]>(initial.dishes.length ? initial.dishes : [emptyRow()]);
+  const [dishes, setDishes] = useState<DishRow[]>(initial.dishes);
   const [verdict, setVerdict] = useState<VerdictValue | undefined>(initial.verdict);
   const [notes, setNotes] = useState<{ id?: string; text: string }[]>(initial.notes.length ? initial.notes : [{ text: '' }]);
 
@@ -58,20 +60,19 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
   const guests = people.filter((p) => p.kind === 'guest').sort((a, b) => (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? '')).slice(0, 8);
   const chipPeople = [...household, ...guests.filter((g) => !household.includes(g)), ...people.filter((p) => participants.includes(p.id) && !household.includes(p) && !guests.includes(p))];
 
-  // Dish names to choose from: dishes ordered here before, then the latest menu.
-  const dishOptions = useMemo(() => {
-    if (!placeId) return [] as string[];
-    const items = [...data.placeItems.values()].filter((i) => i.placeId === placeId);
-    const ordered = new Set([...data.visitItems.values()].map((l) => l.placeItemId));
-    return [...items.filter((i) => ordered.has(i.id)), ...items.filter((i) => !ordered.has(i.id) && i.onLatestMenu)].map((i) => i.name);
-  }, [data, placeId]);
-  const quickPicks = dishOptions.filter((name) => !dishes.some((d) => d.name.trim().toLowerCase() === name.toLowerCase())).slice(0, 14);
-
   const setRow = (index: number, change: Partial<DishRow>) => setDishes((rows) => rows.map((r, i) => (i === index ? { ...r, ...change } : r)));
-  const addDish = (name = '') => setDishes((rows) => {
-    const blank = rows.findIndex((r) => !r.name.trim());
-    return blank >= 0 && name ? rows.map((r, i) => (i === blank ? { ...r, name } : r)) : [...rows, { ...emptyRow(), name }];
+  // The menu's steppers: + adds a dish (or one more of it), − takes one off (at 0 it leaves the order).
+  const sameDish = (a: string, b: string) => looseDishKey(a) === looseDishKey(b);
+  const addOne = (name: string, section?: string) => setDishes((rows) => {
+    const at = rows.findIndex((r) => sameDish(r.name, name));
+    if (at < 0) return [...rows, { ...emptyRow(), name, section }];
+    return rows.map((r, i) => (i === at ? { ...r, quantity: (r.quantity ?? 1) + 1 } : r));
   });
+  const removeOne = (name: string) => setDishes((rows) => rows.flatMap((r) => {
+    if (!sameDish(r.name, name)) return [r];
+    const q = (r.quantity ?? 1) - 1;
+    return q > 0 ? [{ ...r, quantity: q }] : [];
+  }));
 
   const canSave = Boolean(date) && (target.kind === 'ours' || place || google) && !saving;
 
@@ -96,13 +97,14 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
   }
 
   return (
-    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open onClose={onClose} maxWidth="lg" fullWidth slotProps={{ paper: { sx: { height: 'min(92vh, 900px)' } } }}>
       <DialogTitle sx={{ fontWeight: 700 }}>{editing ? 'Edit visit' : 'Add a past visit'} · {placeName}</DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={2.5}>
+      <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column' }}>
+        <Stack spacing={2.5} sx={{ flex: 1, minHeight: 0 }}>
           {error && <Alert severity="error">{error}</Alert>}
           {target.kind === 'google' && !place && !google && !error && <Stack direction="row" spacing={1} alignItems="center"><CircularProgress size={18} /><Typography>Looking up the restaurant…</Typography></Stack>}
 
+          <Stack direction="row" spacing={3} alignItems="flex-end" flexWrap="wrap" useFlexGap>
           <Stack direction="row" spacing={2}>
             <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 200 }} />
             <TextField label="Time (optional)" type="time" value={time} onChange={(e) => setTime(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 170 }} />
@@ -122,72 +124,81 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
                 sx={{ width: 140 }} />
             </Stack>
           </Box>
+          </Stack>
 
-          <Box>
-            <Typography variant="caption" fontWeight={600} color="text.secondary">DISHES</Typography>
-            <Stack spacing={1} sx={{ mt: 0.75 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '5fr 6fr' }, gap: 2.5, flex: 1, minHeight: 0 }}>
+            <Box sx={{ minHeight: 360, maxHeight: { md: '100%' }, height: { md: '100%' } }}>
+              <OrderMenu data={data} placeId={placeId} dishes={dishes} onAdd={addOne} onRemoveOne={removeOne} />
+            </Box>
+            <Box sx={{ overflowY: 'auto', minHeight: 0 }}>
+              <Stack direction="row" alignItems="baseline">
+                <Typography fontWeight={700} sx={{ flex: 1 }}>Your order</Typography>
+                {dishes.length > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    {dishes.length} dish{dishes.length === 1 ? '' : 'es'} · {dishes.reduce((n, d) => n + (d.quantity ?? 1), 0)} items
+                  </Typography>
+                )}
+              </Stack>
+              {dishes.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>Nothing yet — tap + on the menu, or add a dish that isn’t on it.</Typography>}
               {dishes.map((row, index) => (
-                <Stack key={index} direction="row" spacing={1.25} alignItems="center" sx={{ borderBottom: '1px solid #efeff3', pb: 1 }}>
-                  <Autocomplete freeSolo options={dishOptions} value={row.name} onInputChange={(_, v) => setRow(index, { name: v })}
-                    renderInput={(params) => <TextField {...params} size="small" placeholder="Dish" />} sx={{ width: 220 }} />
-                  <ToggleButtonGroup size="small" exclusive value={row.ratingMode} onChange={(_, v: 'us' | 'split' | null) => v && setRow(index, { ratingMode: v })}>
-                    <ToggleButton value="us" sx={{ px: 1.25 }}>Us</ToggleButton>
-                    <ToggleButton value="split" sx={{ px: 1.25 }}>Ted / Lori</ToggleButton>
-                  </ToggleButtonGroup>
-                  {row.ratingMode === 'us'
-                    ? <RatingButtons value={row.us} onChange={(v) => setRow(index, { us: v })} />
-                    : (
-                      <Stack spacing={0.5}>
-                        <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Ted</Typography><RatingButtons value={row.ted} onChange={(v) => setRow(index, { ted: v })} /></Stack>
-                        <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Lori</Typography><RatingButtons value={row.lori} onChange={(v) => setRow(index, { lori: v })} /></Stack>
-                      </Stack>
-                    )}
-                  <TextField size="small" placeholder="Note" value={row.note} onChange={(e) => setRow(index, { note: e.target.value })} sx={{ flex: 1 }} />
-                  <IconButton size="small" aria-label="Remove dish" onClick={() => setDishes((rows) => rows.filter((_, i) => i !== index))}>✕</IconButton>
-                </Stack>
-              ))}
-              <Box><Button size="small" onClick={() => addDish()}>+ Add dish</Button></Box>
-              {quickPicks.length > 0 && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Tap to add — ordered before, then the latest menu</Typography>
-                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-                    {quickPicks.map((name) => <Chip key={name} size="small" variant="outlined" label={`+ ${name}`} onClick={() => addDish(name)} />)}
+                <Box key={`${row.lineId ?? 'new'}-${index}`} sx={{ borderTop: '1px solid #efeff3', py: 1.25 }}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography fontWeight={600}>{row.name}</Typography>
+                    {(row.quantity ?? 1) > 1 && <Typography fontWeight={700} color="#c26a00">×{row.quantity}</Typography>}
+                    {row.section && <Typography variant="caption" color="text.secondary">{row.section}</Typography>}
+                    <Box sx={{ flex: 1 }} />
+                    <IconButton size="small" aria-label={`Remove ${row.name}`} onClick={() => setDishes((rows) => rows.filter((_, i) => i !== index))}>✕</IconButton>
+                  </Stack>
+                  <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mt: 0.5 }}>
+                    <ToggleButtonGroup size="small" exclusive value={row.ratingMode} onChange={(_, v: 'us' | 'split' | null) => v && setRow(index, { ratingMode: v })}>
+                      <ToggleButton value="us" sx={{ px: 1.25 }}>Us</ToggleButton>
+                      <ToggleButton value="split" sx={{ px: 1.25 }}>Ted / Lori</ToggleButton>
+                    </ToggleButtonGroup>
+                    {row.ratingMode === 'us'
+                      ? <RatingButtons value={row.us} onChange={(v) => setRow(index, { us: v })} />
+                      : (
+                        <Stack spacing={0.5}>
+                          <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Ted</Typography><RatingButtons value={row.ted} onChange={(v) => setRow(index, { ted: v })} /></Stack>
+                          <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Lori</Typography><RatingButtons value={row.lori} onChange={(v) => setRow(index, { lori: v })} /></Stack>
+                        </Stack>
+                      )}
+                    <TextField size="small" placeholder="Note" value={row.note} onChange={(e) => setRow(index, { note: e.target.value })} sx={{ flex: 1 }} />
                   </Stack>
                 </Box>
-              )}
-            </Stack>
-          </Box>
+              ))}
 
-          <Stack direction="row" spacing={3} alignItems="flex-start">
-            <Box>
-              <Typography variant="caption" fontWeight={600} color="text.secondary">WOULD YOU COME BACK?</Typography>
-              <Stack direction="row" spacing={1} sx={{ mt: 0.75 }}>
-                {(['wontReturn', 'tryAgain', 'wouldReturn'] as const).map((v) => {
-                  const on = verdict === v;
-                  return (
-                    <Button key={v} onClick={() => setVerdict(on ? undefined : v)}
-                      sx={{ flexDirection: 'column', px: 1.5, py: 0.75, bgcolor: on ? VERDICT[v].color : VERDICT[v].bg, color: on ? '#fff' : VERDICT[v].color, '&:hover': { bgcolor: on ? VERDICT[v].color : VERDICT[v].bg } }}>
-                      <span style={{ fontSize: 20 }}>{VERDICT[v].emoji}</span>
-                      <span style={{ fontSize: 12 }}>{VERDICT[v].label}</span>
-                    </Button>
-                  );
-                })}
-              </Stack>
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="caption" fontWeight={600} color="text.secondary">NOTES ABOUT THE VISIT</Typography>
-              <Stack spacing={1} sx={{ mt: 0.75 }}>
-                {notes.map((note, index) => (
-                  <Stack key={note.id ?? `new-${index}`} direction="row" spacing={1} alignItems="flex-start">
-                    <TextField size="small" multiline minRows={1} fullWidth value={note.text} placeholder="The service, the room, who was there…"
-                      onChange={(e) => setNotes((ns) => ns.map((n, i) => (i === index ? { ...n, text: e.target.value } : n)))} />
-                    {notes.length > 1 && <IconButton size="small" aria-label="Remove note" onClick={() => setNotes((ns) => ns.filter((_, i) => i !== index))}>✕</IconButton>}
+              <Stack direction="row" spacing={3} alignItems="flex-start" sx={{ mt: 2.5 }}>
+                <Box>
+                  <Typography variant="caption" fontWeight={600} color="text.secondary">WOULD YOU COME BACK?</Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.75 }}>
+                    {(['wontReturn', 'tryAgain', 'wouldReturn'] as const).map((v) => {
+                      const on = verdict === v;
+                      return (
+                        <Button key={v} onClick={() => setVerdict(on ? undefined : v)}
+                          sx={{ flexDirection: 'column', px: 1.5, py: 0.75, bgcolor: on ? VERDICT[v].color : VERDICT[v].bg, color: on ? '#fff' : VERDICT[v].color, '&:hover': { bgcolor: on ? VERDICT[v].color : VERDICT[v].bg } }}>
+                          <span style={{ fontSize: 20 }}>{VERDICT[v].emoji}</span>
+                          <span style={{ fontSize: 12 }}>{VERDICT[v].label}</span>
+                        </Button>
+                      );
+                    })}
                   </Stack>
-                ))}
-                <Box><Button size="small" onClick={() => setNotes((ns) => [...ns, { text: '' }])}>+ Add note</Button></Box>
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" fontWeight={600} color="text.secondary">NOTES ABOUT THE VISIT</Typography>
+                  <Stack spacing={1} sx={{ mt: 0.75 }}>
+                    {notes.map((note, index) => (
+                      <Stack key={note.id ?? `new-${index}`} direction="row" spacing={1} alignItems="flex-start">
+                        <TextField size="small" multiline minRows={1} fullWidth value={note.text} placeholder="The service, the room, who was there…"
+                          onChange={(e) => setNotes((ns) => ns.map((n, i) => (i === index ? { ...n, text: e.target.value } : n)))} />
+                        {notes.length > 1 && <IconButton size="small" aria-label="Remove note" onClick={() => setNotes((ns) => ns.filter((_, i) => i !== index))}>✕</IconButton>}
+                      </Stack>
+                    ))}
+                    <Box><Button size="small" onClick={() => setNotes((ns) => [...ns, { text: '' }])}>+ Add note</Button></Box>
+                  </Stack>
+                </Box>
               </Stack>
             </Box>
-          </Stack>
+          </Box>
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 1.5 }}>
@@ -219,7 +230,7 @@ function RatingButtons({ value, onChange }: { value?: ItemRatingValue | undefine
 }
 
 /** The form's starting values: blank for a new visit, or the visit's own when editing. */
-function initialForm(data: TedmarksRecords, visitId: string | undefined) {
+export function initialForm(data: TedmarksRecords, visitId: string | undefined) {
   const visit = visitId ? data.visits.get(visitId) : undefined;
   if (!visit) return { date: today(), time: '', participantIds: [TED, LORI], dishes: [] as DishRow[], verdict: undefined, notes: [] as { id?: string; text: string }[] };
   const started = new Date(visit.startedAt);
@@ -230,7 +241,7 @@ function initialForm(data: TedmarksRecords, visitId: string | undefined) {
     const person = (id: string) => ratings.find((r) => r.scope === 'person' && r.personId === id)?.value as ItemRatingValue | undefined;
     const joint = ratings.find((r) => r.scope === 'joint')?.value as ItemRatingValue | undefined;
     const split = ratings.some((r) => r.scope === 'person');
-    return { lineId: d.line.id, name: d.name, ratingMode: split ? 'split' : 'us', us: joint, ted: person(TED) ?? (split ? joint : undefined), lori: person(LORI) ?? (split ? joint : undefined), note: d.notes[0]?.text ?? '' };
+    return { lineId: d.line.id, name: d.name, quantity: d.line.quantity, section: d.line.placeItemId ? data.placeItems.get(d.line.placeItemId)?.section : undefined, ratingMode: split ? 'split' : 'us', us: joint, ted: person(TED) ?? (split ? joint : undefined), lori: person(LORI) ?? (split ? joint : undefined), note: d.notes[0]?.text ?? '' };
   });
   const verdict = [...data.ratings.values()].find((r) => r.subjectId === visit.id && r.scope === 'joint')?.value as VerdictValue | undefined;
   return {

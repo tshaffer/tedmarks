@@ -29,6 +29,8 @@ export const VisitItem = SyncedRecord.extend({
   ordered: z.boolean(),
   addedVia: VisitItemAddedVia,
   sortOrder: z.number().int(),
+  /** How many were ordered (absent = 1); rated once whatever the count. */
+  quantity: z.number().int().min(1).optional(),
 });
 export type VisitItem = z.infer<typeof VisitItem>;
 

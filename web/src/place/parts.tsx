@@ -101,7 +101,10 @@ export function VisitRow({ data, visit, open, onToggle, onEdit, onDelete, place,
           {s.dishes.map((d) => (
             <Box key={d.line.id}>
               <Typography variant="body2" color={d.rating.kind === 'none' ? 'text.secondary' : 'text.primary'}>
-                {d.rating.kind === 'none' ? `– ${d.name} — not rated` : d.rating.kind === 'joint' ? `${DISH[d.rating.value]} ${d.name}` : `${d.name} — ${ratingText(data, d.rating, DISH)}`}
+                {(() => {
+                  const name = (d.line.quantity ?? 1) > 1 ? `${d.name} ×${d.line.quantity}` : d.name;
+                  return d.rating.kind === 'none' ? `– ${name} — not rated` : d.rating.kind === 'joint' ? `${DISH[d.rating.value]} ${name}` : `${name} — ${ratingText(data, d.rating, DISH)}`;
+                })()}
               </Typography>
               {d.notes.map((n) => <Typography key={n.id} variant="caption" color="text.secondary" display="block" sx={{ pl: 3 }}>{n.text}</Typography>)}
             </Box>

@@ -54,6 +54,17 @@ describe('adding a past visit', () => {
 });
 
 describe('editing a visit', () => {
+  test('only one of us there: each dish gets one rating, even from a split row', () => {
+    let data = records();
+    const first = planVisitSave(data, { ...baseForm, dishes: [{ name: 'Arancini', ratingMode: 'split', ted: 'skip', lori: 'loved', note: '' }] }, NOW, counter());
+    data = apply(data, first.changes);
+    const line = [...data.visitItems.values()][0]!;
+    const form: VisitForm = { ...baseForm, visitId: first.visitId, participantIds: [TED], dishes: [{ lineId: line.id, name: 'Arancini', ratingMode: 'split', ted: 'loved', note: '' }] };
+    const after = apply(data, planVisitSave(data, form, NOW, counter()).changes);
+    const live = [...after.ratings.values()].filter((r) => r.subjectId === line.id && !r.deletedAt);
+    expect(live.map((r) => `${r.scope}:${r.value}`)).toEqual(['joint:loved']);
+  });
+
   test('keeps the visit’s own times unless the date changes', () => {
     let data = records();
     const first = planVisitSave(data, baseForm, NOW, counter());

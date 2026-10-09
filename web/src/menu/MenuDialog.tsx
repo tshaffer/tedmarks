@@ -47,9 +47,12 @@ export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) 
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const addFiles = (list: FileList | null) => {
-    if (!list) return;
+    // Copied now: the browser empties a drop's FileList once the event is over, and React may
+    // run the update after that.
+    const added = Array.from(list ?? []);
+    if (added.length === 0) return;
     setError(null);
-    setFiles((current) => [...current, ...Array.from(list)].slice(0, MAX_PAGES));
+    setFiles((current) => [...current, ...added].slice(0, MAX_PAGES));
   };
 
   async function read() {
@@ -85,7 +88,10 @@ export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) 
         {adding ? 'Add a menu' : 'Menu'} · {name}
         <IconButton onClick={onClose} disabled={reading} aria-label="Close" sx={{ position: 'absolute', right: 12, top: 12 }}>✕</IconButton>
       </DialogTitle>
-      <DialogContent dividers sx={{ minHeight: 320 }}>
+      {/* Drops anywhere in the dialog add pages (and never open the file in the browser instead). */}
+      <DialogContent dividers sx={{ minHeight: 320 }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => { e.preventDefault(); if (adding && !reading) addFiles(e.dataTransfer.files); }}>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {adding ? (
           reading ? (
@@ -97,8 +103,6 @@ export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) 
           ) : (
             <Stack spacing={2}>
               <Box
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
                 onClick={() => input.current?.click()}
                 sx={{ border: '2px dashed #e3c79a', borderRadius: 3, bgcolor: '#fffaf2', p: 4, textAlign: 'center', cursor: 'pointer' }}
               >

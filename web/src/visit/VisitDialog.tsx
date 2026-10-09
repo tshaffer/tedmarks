@@ -9,7 +9,7 @@ import { OrderMenu } from './OrderMenu.js';
 import { placeDetails, pushChanges, refreshPlace } from '../api.js';
 import { DISH, VERDICT, visitSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
-import { LORI, TED, localDate, planVisitSave, type DishRow, type VisitForm } from '../data/visitWrites.js';
+import { LORI, TED, localDate, planVisitSave, singleRating, type DishRow, type VisitForm } from '../data/visitWrites.js';
 
 export type VisitTarget =
   | { kind: 'ours'; placeId: string; visitId?: string }
@@ -75,6 +75,10 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
 
   const canSave = Boolean(date) && (target.kind === 'ours' || place || google) && !saving;
 
+  // Us / Ted / Lori only when both of us were there (as on the phone).
+  const bothOfUs = participants.includes(TED) && participants.includes(LORI);
+  const itemCount = dishes.reduce((n, d) => n + (d.quantity ?? 1), 0);
+
   async function save() {
     setSaving(true);
     setError(null);
@@ -131,7 +135,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
                 <Typography fontWeight={700} sx={{ flex: 1 }}>Your order</Typography>
                 {dishes.length > 0 && (
                   <Typography variant="caption" color="text.secondary">
-                    {dishes.length} dish{dishes.length === 1 ? '' : 'es'} · {dishes.reduce((n, d) => n + (d.quantity ?? 1), 0)} items
+                    {dishes.length} dish{dishes.length === 1 ? '' : 'es'}{itemCount > dishes.length ? ` · ${itemCount} items` : ''}
                   </Typography>
                 )}
               </Stack>
@@ -146,18 +150,24 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
                     <IconButton size="small" aria-label={`Remove ${row.name}`} onClick={() => setDishes((rows) => rows.filter((_, i) => i !== index))}>✕</IconButton>
                   </Stack>
                   <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mt: 0.5 }}>
-                    <ToggleButtonGroup size="small" exclusive value={row.ratingMode} onChange={(_, v: 'us' | 'split' | null) => v && setRow(index, { ratingMode: v })}>
-                      <ToggleButton value="us" sx={{ px: 1.25 }}>Us</ToggleButton>
-                      <ToggleButton value="split" sx={{ px: 1.25 }}>Ted / Lori</ToggleButton>
-                    </ToggleButtonGroup>
-                    {row.ratingMode === 'us'
-                      ? <RatingButtons value={row.us} onChange={(v) => setRow(index, { us: v })} />
-                      : (
-                        <Stack spacing={0.5}>
-                          <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Ted</Typography><RatingButtons value={row.ted} onChange={(v) => setRow(index, { ted: v })} /></Stack>
-                          <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Lori</Typography><RatingButtons value={row.lori} onChange={(v) => setRow(index, { lori: v })} /></Stack>
-                        </Stack>
-                      )}
+                    {!bothOfUs ? (
+                      <RatingButtons value={singleRating(row)} onChange={(v) => setRow(index, { ratingMode: 'us', us: v })} />
+                    ) : (
+                      <>
+                        <ToggleButtonGroup size="small" exclusive value={row.ratingMode} onChange={(_, v: 'us' | 'split' | null) => v && setRow(index, { ratingMode: v })}>
+                          <ToggleButton value="us" sx={{ px: 1.25 }}>Us</ToggleButton>
+                          <ToggleButton value="split" sx={{ px: 1.25 }}>Ted / Lori</ToggleButton>
+                        </ToggleButtonGroup>
+                        {row.ratingMode === 'us'
+                          ? <RatingButtons value={row.us} onChange={(v) => setRow(index, { us: v })} />
+                          : (
+                            <Stack spacing={0.5}>
+                              <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Ted</Typography><RatingButtons value={row.ted} onChange={(v) => setRow(index, { ted: v })} /></Stack>
+                              <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Lori</Typography><RatingButtons value={row.lori} onChange={(v) => setRow(index, { lori: v })} /></Stack>
+                            </Stack>
+                          )}
+                      </>
+                    )}
                     <TextField size="small" placeholder="Note" value={row.note} onChange={(e) => setRow(index, { note: e.target.value })} sx={{ flex: 1 }} />
                   </Stack>
                 </Box>

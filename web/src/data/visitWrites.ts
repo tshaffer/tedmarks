@@ -51,6 +51,10 @@ export const randomIds: Ids = { next: () => crypto.randomUUID() };
 const meta = (id: string, now: string) => ({ id, createdAt: now, createdBy: TED, modifiedAt: now, modifiedBy: TED });
 const patch = (id: string, now: string, fields: Record<string, unknown>): Doc => ({ id, modifiedAt: now, modifiedBy: TED, ...fields });
 
+/** A dish's one rating when only one of us was there (a split row keeps whichever was set). */
+export const singleRating = (dish: DishRow): ItemRatingValue | undefined =>
+  dish.ratingMode === 'us' ? dish.us : dish.ted ?? dish.lori;
+
 /** A visit on this date: midday, so it shows as that day anywhere nearby. */
 export function startedAtIso(date: string): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
@@ -96,6 +100,8 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
     participantIds.push(id);
   }
 
+  const bothOfUs = participantIds.includes(TED) && participantIds.includes(LORI);
+
   // The visit.
   const startedAt = startedAtIso(form.date);
   const visitId = form.visitId ?? ids.next();
@@ -139,9 +145,12 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
     } else {
       add('visitItems', { ...meta(lineId, now), visitId, placeItemId, ordered: true, addedVia: 'order', sortOrder: index, ...(quantity > 1 ? { quantity } : {}) });
     }
-    const wanted: { scope: 'joint' | 'person'; personId?: string; value?: ItemRatingValue }[] = dish.ratingMode === 'us'
-      ? [{ scope: 'joint', value: dish.us }]
-      : [{ scope: 'person', personId: TED, value: dish.ted }, { scope: 'person', personId: LORI, value: dish.lori }];
+    // Only one of us there: one rating (as on the phone), whatever the row was set to.
+    const wanted: { scope: 'joint' | 'person'; personId?: string; value?: ItemRatingValue }[] = !bothOfUs
+      ? [{ scope: 'joint', value: singleRating(dish) }]
+      : dish.ratingMode === 'us'
+        ? [{ scope: 'joint', value: dish.us }]
+        : [{ scope: 'person', personId: TED, value: dish.ted }, { scope: 'person', personId: LORI, value: dish.lori }];
     syncRatings(data, 'visitItem', lineId, visitId, placeId, wanted, now, ids, add);
     syncNotes(data, existingNoteFor(data, lineId), dish.note, { placeId, visitId, visitItemId: lineId }, now, ids, add);
   });

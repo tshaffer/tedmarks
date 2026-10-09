@@ -135,7 +135,7 @@ export function VerdictCard({ data, summary }: { data: TedmarksRecords; summary:
         <Typography fontWeight={600}>{verdict.kind === 'joint' ? VERDICT[verdict.value].label : verdict.kind === 'split' ? `We disagree: ${ratingText(data, verdict, verdictEmoji)}` : 'No verdict yet'}</Typography>
         <Typography variant="body2" color="text.secondary">
           {summary.visits.length} visit{summary.visits.length === 1 ? '' : 's'}
-          {summary.visits[0] && ` · last ${longDate(summary.visits[0].startedAt)}`}
+          {summary.visits[0] && ` · ${summary.visits.length > 1 ? 'last ' : ''}${longDate(summary.visits[0].startedAt)}`}
         </Typography>
       </Box>
       {place.refinedRating !== undefined && <Box sx={{ bgcolor: '#fff', borderRadius: 2, px: 1.25, py: 0.5 }}><Typography fontWeight={700}>{place.refinedRating}/10</Typography></Box>}

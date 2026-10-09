@@ -113,7 +113,7 @@ struct PlacesView: View {
                     Text(details.joined(separator: " · ")).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
                 if place.status == .beenThere, summary.visitCount > 0, let last = summary.lastVisitAt {
-                    Text("\(summary.visitCount) visit\(summary.visitCount == 1 ? "" : "s") · last \(last.formatted(.dateTime.month(.abbreviated).year()))")
+                    Text("\(summary.visitCount) visit\(summary.visitCount == 1 ? "" : "s") · \(summary.visitCount > 1 ? "last " : "")\(last.formatted(.dateTime.month(.abbreviated).year()))")
                         .font(.caption).foregroundStyle(.tertiary)
                 }
             }

@@ -35,7 +35,7 @@ export function OrderMenu({ data, placeId, dishes, onAdd, onRemoveOne }: {
       return {
         key: looseDishKey(d.item.name), name: d.item.name, section: d.item.section, price: d.item.price,
         ours: d.latest.kind === 'joint' ? DISH[d.latest.value] : d.latest.kind === 'split' ? '↔' : undefined,
-        sub: `Ordered ${d.timesOrdered === 1 ? 'once' : `${d.timesOrdered} times`}${last ? ` · last ${longDate(last)}` : ''}`,
+        sub: `Ordered ${d.timesOrdered === 1 ? 'once' : `${d.timesOrdered} times`}${last ? ` · ${d.timesOrdered > 1 ? 'last ' : ''}${longDate(last)}` : ''}`,
       };
     });
     const seen = new Set(beforeList.map((e) => e.key));

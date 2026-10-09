@@ -175,7 +175,7 @@ struct AddToOrderSheet: View {
         }
     }
 
-    /// "Ordered 3 times · last Mar 4"
+    /// "Ordered 3 times · last Mar 4", or "Ordered once · Mar 4"
     private func lastOrderedText(_ placeItem: PlaceItem) -> String? {
         let visits = (visit.place?.visits ?? []).filter { other in
             other.id != visit.id && other.deletedAt == nil
@@ -183,7 +183,7 @@ struct AddToOrderSheet: View {
         }
         guard let last = visits.map(\.startedAt).max() else { return placeItem.price }
         let times = visits.count == 1 ? "Ordered once" : "Ordered \(visits.count) times"
-        return [times, "last \(last.formatted(date: .abbreviated, time: .omitted))", placeItem.price]
+        return [times, (visits.count > 1 ? "last " : "") + last.formatted(date: .abbreviated, time: .omitted), placeItem.price]
             .compactMap { $0 }.joined(separator: " · ")
     }
 

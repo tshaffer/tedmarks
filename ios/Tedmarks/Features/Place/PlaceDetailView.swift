@@ -316,7 +316,7 @@ struct PlaceDetailView: View {
     private func visitsLine(_ visits: [Visit]) -> String {
         guard let last = visits.first else { return "No visits recorded" }
         let count = "\(visits.count) visit\(visits.count == 1 ? "" : "s")"
-        return "\(count) · last \(last.startedAt.formatted(date: .abbreviated, time: .omitted))"
+        return "\(count) · \(visits.count > 1 ? "last " : "")\(last.startedAt.formatted(date: .abbreviated, time: .omitted))"
     }
 
     private var todayName: String {

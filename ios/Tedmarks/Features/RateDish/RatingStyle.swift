@@ -29,7 +29,7 @@ extension ItemRatingValue: RatingStyle {
 
 extension VerdictValue: RatingStyle {
     /// Display order on buttons: 👎 👌 👍
-    static var buttonOrder: [VerdictValue] { [.wontReturn, .tryAgain, .wouldReturn] }
+    static var buttonOrder: [VerdictValue] { [.wouldReturn, .tryAgain, .wontReturn] }
     var label: String {
         switch self {
         case .wontReturn: "Won't return"

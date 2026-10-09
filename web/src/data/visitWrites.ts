@@ -35,10 +35,8 @@ export interface VisitForm {
   place: { kind: 'ours'; placeId: string } | { kind: 'google'; details: NearbyPlace };
   /** Existing visit when editing. */
   visitId?: string;
-  /** YYYY-MM-DD in the browser's time zone. */
+  /** YYYY-MM-DD in the browser's time zone (visits are recorded by date, not time). */
   date: string;
-  /** HH:MM, optional. */
-  time?: string;
   participantIds: string[];
   /** Guests typed in that don't exist yet (become people). */
   newGuests: string[];
@@ -53,12 +51,14 @@ export const randomIds: Ids = { next: () => crypto.randomUUID() };
 const meta = (id: string, now: string) => ({ id, createdAt: now, createdBy: TED, modifiedAt: now, modifiedBy: TED });
 const patch = (id: string, now: string, fields: Record<string, unknown>): Doc => ({ id, modifiedAt: now, modifiedBy: TED, ...fields });
 
-/** The visit's time: the date at the given time, or midday (so it shows as that day anywhere nearby). */
-export function startedAtIso(date: string, time?: string): string {
+/** A visit on this date: midday, so it shows as that day anywhere nearby. */
+export function startedAtIso(date: string): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  const [hh, mm] = (time || '12:00').split(':').map(Number) as [number, number];
-  return new Date(y, m - 1, d, hh, mm).toISOString();
+  return new Date(y, m - 1, d, 12, 0).toISOString();
 }
+
+/** YYYY-MM-DD for a stored time, in the browser's time zone. */
+export const localDate = (iso: string) => new Date(iso).toLocaleDateString('en-CA');
 
 export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new Date().toISOString(), ids: Ids = randomIds): { changes: Changes; visitId: string; placeId: string } {
   const changes: Changes = {};
@@ -97,10 +97,13 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
   }
 
   // The visit.
-  const startedAt = startedAtIso(form.date, form.time);
+  const startedAt = startedAtIso(form.date);
   const visitId = form.visitId ?? ids.next();
   if (form.visitId) {
-    add('visits', patch(visitId, now, { startedAt, endedAt: startedAt, participantIds }));
+    // Same date: leave the visit's times alone (a visit from the phone keeps when it started and ended).
+    const existing = data.visits.get(form.visitId);
+    const moved = !existing || localDate(existing.startedAt) !== form.date;
+    add('visits', patch(visitId, now, { ...(moved ? { startedAt, endedAt: startedAt } : {}), participantIds }));
   } else {
     const firstVisit = ![...data.visits.values()].some((v) => v.placeId === placeId);
     add('visits', {

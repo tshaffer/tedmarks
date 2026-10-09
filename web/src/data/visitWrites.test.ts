@@ -54,6 +54,22 @@ describe('adding a past visit', () => {
 });
 
 describe('editing a visit', () => {
+  test('keeps the visit’s own times unless the date changes', () => {
+    let data = records();
+    const first = planVisitSave(data, baseForm, NOW, counter());
+    data = apply(data, first.changes);
+    // As if recorded on the phone: started 6:40 pm, ended 8:05 pm.
+    const visit = data.visits.get(first.visitId)!;
+    const started = new Date(2026, 8, 20, 18, 40).toISOString(), ended = new Date(2026, 8, 20, 20, 5).toISOString();
+    data.visits.set(visit.id, { ...visit, startedAt: started, endedAt: ended });
+
+    const same = apply(data, planVisitSave(data, { ...baseForm, visitId: visit.id, participantIds: [TED] }, NOW, counter()).changes);
+    expect(same.visits.get(visit.id)).toMatchObject({ startedAt: started, endedAt: ended, participantIds: [TED] });
+
+    const moved = apply(data, planVisitSave(data, { ...baseForm, visitId: visit.id, date: '2026-09-21' }, NOW, counter()).changes);
+    expect(moved.visits.get(visit.id)).toMatchObject({ startedAt: startedAtIso('2026-09-21'), endedAt: startedAtIso('2026-09-21') });
+  });
+
   test('changes ratings in place, removes dropped dishes, clears the verdict', () => {
     let data = records();
     const first = planVisitSave(data, {

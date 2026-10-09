@@ -9,7 +9,7 @@ import { OrderMenu } from './OrderMenu.js';
 import { placeDetails, pushChanges, refreshPlace } from '../api.js';
 import { DISH, VERDICT, visitSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
-import { LORI, TED, planVisitSave, type DishRow, type VisitForm } from '../data/visitWrites.js';
+import { LORI, TED, localDate, planVisitSave, type DishRow, type VisitForm } from '../data/visitWrites.js';
 
 export type VisitTarget =
   | { kind: 'ours'; placeId: string; visitId?: string }
@@ -39,7 +39,6 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
   // Form state, filled from the visit when editing.
   const initial = useMemo(() => initialForm(data, editing?.id), [data, editing?.id]);
   const [date, setDate] = useState(initial.date);
-  const [time, setTime] = useState(initial.time);
   const [participants, setParticipants] = useState<string[]>(initial.participantIds);
   const [newGuests, setNewGuests] = useState<string[]>([]);
   const [guestName, setGuestName] = useState('');
@@ -82,7 +81,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
     try {
       const form: VisitForm = {
         place: place ? { kind: 'ours', placeId: place.id } : { kind: 'google', details: google! },
-        visitId: editing?.id, date, time: time || undefined,
+        visitId: editing?.id, date,
         participantIds: participants, newGuests, dishes, verdict, notes,
       };
       const { changes, placeId: savedPlace, visitId } = planVisitSave(data, form);
@@ -105,10 +104,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
           {target.kind === 'google' && !place && !google && !error && <Stack direction="row" spacing={1} alignItems="center"><CircularProgress size={18} /><Typography>Looking up the restaurant…</Typography></Stack>}
 
           <Stack direction="row" spacing={3} alignItems="flex-end" flexWrap="wrap" useFlexGap>
-          <Stack direction="row" spacing={2}>
-            <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 200 }} />
-            <TextField label="Time (optional)" type="time" value={time} onChange={(e) => setTime(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 170 }} />
-          </Stack>
+          <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 200 }} />
 
           <Box>
             <Typography variant="caption" fontWeight={600} color="text.secondary">WHO WAS THERE</Typography>
@@ -171,7 +167,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
                 <Box>
                   <Typography variant="caption" fontWeight={600} color="text.secondary">WOULD YOU COME BACK?</Typography>
                   <Stack direction="row" spacing={1} sx={{ mt: 0.75 }}>
-                    {(['wontReturn', 'tryAgain', 'wouldReturn'] as const).map((v) => {
+                    {(['wouldReturn', 'tryAgain', 'wontReturn'] as const).map((v) => {
                       const on = verdict === v;
                       return (
                         <Button key={v} onClick={() => setVerdict(on ? undefined : v)}
@@ -232,9 +228,7 @@ function RatingButtons({ value, onChange }: { value?: ItemRatingValue | undefine
 /** The form's starting values: blank for a new visit, or the visit's own when editing. */
 export function initialForm(data: TedmarksRecords, visitId: string | undefined) {
   const visit = visitId ? data.visits.get(visitId) : undefined;
-  if (!visit) return { date: today(), time: '', participantIds: [TED, LORI], dishes: [] as DishRow[], verdict: undefined, notes: [] as { id?: string; text: string }[] };
-  const started = new Date(visit.startedAt);
-  const isMidday = started.getHours() === 12 && started.getMinutes() === 0;
+  if (!visit) return { date: today(), participantIds: [TED, LORI], dishes: [] as DishRow[], verdict: undefined, notes: [] as { id?: string; text: string }[] };
   const summary = visitSummary(data, visit);
   const dishes: DishRow[] = summary.dishes.map((d) => {
     const ratings = [...data.ratings.values()].filter((r) => r.subjectId === d.line.id);
@@ -245,8 +239,7 @@ export function initialForm(data: TedmarksRecords, visitId: string | undefined) 
   });
   const verdict = [...data.ratings.values()].find((r) => r.subjectId === visit.id && r.scope === 'joint')?.value as VerdictValue | undefined;
   return {
-    date: started.toLocaleDateString('en-CA'),
-    time: isMidday ? '' : started.toTimeString().slice(0, 5),
+    date: localDate(visit.startedAt),
     participantIds: visit.participantIds,
     dishes,
     verdict,

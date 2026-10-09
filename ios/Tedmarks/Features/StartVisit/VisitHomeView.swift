@@ -141,7 +141,7 @@ struct VisitHomeView: View {
                         .foregroundStyle(.orange)
                 }
             }
-            Text("Started \(visit.startedAt.formatted(date: .omitted, time: .shortened)) · \(names(for: visit))")
+            Text("Started \(visit.startedAt.formatted(date: .abbreviated, time: .omitted)) · \(names(for: visit))")
                 .font(.subheadline).foregroundStyle(.secondary)
 
             if !items.isEmpty {

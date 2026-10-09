@@ -24,7 +24,7 @@ struct AddToOrderSheet: View {
                     if let place = visit.place { MenuPanel(place: place, visit: visit) }
 
                     HStack(spacing: 8) {
-                        TextField("Dish name", text: $dishName)
+                        TextField("Search, or a dish not listed", text: $dishName)
                             .textFieldStyle(.roundedBorder)
                             .focused($isTypingName)
                             .submitLabel(.next)
@@ -34,28 +34,31 @@ struct AddToOrderSheet: View {
                             .disabled(trimmedName.isEmpty)
                     }
 
+                    rowSection(orderItems.isEmpty ? "Our order" : "Our order · \(orderItems.reduce(0) { $0 + $1.count })") {
+                        if orderItems.isEmpty {
+                            Text("Nothing yet. Tap + on a dish below, or type one.")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                                .padding(.vertical, 6)
+                        } else {
+                            ForEach(orderItems) { item in
+                                row(item.displayName, detail: item.placeItem?.price, count: item.count,
+                                    onAdd: { addOne(item) }, onRemove: { removeOne(item) })
+                            }
+                        }
+                    }
+
                     if !suggestions.isEmpty {
-                        chipSection(trimmedName.isEmpty ? "Ordered before" : "Matches") {
+                        rowSection(trimmedName.isEmpty ? "Ordered before" : "Ordered before · matches") {
                             ForEach(suggestions) { placeItem in
-                                chip(placeItem.name, systemImage: "plus") { add(placeItem) }
+                                row(placeItem.name, detail: lastOrderedText(placeItem), count: 0,
+                                    onAdd: { add(placeItem) }, onRemove: {})
                             }
                         }
                     }
 
                     if let place = visit.place {
-                        MenuChipSections(place: place, exclude: shownElsewhere, filter: trimmedName) { placeItem in
-                            chip(placeItem.name, systemImage: "plus") { add(placeItem) }
-                        }
-                    }
-
-                    chipSection(orderItems.isEmpty ? "Our order" : "Our order · \(orderItems.count)") {
-                        if orderItems.isEmpty {
-                            Text("Nothing yet. Type a dish or tap one above.")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                        } else {
-                            ForEach(orderItems) { item in
-                                chip(item.displayName, systemImage: "xmark", filled: true) { remove(item) }
-                            }
+                        MenuChipSections(place: place, exclude: shownElsewhere, filter: trimmedName, asRows: true) { placeItem in
+                            row(placeItem.name, detail: placeItem.price, count: 0, onAdd: { add(placeItem) }, onRemove: {})
                         }
                     }
                 }
@@ -86,40 +89,36 @@ struct AddToOrderSheet: View {
                 Button("Cancel", role: .cancel) { pendingRemoval = nil }
             }
             .onAppear {
-                // First visit: nothing to pick from, so go straight to typing.
-                if suggestions.isEmpty { isTypingName = true }
+                // First visit with no menu: nothing to pick from, so go straight to typing.
+                if suggestions.isEmpty && (visit.place?.latestMenuId == nil) { isTypingName = true }
             }
         }
     }
 
     // MARK: - Pieces
 
-    private func chipSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func rowSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased()).font(.caption.weight(.medium)).foregroundStyle(.secondary)
-            FlowLayout(spacing: 8) { content() }
+            VStack(spacing: 0) { content() }
         }
     }
 
-    private func chip(_ title: String, systemImage: String, filled: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Text(title).lineLimit(1)
-                Image(systemName: systemImage).font(.caption2.weight(.bold)).foregroundStyle(.secondary)
-            }
-            .font(.subheadline.weight(.medium))
-            .padding(.horizontal, 13)
-            .padding(.vertical, 8)
-            .background {
-                if filled {
-                    Capsule().fill(Color(.secondarySystemFill))
-                } else {
-                    Capsule().strokeBorder(Color.secondary.opacity(0.35))
+    /// A dish with a stepper, like a shopping list: [+] at 0, [−] n [+] once ordered.
+    private func row(_ name: String, detail: String?, count: Int, onAdd: @escaping () -> Void, onRemove: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name).font(.body.weight(count > 0 ? .semibold : .regular))
+                if let detail, !detail.isEmpty {
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .fixedSize()
+            Spacer(minLength: 8)
+            OrderStepper(count: count, name: name, onAdd: onAdd, onRemove: onRemove)
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+        .background(count > 0 ? Color.orange.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Logic
@@ -148,24 +147,44 @@ struct AddToOrderSheet: View {
     private func addTyped() {
         let name = trimmedName
         guard !name.isEmpty else { return }
-        perform { try DishCapture.addItem(named: name, to: visit, addedVia: .order, in: context) }
+        perform { try DishCapture.addOne(named: name, to: visit, addedVia: .order, in: context) }
         dishName = ""
         isTypingName = true
     }
 
     private func add(_ placeItem: PlaceItem) {
-        perform { try DishCapture.addItem(placeItem, to: visit, addedVia: .order, in: context) }
+        perform { try DishCapture.addOne(placeItem, to: visit, addedVia: .order, in: context) }
         dishName = ""
     }
 
-    /// Unrated dishes go right away; a rated one asks first so a stray tap doesn't lose its rating.
-    private func remove(_ item: VisitItem) {
+    private func addOne(_ item: VisitItem) {
+        guard let placeItem = item.placeItem else { return }
+        perform { try DishCapture.addOne(placeItem, to: visit, addedVia: .order, in: context) }
+    }
+
+    /// One fewer. The last one of an unrated dish goes right away; a rated one asks first so a
+    /// stray tap doesn't lose its rating.
+    private func removeOne(_ item: VisitItem) {
         let isRated = !((try? DishCapture.ratings(for: item.id, in: context)) ?? []).isEmpty
-        if isRated {
+        if item.count > 1 {
+            perform { try DishCapture.removeOne(item, in: context) }
+        } else if isRated {
             pendingRemoval = item
         } else {
             perform { try DishCapture.removeItem(item, in: context) }
         }
+    }
+
+    /// "Ordered 3 times · last Mar 4"
+    private func lastOrderedText(_ placeItem: PlaceItem) -> String? {
+        let visits = (visit.place?.visits ?? []).filter { other in
+            other.id != visit.id && other.deletedAt == nil
+                && DishCapture.orderItems(for: other).contains { $0.placeItem?.id == placeItem.id }
+        }
+        guard let last = visits.map(\.startedAt).max() else { return placeItem.price }
+        let times = visits.count == 1 ? "Ordered once" : "Ordered \(visits.count) times"
+        return [times, "last \(last.formatted(date: .abbreviated, time: .omitted))", placeItem.price]
+            .compactMap { $0 }.joined(separator: " · ")
     }
 
     private func perform(_ action: () throws -> Void) {
@@ -173,6 +192,32 @@ struct AddToOrderSheet: View {
             try action()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+}
+
+/// [−] n [+], or just [+] at 0.
+private struct OrderStepper: View {
+    let count: Int
+    let name: String
+    let onAdd: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            if count > 0 {
+                Button(action: onRemove) { Image(systemName: "minus").frame(width: 34, height: 30) }
+                    .accessibilityLabel("One less \(name)")
+                Text("\(count)").font(.subheadline.weight(.bold)).monospacedDigit().frame(minWidth: 16)
+            }
+            Button(action: onAdd) { Image(systemName: "plus").frame(width: 34, height: 30) }
+                .accessibilityLabel("Add \(name)")
+        }
+        .font(.subheadline.weight(.bold))
+        .foregroundStyle(count > 0 ? Color.orange : Color.secondary)
+        .buttonStyle(.plain)
+        .background {
+            Capsule().strokeBorder(count > 0 ? Color.orange : Color.secondary.opacity(0.35))
         }
     }
 }

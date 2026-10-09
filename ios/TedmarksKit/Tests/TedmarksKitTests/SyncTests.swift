@@ -323,3 +323,30 @@ private let doppio = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", a
     #expect(place.deletedAt == nil)
     #expect(try context.fetch(FetchDescriptor<Place>()).count == 1)
 }
+
+@MainActor
+@Test func dishQuantitiesSyncAndGoBackToOne() async throws {
+    do {
+        let server = FakeServer()
+        let a = try Phone(server: server)
+        let visit = try VisitStarter.startVisit(at: doppio, participantIds: [Household.tedId], in: a.context)
+        let dish = try #require(try DishCapture.addOne(named: "Arancini", to: visit, addedVia: .order, in: a.context))
+        // A line that never had a quantity sends no quantity field.
+        #expect(SyncEncoder.record(dish)?["quantity"] == nil)
+        try DishCapture.addOne(named: "Arancini", to: visit, addedVia: .order, in: a.context)
+        await a.engine.sync()
+
+        let b = try Phone(server: server)
+        await b.engine.sync()
+        let bVisit = try #require(try b.visits().first)
+        let bDish = try #require(DishCapture.orderItems(for: bVisit).first)
+        #expect(bDish.count == 2)
+
+        // Back to one: null clears it on the server and the other phone.
+        try DishCapture.removeOne(dish, in: a.context)
+        #expect(SyncEncoder.record(dish)?["quantity"] == .null)
+        await a.engine.sync()
+        await b.engine.sync()
+        #expect(bDish.count == 1 && bDish.deletedAt == nil)
+    }
+}

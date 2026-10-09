@@ -134,11 +134,12 @@ struct MenuPanel: View {
     }
 }
 
-/// "On the menu" chips, grouped by the menu's sections. `exclude` hides dishes shown elsewhere.
+/// "On the menu" chips (or rows), grouped by the menu's sections. `exclude` hides dishes shown elsewhere.
 struct MenuChipSections<Chip: View>: View {
     let place: Place
     let exclude: Set<UUID>
     let filter: String
+    var asRows = false
     @ViewBuilder let chip: (PlaceItem) -> Chip
 
     @Environment(\.modelContext) private var context
@@ -157,8 +158,12 @@ struct MenuChipSections<Chip: View>: View {
                 Text((index == 0 ? "On the menu · " : "") + (section.title ?? "Other"))
                     .textCase(.uppercase)
                     .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                FlowLayout(spacing: 8) {
-                    ForEach(section.items) { chip($0) }
+                if asRows {
+                    VStack(spacing: 0) { ForEach(section.items) { chip($0) } }
+                } else {
+                    FlowLayout(spacing: 8) {
+                        ForEach(section.items) { chip($0) }
+                    }
                 }
             }
         }

@@ -84,3 +84,19 @@ private struct Fixture {
 @Test func normalizesNamesLikeTypeScript() {
     #expect(normalizeItemName("  Doppio   Zero PIZZA ") == "doppio zero pizza")
 }
+
+@MainActor
+@Test func addOneCountsUpAndRemoveOneCountsDown() throws {
+    let f = try Fixture()
+    let line = try #require(try DishCapture.addOne(named: "Arancini", to: f.visit, addedVia: .order, in: f.context))
+    #expect(line.count == 1 && line.quantity == nil && line.orderLabel == "Arancini")
+    try DishCapture.addOne(named: "arancini", to: f.visit, addedVia: .order, in: f.context)
+    #expect(line.count == 2 && line.orderLabel == "Arancini ×2")
+    #expect(DishCapture.orderItems(for: f.visit).count == 1)
+
+    try DishCapture.removeOne(line, in: f.context)
+    #expect(line.count == 1 && line.deletedAt == nil)
+    try DishCapture.removeOne(line, in: f.context)
+    #expect(line.deletedAt != nil)
+    #expect(DishCapture.orderItems(for: f.visit).isEmpty)
+}

@@ -38,7 +38,7 @@ struct RateDishSheet: View {
                     if !orderItems.isEmpty {
                         chipSection("Our order") {
                             ForEach(orderItems) { item in
-                                dishChip(item.displayName, badge: badge(for: item), selected: selection == .orderItem(item)) {
+                                dishChip(item.orderLabel, badge: badge(for: item), selected: selection == .orderItem(item)) {
                                     select(.orderItem(item))
                                 }
                             }

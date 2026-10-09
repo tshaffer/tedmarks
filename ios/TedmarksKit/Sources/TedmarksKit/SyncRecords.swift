@@ -189,7 +189,11 @@ enum SyncEncoder {
 
     static func record(_ item: VisitItem) -> SyncRecord? {
         guard let visit = item.visit else { return nil }
-        return base(id: item.id, createdAt: item.createdAt, modifiedAt: item.modifiedAt, deletedAt: item.deletedAt)
+        var record = base(id: item.id, createdAt: item.createdAt, modifiedAt: item.modifiedAt, deletedAt: item.deletedAt)
+        // Only lines that have ever had a quantity carry the field (null once back to one), so
+        // every other line's record — and its sync hash — is unchanged.
+        if item.quantity != nil { record["quantity"] = item.count > 1 ? .number(Double(item.count)) : .null }
+        return record
             .merging([
                 "visitId": SyncValue.id(visit.id),
                 "placeItemId": SyncValue.id(item.placeItem?.id),
@@ -528,6 +532,11 @@ enum SyncDecoder {
             item.ordered = record["ordered"]?.bool ?? true
             item.addedViaRaw = addedVia.rawValue
             item.sortOrder = sortOrder
+            if let quantity = record["quantity"]?.number, quantity > 1 {
+                item.quantity = Int(quantity)
+            } else if item.quantity != nil {
+                item.quantity = 1
+            }
             item.createdAt = createdAt
             item.modifiedAt = modifiedAt
             item.deletedAt = deletedAt

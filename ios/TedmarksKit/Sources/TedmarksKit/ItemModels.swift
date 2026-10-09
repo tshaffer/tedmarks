@@ -47,11 +47,16 @@ public final class VisitItem {
     public var ordered: Bool
     public var addedViaRaw: String
     public var sortOrder: Int
+    /// How many were ordered; nil (never more than one) or 1 means one. Rated once whatever the count.
+    public var quantity: Int?
     public var createdAt: Date
     public var modifiedAt: Date
     public var deletedAt: Date?
 
     public var displayName: String { placeItem?.name ?? placeholderLabel ?? "Dish" }
+    public var count: Int { max(quantity ?? 1, 1) }
+    /// "Arancini ×2" when more than one was ordered.
+    public var orderLabel: String { count > 1 ? "\(displayName) ×\(count)" : displayName }
 
     public init(
         id: UUID = UUID(), visit: Visit, placeItem: PlaceItem?, placeholderLabel: String? = nil,

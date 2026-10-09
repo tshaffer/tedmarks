@@ -140,7 +140,7 @@ struct WrapUpSheet: View {
                 // Tap the name for this dish's notes.
                 Button { notesForDish = item } label: {
                     HStack(spacing: 4) {
-                        Text(item.displayName).font(.body.weight(.medium)).foregroundStyle(.primary)
+                        Text(item.orderLabel).font(.body.weight(.medium)).foregroundStyle(.primary)
                         Image(systemName: dishNotes.isEmpty ? "square.and.pencil" : "note.text")
                             .font(.caption).foregroundStyle(.secondary)
                     }

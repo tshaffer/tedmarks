@@ -51,6 +51,41 @@ public enum DishCapture {
         return item
     }
 
+    /// One more of a dish: adds it to our order, or makes an ordered dish ×2, ×3…
+    @discardableResult
+    public static func addOne(
+        _ placeItem: PlaceItem, to visit: Visit, addedVia: VisitItemAddedVia, in context: ModelContext, now: Date = .now
+    ) throws -> VisitItem {
+        guard let existing = orderItems(for: visit).first(where: { $0.placeItem?.id == placeItem.id }) else {
+            return try addItem(placeItem, to: visit, addedVia: addedVia, in: context, now: now)
+        }
+        existing.quantity = existing.count + 1
+        existing.modifiedAt = now
+        visit.modifiedAt = now
+        try context.save()
+        return existing
+    }
+
+    /// One more of a dish typed by name (a new place dish if we've never had it).
+    @discardableResult
+    public static func addOne(
+        named name: String, to visit: Visit, addedVia: VisitItemAddedVia, in context: ModelContext, now: Date = .now
+    ) throws -> VisitItem? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let place = visit.place else { return nil }
+        let placeItem = placeItem(named: trimmed, at: place, source: addedVia == .voice ? "voice" : "order", in: context, now: now)
+        return try addOne(placeItem, to: visit, addedVia: addedVia, in: context, now: now)
+    }
+
+    /// One fewer of a dish; the last one leaves our order (with its ratings).
+    public static func removeOne(_ item: VisitItem, in context: ModelContext, now: Date = .now) throws {
+        guard item.count > 1 else { return try removeItem(item, in: context, now: now) }
+        item.quantity = item.count - 1
+        item.modifiedAt = now
+        item.visit?.modifiedAt = now
+        try context.save()
+    }
+
     /// Adds "Dish N" for a dish we'll name later (receipt, voice, or editing).
     @discardableResult
     public static func addUnnamedItem(to visit: Visit, in context: ModelContext, now: Date = .now) throws -> VisitItem {

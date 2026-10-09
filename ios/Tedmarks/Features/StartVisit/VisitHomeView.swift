@@ -154,7 +154,7 @@ struct VisitHomeView: View {
                             sheet = .rateDish(visit, item)
                         } label: {
                             HStack(spacing: 5) {
-                                Text(item.displayName).lineLimit(1)
+                                Text(item.orderLabel).lineLimit(1)
                                 if let badge {
                                     Text(badge).font(.footnote)
                                 } else {

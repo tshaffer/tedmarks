@@ -8,6 +8,7 @@ export interface AuthConfig {
   servicesId: string | undefined;
   /** Public origin, e.g. https://tedmarks-api-….herokuapp.com (must match Apple's return URL). */
   publicUrl: string | undefined;
+  /** Apple user IDs allowed in, each optionally with the name to show: "001234.abcd=Ted". */
   allowedAppleUserIds: string[];
   sessionSecret: string | undefined;
   verifier: AppleTokenVerifier;
@@ -27,6 +28,7 @@ function setCookie(res: Response, name: string, value: string, maxAgeSec: number
  */
 export function authRoutes(config: AuthConfig): Router {
   const router = Router();
+  const allowed = allowlist(config.allowedAppleUserIds);
   const configured = Boolean(config.servicesId && config.publicUrl && config.sessionSecret);
   const callbackUrl = `${config.publicUrl}/auth/apple/callback`;
 
@@ -34,10 +36,10 @@ export function authRoutes(config: AuthConfig): Router {
   router.get('/me', (req, res) => {
     const session = sessionFrom(req.get('cookie'), config.sessionSecret);
     if (!session && config.openForDevelopment) {
-      res.json({ signedIn: true, appleUserId: 'local-development', configured });
+      res.json({ signedIn: true, appleUserId: 'local-development', name: 'Ted', configured });
       return;
     }
-    res.json({ signedIn: Boolean(session), appleUserId: session?.appleUserId ?? null, configured });
+    res.json({ signedIn: Boolean(session), appleUserId: session?.appleUserId ?? null, name: (session && allowed.get(session.appleUserId)) || null, configured });
   });
 
   /** GET /auth/apple/start — off to Apple's sign-in page. */
@@ -83,7 +85,7 @@ export function authRoutes(config: AuthConfig): Router {
       res.redirect('/signin?error=invalid');
       return;
     }
-    if (!config.allowedAppleUserIds.includes(appleUserId)) {
+    if (!allowed.has(appleUserId)) {
       console.warn('[auth] Sign-in from an Apple account not on the allowlist');
       res.redirect(`/signin?denied=${encodeURIComponent(appleUserId)}`);
       return;
@@ -100,4 +102,12 @@ export function authRoutes(config: AuthConfig): Router {
   });
 
   return router;
+}
+
+/** Apple user ID → name to show ('' when the entry has none). */
+export function allowlist(entries: string[]): Map<string, string> {
+  return new Map(entries.map((entry) => {
+    const [id = '', name = ''] = entry.split('=').map((part) => part.trim());
+    return [id, name] as const;
+  }).filter(([id]) => id));
 }

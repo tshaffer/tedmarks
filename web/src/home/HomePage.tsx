@@ -33,7 +33,7 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   // Back from a Place page, that place stays chosen.
   const location = useLocation();
   const navigate = useNavigate();
-  const arrived = location.state as { placeId?: string; focus?: boolean; areas?: Area[]; areaIndex?: number } | null;
+  const arrived = location.state as { placeId?: string; focus?: boolean; areas?: Area[]; areaIndex?: number; search?: SearchResult } | null;
   const [selection, setSelection] = useState<Selection>(() => (arrived?.placeId ? { kind: 'ours', placeId: arrived.placeId } : null));
   // From a Places row's 📍: center the map on that place (once the map is ready).
   const [focusId] = useState(() => (arrived?.focus ? arrived.placeId ?? null : null));
@@ -146,6 +146,14 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
     }
   }, [map, chooseGoogle]);
 
+  // From the top bar's search on another page: do it here once the map is ready.
+  const [arrivedSearch, setArrivedSearch] = useState(() => arrived?.search ?? null);
+  useEffect(() => {
+    if (!map || !arrivedSearch) return;
+    setArrivedSearch(null);
+    onSearch(arrivedSearch);
+  }, [map, arrivedSearch, onSearch]);
+
   useEffect(() => {
     if (!map || !data || !focusId) return;
     const place = data.places.get(focusId);
@@ -185,7 +193,7 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} onResult={onSearch} /> : null} />
+      <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} width={360} onResult={onSearch} /> : null} />
       {error && <Alert severity="error">{error}</Alert>}
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <PlaceList items={inView} matching={matching} filters={filters} onFilters={setFilters} cuisines={cuisines} tags={tags} onManageTags={actions.manageTags} selectedId={chosenId}

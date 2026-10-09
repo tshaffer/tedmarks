@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from 'jose';
 import { createApp } from '../server.js';
 import { AppleTokenVerifier } from './appleAuth.js';
+import { allowlist } from './authRoutes.js';
 import { sign, verify } from './session.js';
 
 const SERVICES_ID = 'com.tedshaffer.tedmarks.web';
@@ -52,7 +53,7 @@ test('signed sessions verify, expire, and reject tampering', () => {
 });
 
 test('Sign in with Apple: allowlisted account gets a session that opens the API', async () => {
-  const { server, base, token } = await setup(['ted-apple-id']);
+  const { server, base, token } = await setup(['ted-apple-id = Ted', 'lori-apple-id']);
   try {
     assert.equal((await fetch(`${base}/sync/pull?since=0`)).status, 401);
     const { state, nonce, cookie } = await start(base);
@@ -63,7 +64,7 @@ test('Sign in with Apple: allowlisted account gets a session that opens the API'
     // Past the access check (503: no database in this test app).
     assert.equal((await fetch(`${base}/sync/pull?since=0`, { headers: { cookie: session } })).status, 503);
     const me = await (await fetch(`${base}/auth/me`, { headers: { cookie: session } })).json();
-    assert.deepEqual(me, { signedIn: true, appleUserId: 'ted-apple-id', configured: true });
+    assert.deepEqual(me, { signedIn: true, appleUserId: 'ted-apple-id', name: 'Ted', configured: true });
     // The phone's key still works.
     assert.equal((await fetch(`${base}/sync/pull?since=0`, { headers: { 'x-tedmarks-key': 'phone-key' } })).status, 503);
   } finally {
@@ -93,4 +94,8 @@ test('Sign in with Apple: unknown accounts, wrong nonce, wrong audience and stal
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
+});
+
+test('allowlist entries may carry the name to show', () => {
+  assert.deepEqual([...allowlist(['ted-id=Ted', ' lori-id ', '', 'x = Lori Shaffer']).entries()], [['ted-id', 'Ted'], ['lori-id', ''], ['x', 'Lori Shaffer']]);
 });

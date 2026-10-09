@@ -1,10 +1,10 @@
 import { Box } from '@mui/material';
 import { useEffect, useRef } from 'react';
 
-export interface SearchResult { googlePlaceId: string; location: google.maps.LatLngLiteral | null; viewport: google.maps.LatLngBounds | null; isRestaurant: boolean }
+export interface SearchResult { googlePlaceId: string; location: google.maps.LatLngLiteral | null; viewport: google.maps.LatLngBoundsLiteral | null; isRestaurant: boolean }
 
 /** Google's place search box: restaurants by name, or a town / address to move the map. */
-export function SearchBox({ bias, onResult }: { bias: google.maps.LatLngBounds | null; onResult: (result: SearchResult) => void }) {
+export function SearchBox({ bias, onResult, width = 440 }: { bias: google.maps.LatLngBounds | null; onResult: (result: SearchResult) => void; width?: number }) {
   const host = useRef<HTMLDivElement>(null);
   const element = useRef<google.maps.places.PlaceAutocompleteElement | null>(null);
   const handler = useRef(onResult);
@@ -21,7 +21,7 @@ export function SearchBox({ bias, onResult }: { bias: google.maps.LatLngBounds |
       handler.current({
         googlePlaceId: place.id,
         location: place.location?.toJSON() ?? null,
-        viewport: place.viewport ?? null,
+        viewport: place.viewport?.toJSON() ?? null,
         isRestaurant: types.some((t) => ['restaurant', 'food', 'cafe', 'bar', 'bakery', 'meal_takeaway', 'coffee_shop'].includes(t)),
       });
     });
@@ -33,5 +33,5 @@ export function SearchBox({ bias, onResult }: { bias: google.maps.LatLngBounds |
     if (element.current && bias) element.current.locationBias = bias;
   }, [bias]);
 
-  return <Box ref={host} sx={{ width: 440, '& gmp-place-autocomplete': { width: '100%', colorScheme: 'light' } }} />;
+  return <Box ref={host} sx={{ width, '& gmp-place-autocomplete': { width: '100%', colorScheme: 'light' } }} />;
 }

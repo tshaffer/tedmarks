@@ -20,7 +20,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
-export interface Me { signedIn: boolean; appleUserId: string | null; configured: boolean }
+export interface Me { signedIn: boolean; appleUserId: string | null; /** From the server's allowlist ("…=Ted"). */ name?: string | null; configured: boolean }
 export const getMe = () => api<Me>('/auth/me');
 export const signOut = () => api<Me>('/auth/logout', { method: 'POST' });
 

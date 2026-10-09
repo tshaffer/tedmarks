@@ -71,14 +71,15 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   const googleBeforeCuisine = useMemo(() => (filters.showGoogle && !onlyIds && googleResults
     ? googleResults.filter((r) => !byGoogleId.has(r.googlePlaceId) && (r.googlePlaceId === chosenId || matchesGoogleExceptCuisine(r, filters)))
     : []), [googleResults, filters, onlyIds, byGoogleId, chosenId]);
-  // The restaurant just searched for: pinned while it's the chosen one (unless it's ours, or
-  // Google's area results already have it).
+  // The restaurant last searched for: pinned until the next search or the search is cleared
+  // (unless it's ours, or Google's area results already have it).
   const [searched, setSearched] = useState<AreaRestaurant | null>(null);
   const googleShown = useMemo(() => {
     const shown = googleBeforeCuisine.filter((r) => r.googlePlaceId === chosenId || matchesCuisine(cuisineOfGoogle(r), filters));
-    const extra = searched && searched.googlePlaceId === chosenId && !byGoogleId.has(searched.googlePlaceId) && !shown.some((r) => r.googlePlaceId === searched.googlePlaceId);
+    const extra = searched && !byGoogleId.has(searched.googlePlaceId) && !shown.some((r) => r.googlePlaceId === searched.googlePlaceId);
     return extra ? [...shown, searched] : shown;
   }, [googleBeforeCuisine, filters, chosenId, searched, byGoogleId]);
+  const clearSearched = useCallback(() => setSearched(null), []);
   const cuisines = useMemo(() => withCommonCuisines(cuisineCounts([
     ...oursBeforeCuisine.filter((s) => inViewNow(latLngOf(s.place))).map((s) => s.cuisine),
     ...googleBeforeCuisine.filter((r) => inViewNow({ lat: r.latitude, lng: r.longitude })).map(cuisineOfGoogle),
@@ -155,9 +156,11 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
         map.panBy(PANEL_WIDTH / 2, 0);
       }
     } else if (result.viewport) {
+      setSearched(null);
       autoSearch.current = true;
       map.fitBounds(result.viewport);
     } else if (result.location) {
+      setSearched(null);
       autoSearch.current = true;
       map.panTo(result.location);
     }
@@ -210,7 +213,7 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} width={360} onResult={onSearch} /> : null} />
+      <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} width={360} onResult={onSearch} onClear={clearSearched} /> : null} />
       {error && <Alert severity="error">{error}</Alert>}
       <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <PlaceList items={inView} matching={matching} filters={filters} onFilters={setFilters} cuisines={cuisines} tags={tags} onManageTags={actions.manageTags} selectedId={chosenId}

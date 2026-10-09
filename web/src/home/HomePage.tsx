@@ -20,6 +20,9 @@ import { cityAndTagChoices } from '../places/placesQuery.js';
 import type { Area } from '../places/areas.js';
 import { SearchBox, type SearchResult } from './SearchBox.js';
 
+/** The chosen place's panel, over the map's right side. */
+const PANEL_WIDTH = 420;
+
 type Selection = { kind: 'ours'; placeId: string } | { kind: 'google'; googlePlaceId: string } | null;
 
 /** Figma W1/W1b: choose a restaurant (search, a map pin, or a row), then act on it in the panel. */
@@ -68,7 +71,14 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   const googleBeforeCuisine = useMemo(() => (filters.showGoogle && !onlyIds && googleResults
     ? googleResults.filter((r) => !byGoogleId.has(r.googlePlaceId) && (r.googlePlaceId === chosenId || matchesGoogleExceptCuisine(r, filters)))
     : []), [googleResults, filters, onlyIds, byGoogleId, chosenId]);
-  const googleShown = useMemo(() => googleBeforeCuisine.filter((r) => r.googlePlaceId === chosenId || matchesCuisine(cuisineOfGoogle(r), filters)), [googleBeforeCuisine, filters, chosenId]);
+  // The restaurant just searched for: pinned while it's the chosen one (unless it's ours, or
+  // Google's area results already have it).
+  const [searched, setSearched] = useState<AreaRestaurant | null>(null);
+  const googleShown = useMemo(() => {
+    const shown = googleBeforeCuisine.filter((r) => r.googlePlaceId === chosenId || matchesCuisine(cuisineOfGoogle(r), filters));
+    const extra = searched && searched.googlePlaceId === chosenId && !byGoogleId.has(searched.googlePlaceId) && !shown.some((r) => r.googlePlaceId === searched.googlePlaceId);
+    return extra ? [...shown, searched] : shown;
+  }, [googleBeforeCuisine, filters, chosenId, searched, byGoogleId]);
   const cuisines = useMemo(() => withCommonCuisines(cuisineCounts([
     ...oursBeforeCuisine.filter((s) => inViewNow(latLngOf(s.place))).map((s) => s.cuisine),
     ...googleBeforeCuisine.filter((r) => inViewNow({ lat: r.latitude, lng: r.longitude })).map(cuisineOfGoogle),
@@ -136,7 +146,14 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
     if (!map) return;
     if (result.isRestaurant) {
       chooseGoogle(result.googlePlaceId);
-      if (result.location) { map.panTo(result.location); if ((map.getZoom() ?? 0) < 15) map.setZoom(16); }
+      if (result.location) {
+        // A pin for it, even before Google's restaurants here are looked up.
+        setSearched({ googlePlaceId: result.googlePlaceId, name: result.name, latitude: result.location.lat, longitude: result.location.lng, types: [], ...(result.rating !== null ? { rating: result.rating } : {}) });
+        if ((map.getZoom() ?? 0) < 15) map.setZoom(16);
+        map.panTo(result.location);
+        // Centered in the part of the map the place panel doesn't cover.
+        map.panBy(PANEL_WIDTH / 2, 0);
+      }
     } else if (result.viewport) {
       autoSearch.current = true;
       map.fitBounds(result.viewport);
@@ -221,7 +238,7 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
               onReady={setMap} onSelectOurs={(id) => chooseOurs(id)} onSelectGoogle={chooseGoogle} onIdle={onIdle} />
           )}
           {data && selection && (
-            <Paper elevation={0} sx={{ position: 'absolute', top: 16, right: 16, bottom: 16, width: 420, overflowY: 'auto', p: 2.5, borderRadius: 4, boxShadow: '0 6px 24px rgba(0,0,0,0.16)' }}>
+            <Paper elevation={0} sx={{ position: 'absolute', top: 16, right: 16, bottom: 16, width: PANEL_WIDTH, overflowY: 'auto', p: 2.5, borderRadius: 4, boxShadow: '0 6px 24px rgba(0,0,0,0.16)' }}>
               {selection.kind === 'ours' && selected
                 ? <OurPlacePanel key={selected.place.id} data={data} summary={selected} onClose={() => setSelection(null)} />
                 : selection.kind === 'google'

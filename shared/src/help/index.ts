@@ -58,7 +58,7 @@ Google's restaurants are only looked up when you ask: **Find Google's restaurant
 
 The list shows what's in the map view: our places nearest the center first, then Google's restaurants best rated first, with type, price, city, distance, and whether they're open now.
 
-- **Our places** show our verdict, what to order, the visits, Google's rating and hours, **Directions ↗**, and **+ Add a past visit**, **Menu**, want to go, and **Place page ›**. **On Google ▸** opens Google's own card.
+- **Our places** show our verdict, what we've ordered, the visits, Google's rating and hours, **Directions ↗**, and **+ Add a past visit**, **Menu**, want to go, and **Place page ›**. **On Google ▸** opens Google's own card.
 - **Google's restaurants** show Google's card (photos, hours, reviews) with **★ Save as want to go**, **Add a menu** and **Add a past visit**.
 
 ### Pins
@@ -84,7 +84,7 @@ The list shows what's in the map view: our places nearest the center first, then
 
 ### A place's page
 
-Click a row (or **Place page ›** on the map) for everything about a place: our **verdict**, **What to order**, the **visits**, our **review** and **tags**, any want-to-go note, **hours** from Google, and the latest **menu**. **Refresh from Google** updates its hours, rating, address and type. **Edit place**, **Merge dishes…** and **Delete place** are here too. **Back to the map** returns with this place chosen.`,
+Click a row (or **Place page ›** on the map) for everything about a place: our **verdict**, what we've **Ordered**, the **visits**, our **review** and **tags**, any want-to-go note, **hours** from Google, and the latest **menu**. **Refresh from Google** updates its hours, rating, address and type. **Edit place**, **Merge dishes…** and **Delete place** are here too. **Back to the map** returns with this place chosen.`,
   },
   {
     slug: 'visits',
@@ -122,16 +122,16 @@ Saving a visit to a Google restaurant adds it to Tedmarks as **been there**; a w
     slug: 'ratings-and-verdicts',
     title: 'Ratings and verdicts',
     category: 'Recording',
-    keywords: ['rating', 'verdict', 'would return', 'try again', "won't return", 'loved', 'good', 'skip', 'disagree', 'us', 'ted', 'lori', 'joint', 'what to order', 'order again', '0-10', 'refined rating'],
+    keywords: ['rating', 'verdict', 'would return', 'try again', "won't return", 'loved', 'good', 'skip', 'disagree', 'us', 'ted', 'lori', 'joint', 'what to order', 'ordered', 'order again', '0-10', 'refined rating'],
     body: `Tedmarks keeps two kinds of rating: each dish we ordered gets 😍 loved it, 👍 good, or 👎 skip it; each visit gets a verdict — 👍 would return, 👌 try again, or 👎 won't return. A place's verdict is from its latest visit with one.
 
 ### Joint unless we disagree
 
 Most of the time one rating speaks for both of us ("Us"). When we don't agree, rate each person separately (Ted / Lori in the visit form, or on the phone). Tedmarks shows one rating when everyone's is the same, and both side by side (↔ Ted 👎 · Lori 😍) when they differ.
 
-### What to order
+### Ordered
 
-On a place, What to order lists every dish once, grouped by its most recent rating: Order again, We disagree, Skip, Not rated. ×2 means we ordered it on two visits. Dishes no longer on the latest menu are greyed.
+On a place, Ordered lists every dish once, grouped by its most recent rating: Order again, We disagree, Skip, Not rated. ×2 means we ordered it on two visits. Dishes no longer on the latest menu are greyed.
 
 ### Our 0–10
 
@@ -144,7 +144,7 @@ Places brought over from memorapp keep their 0–10 score; it shows next to the 
     keywords: ['note', 'notes', 'comment', 'review', 'our review', 'dish note', 'visit note'],
     body: `Three kinds of notes, for three things:
 
-- **A dish's note** — about that dish on that visit ("ask for extra bread"). Add it beside the dish in the visit form, or on the phone when rating it or from Wrap up (tap the dish's name). Dish notes show under the dish in What to order.
+- **A dish's note** — about that dish on that visit ("ask for extra bread"). Add it beside the dish in the visit form, or on the phone when rating it or from Wrap up (tap the dish's name). Dish notes show under the dish in Ordered.
 - **A visit's notes** — anything that isn't about one dish: the service, the room, the occasion, who was there. At the bottom of the visit form, or in Wrap up on the phone.
 - **Our review** — what we think of the place overall. In **Edit place** (website or phone); it shows on the place.
 
@@ -206,7 +206,7 @@ Menus make ordering a tap — in the visit form here, and in What did you order?
     title: 'Merge dishes',
     category: 'Tidying up',
     keywords: ['merge', 'duplicate', 'same dish', 'dish names', 'clean up', 'not the same', 'aliases'],
-    body: `The same dish can end up under two names ("Margherita" and "Margherita Pizza", or a typo), which splits its history: two entries in What to order, each with half the ratings.
+    body: `The same dish can end up under two names ("Margherita" and "Margherita Pizza", or a typo), which splits its history: two entries in Ordered, each with half the ratings.
 
 **Merge dishes…** on a place's page fixes that. It suggests dishes that **look like the same dish**: choose which name to keep, or **Not the same** to dismiss it. You can also **pick dishes to merge** yourself.
 

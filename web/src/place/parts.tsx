@@ -12,13 +12,13 @@ import { WANT } from '../theme.js';
 export const longDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const verdictEmoji = Object.fromEntries(Object.entries(VERDICT).map(([k, v]) => [k, v.emoji]));
 
-/** "What to order" across every visit: each dish once, grouped by its latest rating. */
+/** "Ordered" across every visit: each dish once, grouped by its latest rating. */
 export function WhatToOrder({ data, placeId, visitCount, title = true }: { data: TedmarksRecords; placeId: string; visitCount: number; title?: boolean }) {
   const dishes = dishesAt(data, placeId);
   if (dishes.length === 0) return null;
   return (
     <Box>
-      {title && <Typography variant="caption" fontWeight={700} color="#c26a00">WHAT TO ORDER — {visitCount === 1 ? 'FROM 1 VISIT' : `FROM ALL ${visitCount} VISITS`}</Typography>}
+      {title && <Typography variant="caption" fontWeight={700} color="#c26a00">ORDERED — {visitCount === 1 ? 'FROM 1 VISIT' : `FROM ALL ${visitCount} VISITS`}</Typography>}
       {(['orderAgain', 'disagree', 'skip', 'unrated'] as const).map((group) => {
         const list = dishes.filter((d) => d.group === group);
         if (list.length === 0) return null;

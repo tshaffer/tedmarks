@@ -91,7 +91,7 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.6fr 1fr' }, gap: 2.5, alignItems: 'start' }}>
         <Stack spacing={2.5}>
-          <Card title={`What to order${summary.visits.length ? ` · from ${summary.visits.length === 1 ? '1 visit' : `all ${summary.visits.length} visits`}` : ''}`}
+          <Card title={`Ordered${summary.visits.length ? ` · from ${summary.visits.length === 1 ? '1 visit' : `all ${summary.visits.length} visits`}` : ''}`}
             action={dishCountAll > 1 ? <Action onClick={() => actions.mergeDishes(place.id)}>Merge dishes…{suggested ? ` (${suggested})` : ''}</Action> : undefined}>
             {summary.visits.length
               ? <WhatToOrder data={data} placeId={place.id} visitCount={summary.visits.length} title={false} />

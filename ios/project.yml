@@ -15,6 +15,9 @@ settings:
 packages:
   TedmarksKit:
     path: TedmarksKit
+  GoogleMaps:
+    url: https://github.com/googlemaps/ios-maps-sdk
+    from: 11.2.0
 targets:
   Tedmarks:
     type: application
@@ -29,6 +32,8 @@ targets:
       - path: Shared    # Live Activity views + button intents (also in TedmarksWidgets)
     dependencies:
       - package: TedmarksKit
+      - package: GoogleMaps
+        product: GoogleMaps
       - target: TedmarksWidgets
     entitlements:
       path: Tedmarks/Resources/Tedmarks.entitlements
@@ -43,6 +48,7 @@ targets:
         NSSupportsLiveActivities: true
         TedmarksAPIBaseURL: $(TEDMARKS_API_BASE_URL)
         TedmarksAPIKey: $(TEDMARKS_API_KEY)
+        TedmarksGoogleMapsKey: $(TEDMARKS_GOOGLE_MAPS_KEY)
         CFBundleURLTypes:
           - CFBundleURLName: com.tedshaffer.tedmarks
             CFBundleURLSchemes: [tedmarks]

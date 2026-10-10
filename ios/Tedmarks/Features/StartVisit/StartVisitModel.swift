@@ -44,6 +44,10 @@ final class StartVisitModel {
     private var morePageToken: String?
     private(set) var location: CLLocation?
     private var nearby: [NearbyPlace] = []
+    /// Where the nearby list was searched from (you, or the map after "Search this area").
+    private(set) var searchedCenter: CLLocationCoordinate2D?
+    /// A lookup in progress while the map stays up (a tapped Google icon, "Search this area").
+    var isBusy = false
     private let api = AppConfig.api
 
     var selectedPlace: NearbyPlace? {
@@ -65,7 +69,52 @@ final class StartVisitModel {
                 radiusMeters: NearbySearchSettings.radius()
             )
             nearby = PlaceRanking.rank(found, savedStatus: savedStatus)
+            searchedCenter = location.coordinate
             show(nearby)
+        } catch {
+            phase = .failed(Self.failure(for: error))
+        }
+    }
+
+    /// The map's "Search this area": restaurants around where the map is now.
+    func searchArea(_ center: CLLocationCoordinate2D, savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let found = try await api.nearbyPlaces(latitude: center.latitude, longitude: center.longitude, radiusMeters: NearbySearchSettings.radius())
+            nearby = PlaceRanking.rank(found, savedStatus: savedStatus)
+            searchedCenter = center
+            morePlaces = []
+            morePageToken = nil
+            moreState = .available
+            isShowingSearchResults = false
+            // Keep what's chosen if it's still here.
+            let chosen = selectedId
+            show(nearby)
+            if let chosen, nearby.contains(where: { $0.googlePlaceId == chosen }) { selectedId = chosen }
+        } catch {
+            phase = .failed(Self.failure(for: error))
+        }
+    }
+
+    /// One of Google's own restaurant icons on the map was tapped: look it up and choose it.
+    func choose(googlePlaceId: String) async {
+        if let known = (places + morePlaces).first(where: { $0.googlePlaceId == googlePlaceId }) {
+            selectedId = known.googlePlaceId
+            return
+        }
+        guard let location else { return }
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let place = try await api.placeDetails(
+                googlePlaceId: googlePlaceId,
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                sessionToken: UUID()
+            )
+            if isShowingSearchResults { places.append(place) } else { nearby.append(place); places = nearby }
+            selectedId = place.googlePlaceId
         } catch {
             phase = .failed(Self.failure(for: error))
         }
@@ -74,7 +123,9 @@ final class StartVisitModel {
     func search(savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
         let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let location else { return }
-        phase = .loading
+        if phase != .loaded { phase = .loading }
+        isBusy = true
+        defer { isBusy = false }
         do {
             let found = try await api.searchPlaces(
                 text,
@@ -138,7 +189,9 @@ final class StartVisitModel {
     func choose(_ suggestion: PlaceSuggestion) async {
         guard let location else { return }
         suggestionTask?.cancel()
-        phase = .loading
+        if phase != .loaded { phase = .loading }
+        isBusy = true
+        defer { isBusy = false }
         do {
             let place = try await api.placeDetails(
                 googlePlaceId: suggestion.googlePlaceId,

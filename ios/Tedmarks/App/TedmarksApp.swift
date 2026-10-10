@@ -1,4 +1,5 @@
 import AppIntents
+import GoogleMaps
 import SwiftData
 import SwiftUI
 import TedmarksKit
@@ -9,6 +10,7 @@ struct TedmarksApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        if let key = AppConfig.googleMapsKey { GMSServices.provideAPIKey(key) }
         MainActor.assumeIsolated {
             SyncEngine.shared.configure(transport: AppConfig.api, context: TedmarksStore.context)
             #if DEBUG

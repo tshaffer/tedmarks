@@ -1,9 +1,11 @@
+import CoreLocation
 import SwiftData
 import SwiftUI
 import TedmarksKit
 
 /// Figma 02 · Start visit — pick the place and who's here. The Visit tab's landing screen
 /// when no visit is in progress (`embedded`, inside that tab's navigation stack), or a sheet.
+/// With a Google Maps key the places are on a map (Figma 02 · map); without one, a list.
 struct StartVisitSheet: View {
     var embedded = false
 
@@ -19,6 +21,12 @@ struct StartVisitSheet: View {
     @State private var isAddingGuest = false
     @State private var newGuestName = ""
     @State private var saveError: String?
+    /// Where the map has settled (for "Search this area").
+    @State private var mapCenter: CLLocationCoordinate2D?
+    /// Pin glyphs for our been-there places: the verdict's emoji (or ? without one).
+    @State private var verdictGlyphs: [String: String] = [:]
+
+    private var usesMap: Bool { AppConfig.googleMapsKey != nil }
 
     var body: some View {
         if embedded {
@@ -36,8 +44,12 @@ struct StartVisitSheet: View {
 
     private var screen: some View {
         content
-            .navigationTitle("Start a visit")
-            .searchable(text: $model.searchText, isPresented: $model.isSearchPresented, prompt: "Somewhere else…")
+            // The map gets the room the title would take.
+            .navigationTitle(usesMap ? "" : "Start a visit")
+            .navigationBarTitleDisplayMode(usesMap ? .inline : .automatic)
+            .searchable(text: $model.searchText, isPresented: $model.isSearchPresented,
+                        placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: usesMap ? "Search a restaurant" : "Somewhere else…")
             .onSubmit(of: .search) { Task { await model.search(savedStatus: savedStatus) } }
             .onChange(of: model.searchText) { _, text in
                 if text.isEmpty { model.clearSearch() }
@@ -47,6 +59,7 @@ struct StartVisitSheet: View {
                 // Hidden while picking from suggestions, so it can't start a visit at the wrong place.
                 if !isShowingSuggestions { startButton }
             }
+        .onChange(of: model.places, initial: true) { refreshVerdicts() }
         .task {
         if participantIds.isEmpty {
             participantIds = Set(people.filter { $0.kind == .household }.map(\.id))
@@ -87,6 +100,9 @@ struct StartVisitSheet: View {
             ProgressView("Looking for restaurants…").frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed(let failure):
             failureView(failure)
+        case .loaded where usesMap:
+            // Suggestions cover the map rather than replace it, so it keeps its place and zoom.
+            mapContent.overlay { if isShowingSuggestions { suggestionList } }
         case .loaded where isShowingSuggestions:
             suggestionList
         case .loaded:
@@ -120,6 +136,106 @@ struct StartVisitSheet: View {
             }
             .refreshable { await model.load(savedStatus: savedStatus) }
         }
+    }
+
+    // MARK: - Map
+
+    private var mapContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack(alignment: .top) {
+                StartVisitMap(
+                    pins: pins,
+                    selectedId: model.selectedId,
+                    home: model.location?.coordinate,
+                    onSelect: { model.selectedId = $0 },
+                    onSelectGoogleIcon: { id in Task { await model.choose(googlePlaceId: id) } },
+                    onIdle: { mapCenter = $0 }
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                if model.isBusy {
+                    ProgressView()
+                        .padding(10)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.top, 10)
+                } else if movedAway, let center = mapCenter {
+                    Button {
+                        Task { await model.searchArea(center, savedStatus: savedStatus) }
+                    } label: {
+                        Label("Search this area", systemImage: "arrow.clockwise")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .padding(.top, 10)
+                }
+                if pins.isEmpty && !model.isBusy {
+                    Text(model.isShowingSearchResults ? "No matches." : "No restaurants found here. Search by name, or move the map and Search this area.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .padding(12)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.top, 54)
+                        .padding(.horizontal, 24)
+                }
+            }
+            .frame(maxHeight: .infinity)
+
+            if let place = model.selectedPlace {
+                placeRow(place)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+                Text("Tap a pin to choose somewhere else")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+            }
+
+            Text("WHO'S HERE").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            participantChips
+        }
+        .padding(.horizontal)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    /// Every place found, ours colored as on the website.
+    private var pins: [MapPin] {
+        var seen = Set<String>()
+        return (model.places + model.morePlaces).compactMap { place in
+            guard seen.insert(place.googlePlaceId).inserted else { return nil }
+            let saved = savedPlaces.first { $0.googlePlaceId == place.googlePlaceId }
+            switch saved?.status {
+            case .wantToGo:
+                return MapPin(place: place, kind: .wantToGo, glyph: saved?.interestLevel == .curious ? "☆" : "★")
+            case .beenThere:
+                return MapPin(place: place, kind: .beenThere, glyph: verdictGlyphs[place.googlePlaceId] ?? "?")
+            case nil:
+                return MapPin(place: place, kind: .google, glyph: "🍴")
+            }
+        }
+    }
+
+    /// The map has moved well away from where the places were searched.
+    private var movedAway: Bool {
+        guard let center = mapCenter, let searched = model.searchedCenter, !model.isShowingSearchResults else { return false }
+        let meters = CLLocation(latitude: center.latitude, longitude: center.longitude)
+            .distance(from: CLLocation(latitude: searched.latitude, longitude: searched.longitude))
+        return meters > Double(NearbySearchSettings.radius()) / 2
+    }
+
+    private func refreshVerdicts() {
+        guard usesMap, let insights = try? PlaceInsights(context: context) else { return }
+        var glyphs: [String: String] = [:]
+        for place in savedPlaces where place.status == .beenThere {
+            guard let id = place.googlePlaceId, model.places.contains(where: { $0.googlePlaceId == id }) else { continue }
+            glyphs[id] = switch insights.summary(for: place).verdict {
+            case .joint(let value): value.emoji
+            case .split: "↔"
+            case .none: "?"
+            }
+        }
+        verdictGlyphs = glyphs
     }
 
     private var isShowingSuggestions: Bool {
@@ -309,7 +425,8 @@ struct StartVisitSheet: View {
     }
 
     private func subtitle(for place: NearbyPlace) -> String {
-        let distance = Self.distanceText(place.distanceMeters)
+        let meters = model.location.map { CLLocation(latitude: place.latitude, longitude: place.longitude).distance(from: $0) } ?? place.distanceMeters
+        let distance = Self.distanceText(meters)
         let street = place.address?.components(separatedBy: ",").first
         return [distance, place.primaryTypeLabel, street].compactMap { $0 }.joined(separator: " · ")
     }

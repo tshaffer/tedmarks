@@ -18,6 +18,7 @@ struct StartVisitSheet: View {
 
     @State private var model = StartVisitModel()
     @State private var saveError: String?
+    @FocusState private var searchFocused: Bool
     /// Where the map has settled (for "Search this area").
     @State private var mapCenter: CLLocationCoordinate2D?
     /// How far the map shows from its center (meters).
@@ -43,11 +44,11 @@ struct StartVisitSheet: View {
 
     private var screen: some View {
         content
-            // The map gets the room the title would take.
+            // With the map: no title and no navigation bar (our own search box), so the map gets the room.
             .navigationTitle(usesMap ? "" : "Start a visit")
             .navigationBarTitleDisplayMode(usesMap ? .inline : .automatic)
-            .searchable(text: $model.searchText, isPresented: $model.isSearchPresented,
-                        placement: .navigationBarDrawer(displayMode: .always),
+            .toolbar(embedded && usesMap ? .hidden : .automatic, for: .navigationBar)
+            .searchable(if: !(embedded && usesMap), text: $model.searchText, isPresented: $model.isSearchPresented,
                         prompt: usesMap ? "Search a restaurant" : "Somewhere else…")
             .onSubmit(of: .search) { Task { await model.search(savedStatus: savedStatus) } }
             .onChange(of: model.searchText) { _, text in
@@ -93,7 +94,11 @@ struct StartVisitSheet: View {
             failureView(failure)
         case .loaded where usesMap:
             // Suggestions cover the map rather than replace it, so it keeps its place and zoom.
-            mapContent.overlay { if isShowingSuggestions { suggestionList } }
+            VStack(spacing: 8) {
+                if embedded { mapSearchField.padding(.horizontal).padding(.top, 8) }
+                mapContent.overlay { if isShowingSuggestions { suggestionList } }
+            }
+            .background(Color(.systemGroupedBackground))
         case .loaded where isShowingSuggestions:
             suggestionList
         case .loaded:
@@ -127,6 +132,36 @@ struct StartVisitSheet: View {
     }
 
     // MARK: - Map
+
+    /// The map screen's search box (in place of the navigation bar's, which needs a bar above it).
+    private var mapSearchField: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search a restaurant", text: $model.searchText)
+                    .focused($searchFocused)
+                    .submitLabel(.search)
+                    .autocorrectionDisabled()
+                    .onSubmit { Task { await model.search(savedStatus: savedStatus) } }
+                if !model.searchText.isEmpty {
+                    Button { model.searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(Color(.secondarySystemGroupedBackground), in: Capsule())
+            if searchFocused {
+                Button("Cancel") {
+                    model.searchText = ""
+                    searchFocused = false
+                }
+            }
+        }
+    }
 
     private var mapContent: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -167,13 +202,6 @@ struct StartVisitSheet: View {
                 }
             }
             .frame(maxHeight: .infinity)
-
-            if let place = model.selectedPlace {
-                placeRow(place)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-            }
         }
         .padding(.horizontal)
         .padding(.top, 4)
@@ -267,6 +295,7 @@ struct StartVisitSheet: View {
                 }
                 ForEach(model.suggestions) { suggestion in
                     Button {
+                        searchFocused = false
                         Task { await model.choose(suggestion) }
                     } label: {
                         HStack(spacing: 12) {
@@ -321,15 +350,24 @@ struct StartVisitSheet: View {
         .buttonStyle(.plain)
     }
 
+    /// Start, with the chosen place's details under its name (one control, not a card and a button).
     private var startButton: some View {
         Button {
             startVisit()
         } label: {
-            Text(model.selectedPlace.map { "Start visit at \($0.name)" } ?? "Start visit")
-                .font(.headline)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
+            VStack(spacing: 2) {
+                Text(model.selectedPlace.map { "Start visit at \($0.name)" } ?? "Start visit")
+                    .font(.headline)
+                    .lineLimit(1)
+                if let place = model.selectedPlace {
+                    Text(startDetails(place))
+                        .font(.footnote)
+                        .lineLimit(1)
+                        .opacity(0.85)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
@@ -337,6 +375,16 @@ struct StartVisitSheet: View {
         .padding(.horizontal)
         .padding(.bottom, 8)
         .background(.bar)
+    }
+
+    /// "4 mi · Asian Restaurant · Parking lot · Been there"
+    private func startDetails(_ place: NearbyPlace) -> String {
+        let status: String? = switch savedStatus(place) {
+        case .beenThere: "Been there"
+        case .wantToGo: "Want to go"
+        case nil: nil
+        }
+        return [subtitle(for: place), status].compactMap { $0 }.joined(separator: " · ")
     }
 
     @ViewBuilder
@@ -443,5 +491,17 @@ struct StatusBadge: View {
             .padding(.vertical, 3)
             .background(color.opacity(0.15), in: Capsule())
             .foregroundStyle(color)
+    }
+}
+
+private extension View {
+    /// `.searchable` in the navigation bar, or nothing (the map screen has its own search box).
+    @ViewBuilder
+    func searchable(if enabled: Bool, text: Binding<String>, isPresented: Binding<Bool>, prompt: String) -> some View {
+        if enabled {
+            searchable(text: text, isPresented: isPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: Text(prompt))
+        } else {
+            self
+        }
     }
 }

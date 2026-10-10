@@ -2,9 +2,9 @@ import SwiftData
 import SwiftUI
 import TedmarksKit
 
-enum AppTab: Hashable { case visit, inbox, places, settings }
+enum AppTab: Hashable { case visit, visits, places, more }
 
-/// Tab bar from the Figma designs (10 · Inbox): Visit · Inbox · Places · Settings.
+/// Tab bar: Visit · Visits · Places · More (the Inbox lives in More, with the settings).
 struct RootTabView: View {
     @State private var selectedTab: AppTab = .visit
     @Query(filter: #Predicate<Draft> { $0.statusRaw == "pending" && $0.deletedAt == nil }) private var pendingDrafts: [Draft]
@@ -15,18 +15,21 @@ struct RootTabView: View {
             Tab("Visit", systemImage: "fork.knife", value: .visit) {
                 VisitHomeView()
             }
-            Tab("Inbox", systemImage: "tray", value: .inbox) { InboxView() }
-                .badge(pendingDrafts.count + unprocessedNotes.count)
+            Tab("Visits", systemImage: "clock.arrow.circlepath", value: .visits) {
+                NavigationStack { PastVisitsView() }
+            }
             Tab("Places", systemImage: "map", value: .places) { PlacesView() }
-            Tab("Settings", systemImage: "gearshape", value: .settings) { SettingsView() }
+            Tab("More", systemImage: "ellipsis.circle", value: .more) { SettingsView() }
+                .badge(pendingDrafts.count + unprocessedNotes.count)
         }
         #if DEBUG
-        // Dev/testing: `simctl launch … -openSettings` / `-openPlaces` / `-openPlace <name>` / `-openInbox` skip taps.
+        // Dev/testing: `simctl launch … -openSettings` / `-openInbox` (More) / `-openPlaces` / `-openPlace <name>` /
+        // `-openPastVisits` (Visits) skip taps.
         .onAppear {
             let arguments = ProcessInfo.processInfo.arguments
-            if arguments.contains("-openSettings") { selectedTab = .settings }
+            if arguments.contains("-openSettings") || arguments.contains("-openInbox") { selectedTab = .more }
+            if arguments.contains("-openPastVisits") { selectedTab = .visits }
             if arguments.contains("-openPlaces") || arguments.contains("-openPlace") { selectedTab = .places }
-            if arguments.contains("-openInbox") { selectedTab = .inbox }
         }
         #endif
         // Deep links from the Lock Screen widget (01), Live Activity (03) and notifications (06).

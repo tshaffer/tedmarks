@@ -51,11 +51,11 @@ struct PastVisitsView: View {
         }
         .overlay {
             if visits.isEmpty {
-                ContentUnavailableView("No past visits", systemImage: "fork.knife",
+                ContentUnavailableView("No visits yet", systemImage: "fork.knife",
                                        description: Text("Visits show up here once they're wrapped up."))
             }
         }
-        .navigationTitle("Past visits")
+        .navigationTitle("Visits")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {

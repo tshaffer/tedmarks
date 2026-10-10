@@ -1,7 +1,12 @@
+import SwiftData
 import SwiftUI
 import TedmarksKit
 
+/// The More tab: the Inbox (voice notes waiting for an OK), then the settings.
 struct SettingsView: View {
+    @Query(filter: #Predicate<Draft> { $0.statusRaw == "pending" && $0.deletedAt == nil }) private var pendingDrafts: [Draft]
+    @Query(filter: #Predicate<VoiceNote> { $0.draftId == nil && $0.deletedAt == nil }) private var unprocessedNotes: [VoiceNote]
+
     #if DEBUG
     @State private var testPromptStatus: String?
     #endif
@@ -11,6 +16,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    NavigationLink { InboxView() } label: { Label("Inbox", systemImage: "tray") }
+                        .badge(pendingDrafts.count + unprocessedNotes.count)
+                } footer: {
+                    Text("Voice notes waiting for your OK.")
+                }
+
                 Section {
                     Picker("Search radius", selection: $radiusMeters) {
                         ForEach(NearbySearchSettings.options) { option in
@@ -59,7 +71,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("More")
         }
     }
 }

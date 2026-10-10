@@ -3,8 +3,8 @@ import SwiftUI
 import TedmarksKit
 
 /// The Visit tab: Start a visit (Figma 02) when no visit is in progress; otherwise the current
-/// visit — our order with ratings, Add dish, Rate dish (04) and Wrap up (05). Past visits is
-/// one tap away from either.
+/// visit — who's here, our order with ratings, Add dish, Rate dish (04) and Wrap up (05).
+/// Earlier visits are in the Visits tab.
 struct VisitHomeView: View {
     @Environment(\.modelContext) private var context
     @Query(
@@ -21,12 +21,10 @@ struct VisitHomeView: View {
     @Query(filter: #Predicate<VisitItem> { $0.deletedAt == nil }) private var visitItems: [VisitItem]
 
     @State private var sheet: VisitSheet?
-    @State private var path: [Route] = []
     @State private var discardError: String?
     @State private var voice = VoiceCapture()
     @State private var reviewingDraft: Draft?
 
-    enum Route: Hashable { case pastVisits }
     #if DEBUG
     @State private var debugPreviewVisit: Visit?
     #endif
@@ -46,7 +44,7 @@ struct VisitHomeView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             Group {
                 if let visit = activeVisits.first {
                     List {
@@ -64,18 +62,11 @@ struct VisitHomeView: View {
                     StartVisitSheet(embedded: true)
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    NavigationLink("Past visits", value: Route.pastVisits)
-                }
-            }
-            .navigationDestination(for: Route.self) { _ in PastVisitsView() }
             #if DEBUG
             // Dev/testing: `-openWrapUp` / `-openRateDish` / `-openAddToOrder` open the active visit's sheets
-            // without a tap; `-openPastVisits` opens Past visits (add `-pastVisits.sort name|distance`).
+            // without a tap.
             .task {
                 let arguments = ProcessInfo.processInfo.arguments
-                if arguments.contains("-openPastVisits") { path = [.pastVisits] }
                 guard let visit = activeVisits.first else { return }
                 // `-voiceTranscript "…"` runs a voice note through Claude without recording.
                 if let transcript = UserDefaults.standard.string(forKey: "voiceTranscript") {

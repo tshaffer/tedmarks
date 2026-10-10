@@ -18,7 +18,8 @@ struct InboxView: View {
     @State private var reviewing: Draft?
 
     var body: some View {
-        NavigationStack {
+        // Opened from the More tab's navigation.
+        Group {
             List {
                 if !drafts.isEmpty {
                     Section("To confirm") {

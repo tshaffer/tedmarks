@@ -20,7 +20,7 @@ export function SearchBox({ bias, onResult, onClear, width = 440 }: {
   useEffect(() => {
     if (!host.current || element.current) return;
     const el = new google.maps.places.PlaceAutocompleteElement({});
-    el.setAttribute('placeholder', 'Search restaurants by name, or a town');
+    el.setAttribute('placeholder', 'Search a restaurant or town');
     let last: SearchResult | null = null;   // the last choice, for Enter
     let edited = false;                     // typed since then
     el.addEventListener('gmp-select', async (event) => {

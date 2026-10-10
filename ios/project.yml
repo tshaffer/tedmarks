@@ -49,6 +49,7 @@ targets:
         TedmarksAPIBaseURL: $(TEDMARKS_API_BASE_URL)
         TedmarksAPIKey: $(TEDMARKS_API_KEY)
         TedmarksGoogleMapsKey: $(TEDMARKS_GOOGLE_MAPS_KEY)
+        TedmarksGoogleMapID: $(TEDMARKS_GOOGLE_MAP_ID)
         CFBundleURLTypes:
           - CFBundleURLName: com.tedshaffer.tedmarks
             CFBundleURLSchemes: [tedmarks]

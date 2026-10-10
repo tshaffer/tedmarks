@@ -28,6 +28,12 @@ enum AppConfig {
 
     static let api = TedmarksAPI(baseURL: apiBaseURL, accessKey: apiAccessKey)
 
+    /// Map ID (TEDMARKS_GOOGLE_MAP_ID): the website's map style, on an iOS Map ID. nil = Google's default map.
+    static let googleMapID: String? = {
+        let value = Bundle.main.object(forInfoDictionaryKey: "TedmarksGoogleMapID") as? String
+        return value?.isEmpty == false ? value : nil
+    }()
+
     /// Google Maps SDK key (TEDMARKS_GOOGLE_MAPS_KEY), for Start a visit's map. nil = show the list.
     static let googleMapsKey: String? = {
         let value = Bundle.main.object(forInfoDictionaryKey: "TedmarksGoogleMapsKey") as? String

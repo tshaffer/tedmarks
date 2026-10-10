@@ -21,13 +21,16 @@ struct StartVisitMap: UIViewRepresentable {
     let home: CLLocationCoordinate2D?
     let onSelect: (String) -> Void
     let onSelectGoogleIcon: (String) -> Void
-    let onIdle: (CLLocationCoordinate2D) -> Void
+    /// Where the map settled, and how far it shows from there (meters, center to edge).
+    let onIdle: (CLLocationCoordinate2D, Double) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> GMSMapView {
         let options = GMSMapViewOptions()
         if let home { options.camera = GMSCameraPosition(target: home, zoom: 16) }
+        // The website's map style (restaurants only), when there's an iOS Map ID for it.
+        if let mapID = AppConfig.googleMapID { options.mapID = GMSMapID(identifier: mapID) }
         let map = GMSMapView(options: options)
         map.delegate = context.coordinator
         map.isMyLocationEnabled = true
@@ -47,9 +50,11 @@ struct StartVisitMap: UIViewRepresentable {
     final class Coordinator: NSObject, @preconcurrency GMSMapViewDelegate {
         var parent: StartVisitMap
         private var markers: [String: GMSMarker] = [:]
-        private var drawn: [String: (MapPin, Bool)] = [:]
+        private var drawn: [String: Drawn] = [:]
         private var centeredOnHome = false
         private var shownSelection: String?
+
+        private struct Drawn: Equatable { let pin: MapPin; let selected: Bool; let label: LabelSide? }
 
         init(_ parent: StartVisitMap) { self.parent = parent }
 
@@ -64,19 +69,22 @@ struct StartVisitMap: UIViewRepresentable {
                 markers[id] = nil
                 drawn[id] = nil
             }
+            let labels = labelSides(map)
             for (id, pin) in wanted {
-                let selected = id == parent.selectedId
-                if let previous = drawn[id], previous.0 == pin, previous.1 == selected { continue }
-                let marker = markers[id] ?? GMSMarker(position: CLLocationCoordinate2D(latitude: pin.place.latitude, longitude: pin.place.longitude))
-                marker.position = CLLocationCoordinate2D(latitude: pin.place.latitude, longitude: pin.place.longitude)
-                marker.iconView = PinView(pin: pin, selected: selected)
-                marker.groundAnchor = CGPoint(x: 0.5, y: 0.5)
+                let next = Drawn(pin: pin, selected: id == parent.selectedId, label: labels[id])
+                if drawn[id] == next { continue }
+                let position = CLLocationCoordinate2D(latitude: pin.place.latitude, longitude: pin.place.longitude)
+                let marker = markers[id] ?? GMSMarker(position: position)
+                let view = PinView(pin: pin, selected: next.selected, label: next.label)
+                marker.position = position
+                marker.iconView = view
+                marker.groundAnchor = view.anchor
                 marker.tracksViewChanges = false
-                marker.zIndex = selected ? 1000 : pin.kind == .google ? 1 : 10
+                marker.zIndex = next.selected ? 1000 : pin.kind == .google ? 1 : 10
                 marker.userData = id
                 marker.map = map
                 markers[id] = marker
-                drawn[id] = (pin, selected)
+                drawn[id] = next
             }
             // A newly chosen place off screen (a search result): bring it into view.
             if let id = parent.selectedId, id != shownSelection, let pin = wanted[id], !map.bounds.isEmpty {
@@ -85,6 +93,41 @@ struct StartVisitMap: UIViewRepresentable {
                 if !map.projection.visibleRegion().contains(position) { map.animate(toLocation: position) }
             }
         }
+
+        /// Names beside the pins when zoomed in (as on the website): right if there's room, else
+        /// left, else none; ours get first claim, then Google's nearest the middle.
+        private func labelSides(_ map: GMSMapView) -> [String: LabelSide] {
+            guard map.camera.zoom >= Self.labelZoom, !map.bounds.isEmpty else { return [:] }
+            let projection = map.projection
+            let point = { (pin: MapPin) in projection.point(for: CLLocationCoordinate2D(latitude: pin.place.latitude, longitude: pin.place.longitude)) }
+            let pins = parent.pins.filter { map.bounds.contains(point($0)) }
+            var taken = pins.map { pin in
+                let size = pin.place.googlePlaceId == parent.selectedId
+                    ? PinView.chosenSize(pin) : PinView.coreSize(pin.kind)
+                return CGRect(x: point(pin).x - size.width / 2, y: point(pin).y - size.height / 2, width: size.width, height: size.height)
+            }
+            let middle = CGPoint(x: map.bounds.midX, y: map.bounds.midY)
+            let order = pins.filter { $0.place.googlePlaceId != parent.selectedId }.sorted { a, b in
+                if (a.kind == .google) != (b.kind == .google) { return a.kind != .google }
+                return hypot(point(a).x - middle.x, point(a).y - middle.y) < hypot(point(b).x - middle.x, point(b).y - middle.y)
+            }
+            var sides: [String: LabelSide] = [:]
+            for pin in order {
+                let p = point(pin), core = PinView.coreSize(pin.kind), tag = PinView.nameTagSize(pin.place.name)
+                let y = p.y - tag.height / 2
+                let right = CGRect(x: p.x + core.width / 2 + PinView.gap, y: y, width: tag.width, height: tag.height)
+                let left = CGRect(x: p.x - core.width / 2 - PinView.gap - tag.width, y: y, width: tag.width, height: tag.height)
+                for (side, rect) in [(LabelSide.right, right), (.left, left)]
+                where map.bounds.contains(rect) && !taken.contains(where: { $0.intersects(rect.insetBy(dx: -2, dy: -1)) }) {
+                    sides[pin.place.googlePlaceId] = side
+                    taken.append(rect)
+                    break
+                }
+            }
+            return sides
+        }
+
+        private static let labelZoom: Float = 16
 
         func mapView(_ mapView: GMSMapView, didTap marker: GMSMarker) -> Bool {
             if let id = marker.userData as? String { parent.onSelect(id) }
@@ -96,7 +139,11 @@ struct StartVisitMap: UIViewRepresentable {
         }
 
         func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
-            parent.onIdle(position.target)
+            let region = mapView.projection.visibleRegion()
+            let reach = CLLocation(latitude: region.farLeft.latitude, longitude: region.farLeft.longitude)
+                .distance(from: CLLocation(latitude: region.nearRight.latitude, longitude: region.nearRight.longitude)) / 2
+            parent.onIdle(position.target, reach)
+            update(mapView)   // names follow the new view
         }
     }
 }
@@ -107,59 +154,113 @@ private extension GMSVisibleRegion {
     }
 }
 
-/// The pin itself: a white rounded tag with a colored ring, or orange with the name when chosen.
-/// Google's (not ours) are just small grey dots until chosen, so a busy street stays readable.
+enum LabelSide { case left, right }
+
+/// The pin: a white rounded tag with a colored ring (ours) or a small grey dot (Google's), with
+/// its name in a white tag beside it when there's room; orange with the name when chosen.
 private final class PinView: UIView {
-    init(pin: MapPin, selected: Bool) {
-        super.init(frame: .zero)
-        if pin.kind == .google && !selected {
-            frame = CGRect(x: 0, y: 0, width: 16, height: 16)
-            backgroundColor = .white
-            layer.cornerRadius = 8
-            layer.borderColor = UIColor.systemGray.cgColor
-            layer.borderWidth = 4
-            layer.shadowColor = UIColor.black.cgColor
-            layer.shadowOpacity = 0.2
-            layer.shadowRadius = 2
-            layer.shadowOffset = CGSize(width: 0, height: 1)
-            return
+    static let gap: CGFloat = 4
+    private static let nameFont = UIFont.systemFont(ofSize: 12, weight: .semibold)
+    private static let nameMaxWidth: CGFloat = 150
+
+    /// Where the place itself is within the view (the marker's ground anchor).
+    private(set) var anchor = CGPoint(x: 0.5, y: 0.5)
+
+    init(pin: MapPin, selected: Bool, label: LabelSide?) {
+        let core = selected ? Self.chosen(pin) : Self.core(pin)
+        let tag = selected ? nil : label.map { _ in Self.nameTag(pin.place.name) }
+        let tagWidth = tag.map { $0.bounds.width + Self.gap } ?? 0
+        let height = max(core.bounds.height, tag?.bounds.height ?? 0)
+        super.init(frame: CGRect(x: 0, y: 0, width: core.bounds.width + tagWidth, height: height))
+        let coreX = label == .left ? tagWidth : 0
+        core.frame.origin = CGPoint(x: coreX, y: (height - core.bounds.height) / 2)
+        addSubview(core)
+        if let tag {
+            tag.frame.origin = CGPoint(x: label == .left ? 0 : core.bounds.width + Self.gap, y: (height - tag.bounds.height) / 2)
+            addSubview(tag)
         }
-        let ring: UIColor = switch pin.kind {
-        case .beenThere: .systemGreen
-        case .wantToGo: .systemPurple
-        case .google: .systemGray
-        }
-        let label = UILabel()
-        let glyph = NSAttributedString(string: pin.glyph, attributes: [
-            .font: UIFont.systemFont(ofSize: pin.kind == .wantToGo ? 15 : 13, weight: .bold),
-            .foregroundColor: selected ? UIColor.white : (pin.kind == .wantToGo ? UIColor.systemPurple : UIColor.secondaryLabel),
-        ])
-        let text = NSMutableAttributedString(attributedString: glyph)
-        if selected {
-            text.append(NSAttributedString(string: "  " + pin.place.name, attributes: [
-                .font: UIFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: UIColor.white,
-            ]))
-        }
-        label.attributedText = text
-        label.sizeToFit()
-        let padX: CGFloat = selected ? 11 : 6, padY: CGFloat = selected ? 6 : 4
-        let width = min(max(label.bounds.width + padX * 2, label.bounds.height + padY * 2), 260)
-        frame = CGRect(x: 0, y: 0, width: width, height: label.bounds.height + padY * 2)
-        label.frame = bounds.insetBy(dx: padX, dy: padY)
-        label.textAlignment = .center
-        label.lineBreakMode = .byTruncatingTail
-        addSubview(label)
-        backgroundColor = selected ? .systemOrange : .white
-        layer.cornerRadius = bounds.height / 2
-        if !selected {
-            layer.borderColor = ring.cgColor
-            layer.borderWidth = 2
-        }
-        layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOpacity = 0.25
-        layer.shadowRadius = 3
-        layer.shadowOffset = CGSize(width: 0, height: 2)
+        anchor = CGPoint(x: (coreX + core.bounds.width / 2) / bounds.width, y: 0.5)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    static func coreSize(_ kind: MapPin.Kind) -> CGSize { kind == .google ? CGSize(width: 16, height: 16) : CGSize(width: 30, height: 26) }
+    static func chosenSize(_ pin: MapPin) -> CGSize { chosen(pin).bounds.size }
+    static func nameTagSize(_ name: String) -> CGSize { nameTag(name).bounds.size }
+
+    /// Unchosen: Google's a grey dot; ours a white tag with a colored ring and the glyph.
+    private static func core(_ pin: MapPin) -> UIView {
+        if pin.kind == .google {
+            let dot = UIView(frame: CGRect(origin: .zero, size: coreSize(.google)))
+            dot.backgroundColor = .white
+            dot.layer.cornerRadius = 8
+            dot.layer.borderColor = UIColor.systemGray.cgColor
+            dot.layer.borderWidth = 4
+            shadow(dot, opacity: 0.2)
+            return dot
+        }
+        let ring: UIColor = pin.kind == .beenThere ? .systemGreen : .systemPurple
+        let label = UILabel()
+        label.text = pin.glyph
+        label.font = .systemFont(ofSize: pin.kind == .wantToGo ? 15 : 13, weight: .bold)
+        label.textColor = pin.kind == .wantToGo ? .systemPurple : .secondaryLabel
+        label.textAlignment = .center
+        let view = UIView(frame: CGRect(origin: .zero, size: coreSize(pin.kind)))
+        label.frame = view.bounds
+        view.addSubview(label)
+        view.backgroundColor = .white
+        view.layer.cornerRadius = 13
+        view.layer.borderColor = ring.cgColor
+        view.layer.borderWidth = 2
+        shadow(view, opacity: 0.25)
+        return view
+    }
+
+    /// Chosen: orange with the glyph and the name.
+    private static func chosen(_ pin: MapPin) -> UIView {
+        let label = UILabel()
+        let text = NSMutableAttributedString(string: pin.glyph, attributes: [
+            .font: UIFont.systemFont(ofSize: pin.kind == .wantToGo ? 15 : 13, weight: .bold), .foregroundColor: UIColor.white,
+        ])
+        text.append(NSAttributedString(string: "  " + pin.place.name, attributes: [
+            .font: UIFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: UIColor.white,
+        ]))
+        label.attributedText = text
+        label.lineBreakMode = .byTruncatingTail
+        label.sizeToFit()
+        let width = min(label.bounds.width + 22, 260), height = label.bounds.height + 12
+        let view = UIView(frame: CGRect(x: 0, y: 0, width: width, height: height))
+        label.frame = view.bounds.insetBy(dx: 11, dy: 6)
+        label.textAlignment = .center
+        view.addSubview(label)
+        view.backgroundColor = .systemOrange
+        view.layer.cornerRadius = height / 2
+        shadow(view, opacity: 0.25)
+        return view
+    }
+
+    /// The name beside a pin: a small white tag, so it reads over the map.
+    private static func nameTag(_ name: String) -> UIView {
+        let label = UILabel()
+        label.text = name
+        label.font = nameFont
+        label.textColor = .label
+        label.lineBreakMode = .byTruncatingTail
+        label.sizeToFit()
+        let width = min(label.bounds.width, nameMaxWidth) + 8, height = label.bounds.height + 4
+        let tag = UIView(frame: CGRect(x: 0, y: 0, width: width, height: height))
+        label.frame = tag.bounds.insetBy(dx: 4, dy: 2)
+        tag.addSubview(label)
+        tag.backgroundColor = UIColor.white.withAlphaComponent(0.92)
+        tag.layer.cornerRadius = 4
+        shadow(tag, opacity: 0.12)
+        return tag
+    }
+
+    private static func shadow(_ view: UIView, opacity: Float) {
+        view.layer.shadowColor = UIColor.black.cgColor
+        view.layer.shadowOpacity = opacity
+        view.layer.shadowRadius = 2
+        view.layer.shadowOffset = CGSize(width: 0, height: 1)
+    }
 }

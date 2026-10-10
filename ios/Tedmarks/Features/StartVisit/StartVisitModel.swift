@@ -88,6 +88,7 @@ final class StartVisitModel {
             morePageToken = nil
             moreState = .available
             isShowingSearchResults = false
+            searchText = ""
             // Keep what's chosen if it's still here.
             let chosen = selectedId
             show(nearby)

@@ -23,6 +23,8 @@ struct StartVisitSheet: View {
     @State private var saveError: String?
     /// Where the map has settled (for "Search this area").
     @State private var mapCenter: CLLocationCoordinate2D?
+    /// How far the map shows from its center (meters).
+    @State private var mapReach: Double = 500
     /// Pin glyphs for our been-there places: the verdict's emoji (or ? without one).
     @State private var verdictGlyphs: [String: String] = [:]
 
@@ -149,7 +151,7 @@ struct StartVisitSheet: View {
                     home: model.location?.coordinate,
                     onSelect: { model.selectedId = $0 },
                     onSelectGoogleIcon: { id in Task { await model.choose(googlePlaceId: id) } },
-                    onIdle: { mapCenter = $0 }
+                    onIdle: { mapCenter = $0; mapReach = $1 }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 if model.isBusy {
@@ -217,11 +219,13 @@ struct StartVisitSheet: View {
     }
 
     /// The map has moved well away from where the places were searched.
+    /// The map has moved well away from where its pins were searched (about half of what's on
+    /// screen, so a short pan zoomed in counts) — after a name search too.
     private var movedAway: Bool {
-        guard let center = mapCenter, let searched = model.searchedCenter, !model.isShowingSearchResults else { return false }
+        guard let center = mapCenter, let searched = model.searchedCenter else { return false }
         let meters = CLLocation(latitude: center.latitude, longitude: center.longitude)
             .distance(from: CLLocation(latitude: searched.latitude, longitude: searched.longitude))
-        return meters > Double(NearbySearchSettings.radius()) / 2
+        return meters > max(150, mapReach * 0.5)
     }
 
     private func refreshVerdicts() {

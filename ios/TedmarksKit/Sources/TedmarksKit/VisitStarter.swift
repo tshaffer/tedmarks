@@ -65,6 +65,39 @@ public enum VisitStarter {
         return visit
     }
 
+    /// Who's at a visit (changed on the Current visit page). Household first, then guests, in
+    /// the order given; newly added people are marked as seen now.
+    @MainActor
+    public static func setParticipants(_ ids: [UUID], for visit: Visit, in context: ModelContext, now: Date = .now) throws {
+        var seen = Set<UUID>()
+        let unique = ids.filter { seen.insert($0).inserted }
+        guard unique != visit.participantIds else { return }
+        let added = Set(unique).subtracting(visit.participantIds)
+        visit.participantIds = unique
+        visit.modifiedAt = now
+        for person in try context.fetch(FetchDescriptor<Person>()) where added.contains(person.id) {
+            person.lastSeenAt = now
+        }
+        try context.save()
+        VisitSideEffects.reconcile(in: context)
+    }
+
+    /// A guest by name: the one we already know (any capitalization), or a new one.
+    @MainActor
+    public static func guest(named name: String, in context: ModelContext, now: Date = .now) throws -> Person? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let known = try context.fetch(FetchDescriptor<Person>()).first(where: {
+            $0.deletedAt == nil && $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame
+        }) {
+            return known
+        }
+        let person = Person(displayName: trimmed, kind: .guest)
+        context.insert(person)
+        try context.save()
+        return person
+    }
+
     @MainActor
     public static func activeVisits(in context: ModelContext) throws -> [Visit] {
         let inProgress = VisitStatus.inProgress.rawValue

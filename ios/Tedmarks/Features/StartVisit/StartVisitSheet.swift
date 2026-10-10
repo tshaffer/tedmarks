@@ -3,7 +3,7 @@ import SwiftData
 import SwiftUI
 import TedmarksKit
 
-/// Figma 02 · Start visit — pick the place and who's here. The Visit tab's landing screen
+/// Figma 02 · Start visit — pick the place (who's here is on the Current visit page). The Visit tab's landing screen
 /// when no visit is in progress (`embedded`, inside that tab's navigation stack), or a sheet.
 /// With a Google Maps key the places are on a map (Figma 02 · map); without one, a list.
 struct StartVisitSheet: View {
@@ -17,9 +17,6 @@ struct StartVisitSheet: View {
     @Query(filter: #Predicate<Person> { $0.deletedAt == nil }, sort: \Person.createdAt) private var people: [Person]
 
     @State private var model = StartVisitModel()
-    @State private var participantIds: Set<UUID> = []
-    @State private var isAddingGuest = false
-    @State private var newGuestName = ""
     @State private var saveError: String?
     /// Where the map has settled (for "Search this area").
     @State private var mapCenter: CLLocationCoordinate2D?
@@ -63,9 +60,6 @@ struct StartVisitSheet: View {
             }
         .onChange(of: model.places, initial: true) { refreshVerdicts() }
         .task {
-        if participantIds.isEmpty {
-            participantIds = Set(people.filter { $0.kind == .household }.map(\.id))
-        }
         // Coming back to the tab keeps the list; pull down to refresh it.
         guard model.phase != .loaded else { return }
         await model.load(savedStatus: savedStatus)
@@ -78,11 +72,6 @@ struct StartVisitSheet: View {
             model.searchText = text
         }
         #endif
-        }
-        .alert("Add a guest", isPresented: $isAddingGuest) {
-        TextField("Name", text: $newGuestName)
-        Button("Add") { addGuest() }
-        Button("Cancel", role: .cancel) { newGuestName = "" }
         }
         .alert("Couldn't start the visit", isPresented: .constant(saveError != nil)) {
         Button("OK") { saveError = nil }
@@ -131,9 +120,6 @@ struct StartVisitSheet: View {
                         }
                         showMoreRow
                     }
-                }
-                Section("Who's here") {
-                    participantChips.padding(.vertical, 4)
                 }
             }
             .refreshable { await model.load(savedStatus: savedStatus) }
@@ -187,13 +173,7 @@ struct StartVisitSheet: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-                Text("Tap a pin to choose somewhere else")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
             }
-
-            Text("WHO'S HERE").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-            participantChips
         }
         .padding(.horizontal)
         .padding(.top, 4)
@@ -341,27 +321,6 @@ struct StartVisitSheet: View {
         .buttonStyle(.plain)
     }
 
-    private var participantChips: some View {
-        FlowLayout(spacing: 8) {
-            ForEach(chipPeople) { person in
-                let isOn = participantIds.contains(person.id)
-                Button {
-                    if isOn { participantIds.remove(person.id) } else { participantIds.insert(person.id) }
-                } label: {
-                    Chip(title: person.displayName, systemImage: isOn ? "checkmark" : "plus", isOn: isOn)
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isOn ? .isSelected : [])
-            }
-            Button {
-                isAddingGuest = true
-            } label: {
-                Chip(title: "Guest", systemImage: "plus", isOn: false, outlined: true)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
     private var startButton: some View {
         Button {
             startVisit()
@@ -416,14 +375,6 @@ struct StartVisitSheet: View {
 
     // MARK: - Helpers
 
-    /// Household first (Ted, Lori), then guests seen most recently.
-    private var chipPeople: [Person] {
-        let household = people.filter { $0.kind == .household }
-        let guests = people.filter { $0.kind == .guest }
-            .sorted { ($0.lastSeenAt ?? $0.createdAt) > ($1.lastSeenAt ?? $1.createdAt) }
-        return household + guests.prefix(6)
-    }
-
     private func savedStatus(_ place: NearbyPlace) -> PlaceStatus? {
         savedPlaces.first { $0.googlePlaceId == place.googlePlaceId }?.status
     }
@@ -435,25 +386,12 @@ struct StartVisitSheet: View {
         return [distance, place.primaryTypeLabel, street].compactMap { $0 }.joined(separator: " · ")
     }
 
-    private func addGuest() {
-        let name = newGuestName.trimmingCharacters(in: .whitespacesAndNewlines)
-        newGuestName = ""
-        guard !name.isEmpty else { return }
-        if let existing = people.first(where: { $0.displayName.caseInsensitiveCompare(name) == .orderedSame }) {
-            participantIds.insert(existing.id)
-            return
-        }
-        let guest = Person(displayName: name, kind: .guest)
-        context.insert(guest)
-        try? context.save()
-        participantIds.insert(guest.id)
-    }
-
     private func startVisit() {
         guard let place = model.selectedPlace else { return }
-        let ordered = chipPeople.map(\.id).filter { participantIds.contains($0) }
+        // Ted and Lori to start; who's here can be changed on the Current visit page.
+        let household = people.filter { $0.kind == .household }.map(\.id)
         do {
-            try VisitStarter.startVisit(at: place, participantIds: ordered, in: context)
+            try VisitStarter.startVisit(at: place, participantIds: household, in: context)
             // Ask once (iOS remembers): needed for the "How was it?" prompt.
             Task { await VisitPrompt.requestAuthorization() }
             dismiss()

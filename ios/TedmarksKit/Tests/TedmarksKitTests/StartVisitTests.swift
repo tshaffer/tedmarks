@@ -53,3 +53,19 @@ private func place(_ id: String, _ meters: Double) -> NearbyPlace {
     defaults.set(402, forKey: NearbySearchSettings.radiusKey)   // old/unknown value → default
     #expect(NearbySearchSettings.radius(from: defaults) == 1609)
 }
+
+@MainActor
+@Test func whoIsHereCanChangeDuringTheVisit() throws {
+    let container = try ModelContainer(for: Schema(tedmarksModelTypes), configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let context = container.mainContext
+    try VisitStarter.ensureHousehold(in: context)
+    let place = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", latitude: 37.39, longitude: -122.08, distanceMeters: 30)
+    let visit = try VisitStarter.startVisit(at: place, participantIds: [Household.tedId, Household.loriId], in: context)
+
+    // Lori wasn't there after all; Sam was (and "sam" is the same guest).
+    let sam = try #require(try VisitStarter.guest(named: " Sam ", in: context))
+    #expect(try VisitStarter.guest(named: "sam", in: context)?.id == sam.id)
+    try VisitStarter.setParticipants([Household.tedId, sam.id, sam.id], for: visit, in: context)
+    #expect(visit.participantIds == [Household.tedId, sam.id])
+    #expect(sam.lastSeenAt != nil)
+}

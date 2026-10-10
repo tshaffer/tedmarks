@@ -141,8 +141,10 @@ struct VisitHomeView: View {
                         .foregroundStyle(.orange)
                 }
             }
-            Text("Started \(visit.startedAt.formatted(date: .abbreviated, time: .omitted)) · \(names(for: visit))")
+            Text("Started \(visit.startedAt.formatted(date: .abbreviated, time: .omitted))")
                 .font(.subheadline).foregroundStyle(.secondary)
+
+            WhoIsHere(visit: visit)
 
             if !items.isEmpty {
                 Text("OUR ORDER · \(rated) OF \(items.count) RATED")
@@ -245,11 +247,5 @@ struct VisitHomeView: View {
         case .joint(let value): return value.emoji
         case .split(let people): return people.map(\.value.emoji).joined(separator: "/")
         }
-    }
-
-    private func names(for visit: Visit) -> String {
-        let byId = Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0.displayName) })
-        let names = visit.participantIds.compactMap { byId[$0] }
-        return names.isEmpty ? "No one listed" : ListFormatter.localizedString(byJoining: names)
     }
 }

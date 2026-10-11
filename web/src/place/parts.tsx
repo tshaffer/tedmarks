@@ -1,4 +1,4 @@
-import type { Place, Visit } from '@tedmarks/shared';
+import { isDateUnknown, type Place, type Visit } from '@tedmarks/shared';
 import { Box, Button, Collapse, Stack, Typography } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 import type { Interest } from '../data/placeWrites.js';
@@ -10,6 +10,9 @@ import { WANT } from '../theme.js';
 // Pieces shared by the map's place panel (W1) and the Place page (W2).
 
 export const longDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+/** A visit's date, or "Date unknown" for a visit from memory. */
+export const visitDate = (visit: Visit, format: (iso: string) => string = longDate) => (isDateUnknown(visit) ? 'Date unknown' : format(visit.startedAt));
 const verdictEmoji = Object.fromEntries(Object.entries(VERDICT).map(([k, v]) => [k, v.emoji]));
 
 /** "Ordered" across every visit: each dish once, grouped by its latest rating. */
@@ -80,7 +83,7 @@ export function VisitRow({ data, visit, open, onToggle, onEdit, onDelete, place,
         <Typography sx={{ width: 22, textAlign: 'center' }}>{s.verdict.kind === 'joint' ? VERDICT[s.verdict.value].emoji : s.verdict.kind === 'split' ? '↔' : '–'}</Typography>
         {place ? (
           <>
-            <Typography variant="body2" fontWeight={600} sx={{ width: 64, flexShrink: 0 }}>{dateFormat(visit.startedAt)}</Typography>
+            <Typography variant="body2" fontWeight={600} sx={{ width: 64, flexShrink: 0 }}>{isDateUnknown(visit) ? '—' : dateFormat(visit.startedAt)}</Typography>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               {place}
               <Typography variant="caption" color="text.secondary" display="block" noWrap>
@@ -90,7 +93,7 @@ export function VisitRow({ data, visit, open, onToggle, onEdit, onDelete, place,
           </>
         ) : (
           <Box sx={{ flex: 1 }}>
-            <Typography variant="body2" fontWeight={600}>{dateFormat(visit.startedAt)}</Typography>
+            <Typography variant="body2" fontWeight={600}>{visitDate(visit, dateFormat)}</Typography>
             <Typography variant="caption" color="text.secondary">{[s.participants.join(', '), `${s.dishes.length} dish${s.dishes.length === 1 ? '' : 'es'}`].filter(Boolean).join(' · ')}</Typography>
           </Box>
         )}
@@ -135,7 +138,9 @@ export function VerdictCard({ data, summary }: { data: TedmarksRecords; summary:
         <Typography fontWeight={600}>{verdict.kind === 'joint' ? VERDICT[verdict.value].label : verdict.kind === 'split' ? `We disagree: ${ratingText(data, verdict, verdictEmoji)}` : 'No verdict yet'}</Typography>
         <Typography variant="body2" color="text.secondary">
           {summary.visits.length} visit{summary.visits.length === 1 ? '' : 's'}
-          {summary.visits[0] && ` · ${summary.visits.length > 1 ? 'last ' : ''}${longDate(summary.visits[0].startedAt)}`}
+          {summary.visits[0] && (isDateUnknown(summary.visits[0])
+            ? ` · ${summary.visits.length > 1 ? 'dates' : 'date'} unknown`
+            : ` · ${summary.visits.length > 1 ? 'last ' : ''}${longDate(summary.visits[0].startedAt)}`)}
         </Typography>
       </Box>
       {place.refinedRating !== undefined && <Box sx={{ bgcolor: '#fff', borderRadius: 2, px: 1.25, py: 0.5 }}><Typography fontWeight={700}>{place.refinedRating}/10</Typography></Box>}

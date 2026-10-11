@@ -1,10 +1,10 @@
 import type { ItemRatingValue, NearbyPlace, VerdictValue } from '@tedmarks/shared';
 import {
-  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  FormControlLabel, IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
-import { looseDishKey } from '@tedmarks/shared';
+import { isDateUnknown, looseDishKey } from '@tedmarks/shared';
 import { OrderMenu } from './OrderMenu.js';
 import { placeDetails, pushChanges, refreshPlace } from '../api.js';
 import { DISH, VERDICT, visitSummary } from '../data/insights.js';
@@ -39,6 +39,8 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
   // Form state, filled from the visit when editing.
   const initial = useMemo(() => initialForm(data, editing?.id), [data, editing?.id]);
   const [date, setDate] = useState(initial.date);
+  // A visit from memory: we don't know when (the date is kept, in case it's unticked again).
+  const [dateUnknown, setDateUnknown] = useState(initial.dateUnknown);
   const [participants, setParticipants] = useState<string[]>(initial.participantIds);
   const [newGuests, setNewGuests] = useState<string[]>([]);
   const [guestName, setGuestName] = useState('');
@@ -73,7 +75,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
     return q > 0 ? [{ ...r, quantity: q }] : [];
   }));
 
-  const canSave = Boolean(date) && (target.kind === 'ours' || place || google) && !saving;
+  const canSave = (dateUnknown || Boolean(date)) && (target.kind === 'ours' || place || google) && !saving;
 
   // Us / Ted / Lori only when both of us were there (as on the phone).
   const bothOfUs = participants.includes(TED) && participants.includes(LORI);
@@ -85,7 +87,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
     try {
       const form: VisitForm = {
         place: place ? { kind: 'ours', placeId: place.id } : { kind: 'google', details: google! },
-        visitId: editing?.id, date,
+        visitId: editing?.id, date: dateUnknown ? null : date,
         participantIds: participants, newGuests, dishes, verdict, notes,
       };
       const { changes, placeId: savedPlace, visitId } = planVisitSave(data, form);
@@ -108,7 +110,13 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
           {target.kind === 'google' && !place && !google && !error && <Stack direction="row" spacing={1} alignItems="center"><CircularProgress size={18} /><Typography>Looking up the restaurant…</Typography></Stack>}
 
           <Stack direction="row" spacing={3} alignItems="flex-end" flexWrap="wrap" useFlexGap>
-          <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 200 }} />
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            {dateUnknown
+              ? <TextField label="Date" value="Date unknown" disabled sx={{ width: 200 }} />
+              : <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 200 }} />}
+            <FormControlLabel label="I don’t remember when" sx={{ color: 'text.secondary' }}
+              control={<Checkbox size="small" checked={dateUnknown} onChange={(e) => setDateUnknown(e.target.checked)} />} />
+          </Stack>
 
           <Box>
             <Typography variant="caption" fontWeight={600} color="text.secondary">WHO WAS THERE</Typography>
@@ -238,7 +246,7 @@ function RatingButtons({ value, onChange }: { value?: ItemRatingValue | undefine
 /** The form's starting values: blank for a new visit, or the visit's own when editing. */
 export function initialForm(data: TedmarksRecords, visitId: string | undefined) {
   const visit = visitId ? data.visits.get(visitId) : undefined;
-  if (!visit) return { date: today(), participantIds: [TED, LORI], dishes: [] as DishRow[], verdict: undefined, notes: [] as { id?: string; text: string }[] };
+  if (!visit) return { date: today(), dateUnknown: false, participantIds: [TED, LORI], dishes: [] as DishRow[], verdict: undefined, notes: [] as { id?: string; text: string }[] };
   const summary = visitSummary(data, visit);
   const dishes: DishRow[] = summary.dishes.map((d) => {
     const ratings = [...data.ratings.values()].filter((r) => r.subjectId === d.line.id);
@@ -249,7 +257,8 @@ export function initialForm(data: TedmarksRecords, visitId: string | undefined) 
   });
   const verdict = [...data.ratings.values()].find((r) => r.subjectId === visit.id && r.scope === 'joint')?.value as VerdictValue | undefined;
   return {
-    date: localDate(visit.startedAt),
+    date: isDateUnknown(visit) ? today() : localDate(visit.startedAt),
+    dateUnknown: isDateUnknown(visit),
     participantIds: visit.participantIds,
     dishes,
     verdict,

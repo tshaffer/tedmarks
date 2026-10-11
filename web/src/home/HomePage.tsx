@@ -245,7 +245,9 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
               {selection.kind === 'ours' && selected
                 ? <OurPlacePanel key={selected.place.id} data={data} summary={selected} onClose={() => setSelection(null)} />
                 : selection.kind === 'google'
-                  ? <GooglePlacePanel key={selection.googlePlaceId} googlePlaceId={selection.googlePlaceId} onClose={() => setSelection(null)}
+                  ? <GooglePlacePanel key={selection.googlePlaceId} googlePlaceId={selection.googlePlaceId}
+                      name={googleShown.find((r) => r.googlePlaceId === selection.googlePlaceId)?.name ?? googleResults?.find((r) => r.googlePlaceId === selection.googlePlaceId)?.name}
+                      onClose={() => setSelection(null)}
                       onAddVisit={() => actions.openVisit({ kind: 'google', googlePlaceId: selection.googlePlaceId, origin })}
                       onSaveWantToGo={(interest) => actions.saveWantToGo(selection.googlePlaceId, interest, origin)}
                       onAddMenu={() => actions.openMenu({ kind: 'google', googlePlaceId: selection.googlePlaceId, origin })} />

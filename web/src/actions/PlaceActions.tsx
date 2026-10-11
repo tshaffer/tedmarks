@@ -1,3 +1,4 @@
+import { isDateUnknown } from '@tedmarks/shared';
 import { Alert, Button, Snackbar } from '@mui/material';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, placeDetails, pushChanges, refreshPlace } from '../api.js';
@@ -92,11 +93,11 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
       setVisitTarget(null);
       if (placeAction === 'delete') show(null);
       await reload();
-      const when = visit ? day(visit.startedAt) : '';
+      const when = visit && !isDateUnknown(visit) ? `on ${day(visit.startedAt)}` : '(date unknown)';
       undoable(
-        placeAction === 'delete' ? `Visit on ${when} deleted — and ${place?.name ?? 'the place'}, which had nothing else`
-          : placeAction === 'wantToGo' ? `Visit on ${when} deleted — ${place?.name ?? 'the place'} is want to go again`
-          : `Visit on ${when} deleted`,
+        placeAction === 'delete' ? `Visit ${when} deleted — and ${place?.name ?? 'the place'}, which had nothing else`
+          : placeAction === 'wantToGo' ? `Visit ${when} deleted — ${place?.name ?? 'the place'} is want to go again`
+          : `Visit ${when} deleted`,
         async () => { await pushChanges(undo(now())); await reload(); if (place) show(place.id); },
       );
     }, 'Couldn’t delete the visit.'),

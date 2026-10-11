@@ -190,7 +190,7 @@ struct PlaceDetailView: View {
         let dishCount = DishCapture.orderItems(for: visit).count
         return HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(visit.startedAt.formatted(date: .abbreviated, time: .omitted)).font(.body)
+                Text(visit.dateText).font(.body)
                 Text(dishCount == 0 ? "No dishes recorded" : "\(dishCount) dish\(dishCount == 1 ? "" : "es")")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -316,6 +316,8 @@ struct PlaceDetailView: View {
     private func visitsLine(_ visits: [Visit]) -> String {
         guard let last = visits.first else { return "No visits recorded" }
         let count = "\(visits.count) visit\(visits.count == 1 ? "" : "s")"
+        // The newest visit is from memory only when they all are.
+        if last.dateUnknown { return "\(count) · date\(visits.count > 1 ? "s" : "") unknown" }
         return "\(count) · \(visits.count > 1 ? "last " : "")\(last.startedAt.formatted(date: .abbreviated, time: .omitted))"
     }
 
@@ -345,12 +347,7 @@ struct PlaceDetailView: View {
 
     /// Directions in Google Maps (the app when installed, otherwise the website).
     private var googleMapsDirectionsURL: URL {
-        var components = URLComponents(string: "https://www.google.com/maps/dir/")!
-        components.queryItems = [
-            URLQueryItem(name: "api", value: "1"),
-            URLQueryItem(name: "destination", value: place.name),
-        ] + (place.googlePlaceId.map { [URLQueryItem(name: "destination_place_id", value: $0)] } ?? [])
-        return components.url!
+        GoogleMapsLink.directions(name: place.name, googlePlaceId: place.googlePlaceId)
     }
 
     /// Places saved from search have no hours; imported ones age. Ask the server to fetch the

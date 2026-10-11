@@ -1,3 +1,4 @@
+import { isDateUnknown } from '@tedmarks/shared';
 import type { Visit } from '@tedmarks/shared';
 import { cityOf, visitSummary, type VisitSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
@@ -28,7 +29,11 @@ export interface VisitRowData {
   matched?: string | undefined;
 }
 
-const yearOf = (visit: Visit) => String(new Date(visit.startedAt).getFullYear());
+/** The year a visit was in ('unknown' for a visit from memory). */
+const yearOf = (visit: Visit) => (isDateUnknown(visit) ? 'unknown' : String(new Date(visit.startedAt).getFullYear()));
+
+/** The group visits from memory go in, last (their placeholder date sorts oldest). */
+export const DATE_UNKNOWN_GROUP = 'Date unknown · from memory';
 const verdictOf = (s: VisitSummary): VerdictChoice => (s.verdict.kind === 'joint' ? s.verdict.value : s.verdict.kind === 'split' ? 'disagree' : 'none');
 
 /** Something still to rate: a dish without a rating, or no verdict. */
@@ -70,11 +75,11 @@ export function filterVisits(rows: VisitRowData[], query: VisitsQuery): VisitRow
   return out;
 }
 
-/** Rows grouped by month ("October 2026"), keeping order. */
+/** Rows grouped by month ("October 2026"), keeping order; visits from memory last, together. */
 export function byMonth(rows: VisitRowData[]): { month: string; rows: VisitRowData[] }[] {
   const groups: { month: string; rows: VisitRowData[] }[] = [];
   for (const row of rows) {
-    const month = new Date(row.visit.startedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const month = isDateUnknown(row.visit) ? DATE_UNKNOWN_GROUP : new Date(row.visit.startedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     const last = groups.at(-1);
     if (last?.month === month) last.rows.push(row);
     else groups.push({ month, rows: [row] });
@@ -82,8 +87,8 @@ export function byMonth(rows: VisitRowData[]): { month: string; rows: VisitRowDa
   return groups;
 }
 
-/** The years with visits, newest first. */
-export const yearsOf = (rows: VisitRowData[]) => [...new Set(rows.map((r) => yearOf(r.visit)))].sort().reverse();
+/** The years with visits, newest first (visits from memory have none). */
+export const yearsOf = (rows: VisitRowData[]) => [...new Set(rows.map((r) => yearOf(r.visit)))].filter((y) => y !== 'unknown').sort().reverse();
 
 /** For the sidebar: counts for a year (or all time), most-visited places, and unfinished visits. */
 export function visitStats(all: VisitRowData[], year: string) {

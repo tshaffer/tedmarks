@@ -1,4 +1,4 @@
-import { normalizeItemName, placeWithoutVisits, type ItemRatingValue, type NearbyPlace, type Rating, type VerdictValue } from '@tedmarks/shared';
+import { normalizeItemName, placeWithoutVisits, type ItemRatingValue, type NearbyPlace, type Rating, type VerdictValue, UNKNOWN_VISIT_DATE, isDateUnknown } from '@tedmarks/shared';
 import { dishFinder } from './dishes.js';
 import type { TedmarksRecords } from './TedmarksData.js';
 
@@ -35,8 +35,9 @@ export interface VisitForm {
   place: { kind: 'ours'; placeId: string } | { kind: 'google'; details: NearbyPlace };
   /** Existing visit when editing. */
   visitId?: string;
-  /** YYYY-MM-DD in the browser's time zone (visits are recorded by date, not time). */
-  date: string;
+  /** YYYY-MM-DD in the browser's time zone (visits are recorded by date, not time); null = we
+   *  don't remember when (a visit from memory). */
+  date: string | null;
   participantIds: string[];
   /** Guests typed in that don't exist yet (become people). */
   newGuests: string[];
@@ -102,18 +103,23 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
 
   const bothOfUs = participantIds.includes(TED) && participantIds.includes(LORI);
 
-  // The visit.
-  const startedAt = startedAtIso(form.date);
+  // The visit. Date unknown: the placeholder date (sorts oldest) and the flag.
+  const unknown = form.date === null;
+  const startedAt = form.date === null ? UNKNOWN_VISIT_DATE : startedAtIso(form.date);
   const visitId = form.visitId ?? ids.next();
   if (form.visitId) {
     // Same date: leave the visit's times alone (a visit from the phone keeps when it started and ended).
     const existing = data.visits.get(form.visitId);
-    const moved = !existing || localDate(existing.startedAt) !== form.date;
-    add('visits', patch(visitId, now, { ...(moved ? { startedAt, endedAt: startedAt } : {}), participantIds }));
+    const moved = !existing || isDateUnknown(existing) !== unknown || (!unknown && localDate(existing.startedAt) !== form.date);
+    add('visits', patch(visitId, now, {
+      ...(moved ? { startedAt, endedAt: startedAt, dateUnknown: unknown ? true : null } : {}),
+      participantIds,
+    }));
   } else {
     const firstVisit = ![...data.visits.values()].some((v) => v.placeId === placeId);
     add('visits', {
       ...meta(visitId, now), placeId, startedAt, endedAt: startedAt, status: 'ended', origin: 'manual',
+      ...(unknown ? { dateUnknown: true } : {}),
       participantIds, isFirstVisit: firstVisit, wrapUpCompletedAt: now, tags: [],
     });
   }

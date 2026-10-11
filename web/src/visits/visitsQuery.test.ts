@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { PLACE, T0, apply, counter, records } from '../data/testRecords.js';
 import { LORI, TED, planVisitSave } from '../data/visitWrites.js';
-import { allVisits, byMonth, filterVisits, NO_VISITS_QUERY, visitStats } from './visitsQuery.js';
+import { allVisits, byMonth, DATE_UNKNOWN_GROUP, filterVisits, NO_VISITS_QUERY, visitStats, yearsOf } from './visitsQuery.js';
 
 function data() {
   let d = records();
   const ids = counter();
-  const visit = (date: string, dishes: { name: string; us?: 'loved' | 'good' }[], extra: { guests?: string[]; verdict?: 'wouldReturn'; note?: string } = {}) =>
+  const visit = (date: string | null, dishes: { name: string; us?: 'loved' | 'good' }[], extra: { guests?: string[]; verdict?: 'wouldReturn'; note?: string } = {}) =>
     planVisitSave(d, {
       place: { kind: 'ours', placeId: PLACE }, date, participantIds: [TED, LORI], newGuests: extra.guests ?? [], verdict: extra.verdict,
       notes: extra.note ? [{ text: extra.note }] : [], dishes: dishes.map((x) => ({ name: x.name, ratingMode: 'us' as const, us: x.us, note: '' })),
@@ -45,5 +45,29 @@ describe('the Visits list', () => {
     const rows = allVisits(data());
     expect(visitStats(rows, '2026')).toMatchObject({ visits: 2, places: 1, newPlaces: 0, unfinished: 1 });
     expect(visitStats(rows, '2025')).toMatchObject({ visits: 1, places: 1, newPlaces: 1 });
+  });
+});
+
+describe('visits from memory (date unknown)', () => {
+  const withMemory = () => {
+    const d = data();
+    const changes = planVisitSave(d, {
+      place: { kind: 'ours', placeId: PLACE }, date: null, participantIds: [TED, LORI], newGuests: [], verdict: 'wouldReturn',
+      notes: [], dishes: [{ name: 'Gnocchi', ratingMode: 'us', us: 'loved', note: '' }],
+    }, T0, { next: (() => { let n = 0; return () => `00000000-0000-4000-9000-${String(++n).padStart(12, '0')}`; })() }).changes;
+    return apply(d, changes);
+  };
+
+  test('go last, in their own group, and have no year', () => {
+    const rows = allVisits(withMemory());
+    expect(byMonth(rows).map((g) => g.month)).toEqual(['October 2026', 'September 2026', 'December 2025', DATE_UNKNOWN_GROUP]);
+    expect(yearsOf(rows)).toEqual(['2026', '2025']);
+  });
+
+  test('a chosen year leaves them out of its list and its numbers; all time counts them', () => {
+    const rows = allVisits(withMemory());
+    expect(filterVisits(rows, { ...NO_VISITS_QUERY, year: '2026' }).every((r) => !r.visit.dateUnknown)).toBe(true);
+    expect(visitStats(rows, '2026').visits).toBe(2);
+    expect(visitStats(rows, 'all').visits).toBe(4);
   });
 });

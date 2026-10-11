@@ -350,28 +350,44 @@ struct StartVisitSheet: View {
         .buttonStyle(.plain)
     }
 
-    /// Start, with the chosen place's details under its name (one control, not a card and a button).
+    /// Start, with the chosen place's details under its name (one control, not a card and a
+    /// button), and Directions to it beside.
     private var startButton: some View {
-        Button {
-            startVisit()
-        } label: {
-            VStack(spacing: 2) {
-                Text(model.selectedPlace.map { "Start visit at \($0.name)" } ?? "Start visit")
-                    .font(.headline)
-                    .lineLimit(1)
-                if let place = model.selectedPlace {
-                    Text(startDetails(place))
-                        .font(.footnote)
+        HStack(spacing: 10) {
+            Button {
+                startVisit()
+            } label: {
+                VStack(spacing: 2) {
+                    Text(model.selectedPlace.map { "Start visit at \($0.name)" } ?? "Start visit")
+                        .font(.headline)
                         .lineLimit(1)
-                        .opacity(0.85)
+                    if let place = model.selectedPlace {
+                        Text(startDetails(place))
+                            .font(.footnote)
+                            .lineLimit(1)
+                            .opacity(0.85)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(model.selectedPlace == nil)
+
+            if let place = model.selectedPlace {
+                Button {
+                    openURL(GoogleMapsLink.directions(name: place.name, googlePlaceId: place.googlePlaceId))
+                } label: {
+                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                        .font(.title2)
+                        .frame(width: 30, height: 46)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityLabel("Directions to \(place.name)")
+            }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .disabled(model.selectedPlace == nil)
         .padding(.horizontal)
         .padding(.bottom, 8)
         .background(.bar)

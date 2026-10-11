@@ -107,10 +107,10 @@ On the right: how many visits and places that year (and new places tried), the *
     slug: 'adding-a-past-visit',
     title: 'Adding a past visit',
     category: 'Recording',
-    keywords: ['add a past visit', 'edit visit', 'visit form', 'order', 'menu', 'stepper', 'quantity', 'x2', 'date', 'who was there', 'guest'],
+    keywords: ['add a past visit', 'edit visit', 'date unknown', 'from memory', "don't remember", 'backfill', 'visit form', 'order', 'menu', 'stepper', 'quantity', 'x2', 'date', 'who was there', 'guest'],
     body: `**+ Add a past visit** (on a place, a Google restaurant, or the Visits page) records a visit after the fact. **Edit** on a visit opens the same form.
 
-- **Date** — visits are recorded by date.
+- **Date** — visits are recorded by date. Don't remember when? Tick **I don't remember when**: a visit from memory, shown as "Date unknown". It counts as the oldest visit (a dated visit's verdict wins), its dishes and ratings count like any other, and on the Visits page it's under **Date unknown · from memory** (with All time chosen).
 - **Who was there** — Ted and Lori, plus any guests (type a name to add one).
 - **The menu, on the left** — dishes ordered here before (with our last rating and when), then the latest menu by section. **+** adds a dish to the order; **+** again makes it ×2; **−** takes one off. Search the menu if it's long, or add **something not on the menu** at the bottom.
 - **Your order, on the right** — each dish with its rating and a note. A dish ordered twice is still rated once.

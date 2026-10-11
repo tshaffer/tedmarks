@@ -173,7 +173,10 @@ enum SyncEncoder {
 
     static func record(_ visit: Visit) -> SyncRecord? {
         guard let place = visit.place else { return nil }
-        return base(id: visit.id, createdAt: visit.createdAt, modifiedAt: visit.modifiedAt, deletedAt: visit.deletedAt)
+        var record = base(id: visit.id, createdAt: visit.createdAt, modifiedAt: visit.modifiedAt, deletedAt: visit.deletedAt)
+        // Only visits from memory carry the flag, so other visits' records (and sync hashes) are unchanged.
+        if visit.dateUnknown { record["dateUnknown"] = .bool(true) }
+        return record
             .merging([
                 "placeId": SyncValue.id(place.id),
                 "startedAt": SyncValue.date(visit.startedAt),
@@ -511,6 +514,7 @@ enum SyncDecoder {
             visit.isFirstVisit = record["isFirstVisit"]?.bool ?? visit.isFirstVisit
             visit.tags = record["tags"]?.array?.compactMap(\.string) ?? []
             visit.wrapUpCompletedAt = SyncValue.parseDate(record["wrapUpCompletedAt"])
+            visit.dateUnknown = record["dateUnknown"]?.bool ?? false
             visit.createdAt = createdAt
             visit.modifiedAt = modifiedAt
             visit.deletedAt = deletedAt

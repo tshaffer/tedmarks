@@ -11,7 +11,7 @@ import { useTedmarksData } from '../data/TedmarksData.js';
 import { FilterChips, MultiSelectChip } from '../home/FilterChips.js';
 import { cuisineCounts, loadFilters, matchesOursExceptCuisine, saveFilters, type PlaceFilters, type StatusFilter } from '../home/filters.js';
 import { savedView } from '../home/MapView.js';
-import { longDate } from '../place/parts.js';
+import { longDate, visitDate } from '../place/parts.js';
 import { WANT } from '../theme.js';
 import { TopBar } from '../TopBar.js';
 import { cityAndTagChoices, NO_QUERY, placeRows, savedAt, type PlaceRow, type PlacesQuery, type SortKey } from './placesQuery.js';
@@ -190,7 +190,7 @@ function PlaceTableRow({ row, data, onOpen, onMap }: { row: PlaceRow; data: NonN
       </TableCell>
       <TableCell>{place.refinedRating !== undefined ? <Typography fontWeight={600}>{place.refinedRating}</Typography> : muted('—')}</TableCell>
       <TableCell>{s.visits.length ? <Typography>{s.visits.length}</Typography> : muted('—')}</TableCell>
-      <TableCell>{s.visits[0] ? <Typography variant="body2">{longDate(s.visits[0].startedAt)}</Typography> : muted(`Saved ${longDate(savedAt(s))}`)}</TableCell>
+      <TableCell>{s.visits[0] ? <Typography variant="body2">{visitDate(s.visits[0])}</Typography> : muted(`Saved ${longDate(savedAt(s))}`)}</TableCell>
       <TableCell>{s.open ? <Typography variant="body2" fontWeight={500} color={s.open.isOpen ? 'success.main' : 'error.main'}>{s.open.label}</Typography> : muted('—')}</TableCell>
     </TableRow>
   );

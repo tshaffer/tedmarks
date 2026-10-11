@@ -1,4 +1,4 @@
-import { looseDishKey } from '@tedmarks/shared';
+import { looseDishKey, isDateUnknown } from '@tedmarks/shared';
 import { Box, IconButton, InputAdornment, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { DISH, dishesAt } from '../data/insights.js';
@@ -29,7 +29,7 @@ export function OrderMenu({ data, placeId, dishes, onAdd, onRemoveOne }: {
     const visits = [...data.visits.values()].filter((v) => v.placeId === placeId);
     const lastOrdered = (itemId: string) => visits
       .filter((v) => [...data.visitItems.values()].some((l) => l.visitId === v.id && l.placeItemId === itemId))
-      .map((v) => v.startedAt).sort().at(-1);
+      .filter((v) => !isDateUnknown(v)).map((v) => v.startedAt).sort().at(-1);
     const beforeList: Entry[] = dishesAt(data, placeId).map((d) => {
       const last = lastOrdered(d.item.id);
       return {

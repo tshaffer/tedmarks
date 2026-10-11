@@ -92,7 +92,7 @@ struct PastVisitsView: View {
         let household = DishCapture.household(for: visit, people: people)
         let verdict = (try? DishCapture.verdict(for: visit, household: household, in: context)) ?? .none
         let dishCount = DishCapture.orderItems(for: visit).count
-        var details = [visit.startedAt.formatted(date: .abbreviated, time: .omitted),
+        var details = [visit.dateText,
                        "\(dishCount) dish\(dishCount == 1 ? "" : "es")"]
         if sort == .distance, let origin, let meters = PastVisits.distanceMeters(to: visit, from: origin) {
             details.insert(StartVisitSheet.distanceText(meters), at: 0)

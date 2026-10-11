@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { band, importId, interestLevel, mapMemorapp, type MemorappGooglePlace, type MemorappPlace } from './memorapp.js';
+import { UNKNOWN_VISIT_DATE } from '@tedmarks/shared';
+import { band, importId, interestLevel, isImportedStandIn, mapMemorapp, type MemorappGooglePlace, type MemorappPlace } from './memorapp.js';
 
 const google = (id: string, name: string): MemorappGooglePlace => ({
   _id: '6803f283db03ac727fb188d3', googlePlaceId: id, name, geometry: { location: { coordinates: [-122.08, 37.39] } },
@@ -57,4 +58,16 @@ test('rated place with no visits gets a stand-in visit; non-restaurants are skip
   assert.equal(changes.places?.[0]?.id, '11111111-1111-4111-8111-111111111111');
   assert.equal(report.syntheticVisits.length, 1);
   assert.equal(changes.ratings?.[0]?.value, 'wontReturn');
+  // The stand-in is a visit from memory: date unknown.
+  assert.equal(changes.visits?.[0]?.dateUnknown, true);
+  assert.equal(changes.visits?.[0]?.startedAt, UNKNOWN_VISIT_DATE);
+});
+
+test('stand-in visits from an earlier import are recognized (start = creation time, no dishes)', () => {
+  const at = '2026-05-08T17:31:02.000Z';
+  assert.equal(isImportedStandIn({ origin: 'imported', startedAt: at, createdAt: at }, 0), true);
+  assert.equal(isImportedStandIn({ origin: 'imported', startedAt: '2025-06-03T12:00:00.000Z', createdAt: '2025-06-03T00:00:00.000Z' }, 0), false);   // a real imported visit
+  assert.equal(isImportedStandIn({ origin: 'imported', startedAt: at, createdAt: at }, 2), false);                                                   // has dishes
+  assert.equal(isImportedStandIn({ origin: 'manual', startedAt: at, createdAt: at }, 0), false);
+  assert.equal(isImportedStandIn({ origin: 'imported', startedAt: at, createdAt: at, dateUnknown: true }, 0), false);                               // already done
 });

@@ -181,10 +181,12 @@ struct AddToOrderSheet: View {
             other.id != visit.id && other.deletedAt == nil
                 && DishCapture.orderItems(for: other).contains { $0.placeItem?.id == placeItem.id }
         }
-        guard let last = visits.map(\.startedAt).max() else { return placeItem.price }
+        guard !visits.isEmpty else { return placeItem.price }
         let times = visits.count == 1 ? "Ordered once" : "Ordered \(visits.count) times"
-        return [times, (visits.count > 1 ? "last " : "") + last.formatted(date: .abbreviated, time: .omitted), placeItem.price]
-            .compactMap { $0 }.joined(separator: " · ")
+        // Visits from memory have no date to show.
+        let last = visits.filter { !$0.dateUnknown }.map(\.startedAt).max()
+            .map { (visits.count > 1 ? "last " : "") + $0.formatted(date: .abbreviated, time: .omitted) }
+        return [times, last, placeItem.price].compactMap { $0 }.joined(separator: " · ")
     }
 
     private func perform(_ action: () throws -> Void) {

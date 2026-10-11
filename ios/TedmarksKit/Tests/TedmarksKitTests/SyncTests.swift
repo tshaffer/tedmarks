@@ -350,3 +350,27 @@ private let doppio = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", a
         #expect(bDish.count == 1 && bDish.deletedAt == nil)
     }
 }
+
+@MainActor
+@Test func visitsFromMemoryKeepDateUnknownThroughSync() async throws {
+    do {
+        let server = FakeServer()
+        let a = try Phone(server: server)
+        let visit = try VisitStarter.startVisit(at: doppio, participantIds: [Household.tedId], in: a.context)
+        // An ordinary visit's record has no flag (so its sync hash is unchanged).
+        #expect(SyncEncoder.record(visit)?["dateUnknown"] == nil)
+        // As the website saves one: placeholder date, flagged.
+        visit.dateUnknown = true
+        visit.startedAt = Visit.unknownDate
+        visit.modifiedAt = .now
+        try a.context.save()
+        await a.engine.sync()
+
+        let b = try Phone(server: server)
+        await b.engine.sync()
+        let bVisit = try #require(try b.visits().first)
+        #expect(bVisit.dateUnknown)
+        #expect(bVisit.dateText == "Date unknown")
+        #expect(bVisit.startedAt == Visit.unknownDate)
+    }
+}

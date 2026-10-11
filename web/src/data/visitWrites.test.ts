@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { NOW, PLACE, T0, apply, counter, records } from './testRecords.js';
+import { UNKNOWN_VISIT_DATE } from '@tedmarks/shared';
 import { LORI, TED, planVisitDelete, planVisitSave, startedAtIso, type VisitForm } from './visitWrites.js';
 
 const baseForm: VisitForm = {
@@ -54,6 +55,21 @@ describe('adding a past visit', () => {
 });
 
 describe('editing a visit', () => {
+  test('a visit from memory: no date (placeholder, flagged); giving it a date later clears the flag', () => {
+    let data = records();
+    const first = planVisitSave(data, { ...baseForm, date: null }, NOW, counter());
+    data = apply(data, first.changes);
+    expect(data.visits.get(first.visitId)).toMatchObject({ startedAt: UNKNOWN_VISIT_DATE, endedAt: UNKNOWN_VISIT_DATE, dateUnknown: true });
+
+    // Saved again still without a date: nothing about the date changes.
+    const same = planVisitSave(data, { ...baseForm, visitId: first.visitId, date: null }, NOW, counter()).changes;
+    expect(Object.keys(same.visits?.[0] ?? {})).not.toContain('startedAt');
+
+    const dated = apply(data, planVisitSave(data, { ...baseForm, visitId: first.visitId, date: '2026-09-20' }, NOW, counter()).changes);
+    expect(dated.visits.get(first.visitId)).toMatchObject({ startedAt: startedAtIso('2026-09-20') });
+    expect(dated.visits.get(first.visitId)?.dateUnknown).toBeUndefined();
+  });
+
   test('only one of us there: each dish gets one rating, even from a split row', () => {
     let data = records();
     const first = planVisitSave(data, { ...baseForm, dishes: [{ name: 'Arancini', ratingMode: 'split', ted: 'skip', lori: 'loved', note: '' }] }, NOW, counter());

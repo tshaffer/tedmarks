@@ -1,3 +1,4 @@
+import { isDateUnknown } from '@tedmarks/shared';
 import { Alert, Box, Button, Chip, CircularProgress, InputAdornment, Link, ListItemText, Menu, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -56,6 +57,8 @@ export function VisitsPage({ onSignedOut }: { onSignedOut: () => void }) {
   // A search that finds more outside the chosen year says so.
   const otherYears = useMemo(() => (q.year === 'all' || !filtered ? 0 : filterVisits(all, { ...q, year: 'all' }).length - rows.length), [all, q, rows, filtered]);
   const stats = useMemo(() => visitStats(all, q.year), [all, q.year]);
+  // A chosen year shows dated visits only; visits from memory (date unknown) are a link away.
+  const undated = useMemo(() => (q.year === 'all' ? 0 : filterVisits(all, { ...q, year: 'all' }).filter((r) => isDateUnknown(r.visit)).length), [all, q]);
   // Menu choices (with counts) from the visits in the chosen year.
   const inYear = useMemo(() => (q.year === 'all' ? all : all.filter((r) => r.visit.startedAt.startsWith(q.year))), [all, q.year]);
   const people = useMemo(() => {
@@ -140,6 +143,11 @@ export function VisitsPage({ onSignedOut }: { onSignedOut: () => void }) {
                   ))}
                 </Box>
               ))}
+              {undated > 0 && (
+                <Link component="button" variant="body2" underline="hover" sx={{ display: 'block', py: 1.5 }} onClick={() => set({ year: 'all' })}>
+                  {undated} visit{undated === 1 ? '' : 's'} from memory (date unknown) — show all time
+                </Link>
+              )}
             </Paper>
           )}
         </Stack>

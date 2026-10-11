@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { normalizeItemName, type CollectionName } from '@tedmarks/shared';
+import { normalizeItemName, UNKNOWN_VISIT_DATE, type CollectionName } from '@tedmarks/shared';
 
 // Maps memorapp's data (mrplaces + mongoPlaces) to Tedmarks records, following
 // docs/tedmarks-data-model.md §17 and docs/tedmarks-functionality-draft.md §8.
@@ -258,8 +258,8 @@ export function mapMemorapp(
       });
     });
 
-    // The place-level rating becomes the verdict of the most recent imported visit
-    // (or of a stand-in visit dated when the place was saved, if there were none).
+    // The place-level rating becomes the verdict of the most recent imported visit (or, if
+    // there were none, of a stand-in visit from memory: date unknown).
     if (verdict) {
       let target = visitIds.at(-1);
       if (!target) {
@@ -268,7 +268,7 @@ export function mapMemorapp(
         result.report.syntheticVisits.push(name);
         add('visits', {
           ...meta(id, created),
-          placeId, startedAt: created.toISOString(), endedAt: created.toISOString(), status: 'ended', origin: 'imported',
+          placeId, startedAt: UNKNOWN_VISIT_DATE, endedAt: UNKNOWN_VISIT_DATE, dateUnknown: true, status: 'ended', origin: 'imported',
           participantIds: [TED, LORI], isFirstVisit: !prior, wrapUpCompletedAt: created.toISOString(), tags: [],
         });
       }
@@ -292,4 +292,14 @@ function stripUndefined(value: Record<string, unknown>): void {
     if (entry === undefined) delete value[key];
     else if (entry && typeof entry === 'object' && !Array.isArray(entry)) stripUndefined(entry as Record<string, unknown>);
   }
+}
+
+/**
+ * A stand-in visit from an earlier import: memorapp's rating for a place with no recorded visits,
+ * dated when the place was saved (its start equals its creation time; real imported visits start
+ * at midday on their own date) and with no dishes. Those are visits from memory, date unknown.
+ */
+export function isImportedStandIn(visit: Record<string, unknown>, dishCount: number): boolean {
+  return visit.origin === 'imported' && visit.dateUnknown !== true && dishCount === 0
+    && typeof visit.startedAt === 'string' && visit.startedAt === visit.createdAt;
 }

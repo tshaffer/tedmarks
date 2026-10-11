@@ -12,7 +12,8 @@
     "indexes:create": "tsx src/tools/createIndexes.ts",
     "clean": "rimraf dist",
     "migrate:memorapp": "tsx src/tools/migrateMemorapp.ts",
-    "dishes:duplicates": "tsx src/tools/findDuplicateDishes.ts"
+    "dishes:duplicates": "tsx src/tools/findDuplicateDishes.ts",
+    "visits:undate-stand-ins": "tsx src/tools/undateStandInVisits.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

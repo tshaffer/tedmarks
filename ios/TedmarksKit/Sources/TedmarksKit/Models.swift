@@ -123,6 +123,9 @@ public final class Visit {
     @Attribute(.unique) public var id: UUID
     public var place: Place?
     public var startedAt: Date
+    /// A visit from memory (added on the website): we don't know when, and startedAt is
+    /// `Visit.unknownDate` so it sorts as the oldest.
+    public var dateUnknown: Bool = false
     public var endedAt: Date?
     public var statusRaw: String
     public var originRaw: String
@@ -173,3 +176,11 @@ public let tedmarksModelTypes: [any PersistentModel.Type] = [
     Person.self, Place.self, Visit.self, PlaceItem.self, VisitItem.self, Rating.self, SyncRecordState.self,
     Note.self, PlaceSubtype.self, VoiceNote.self, Draft.self, Photo.self, PlaceMenu.self,
 ]
+
+public extension Visit {
+    /// A visit from memory's placeholder start (UNKNOWN_VISIT_DATE in shared): 1970-01-01, midday UTC.
+    static let unknownDate = Date(timeIntervalSince1970: 12 * 3600)
+
+    /// "Oct 3, 2026", or "Date unknown" for a visit from memory.
+    var dateText: String { dateUnknown ? "Date unknown" : startedAt.formatted(date: .abbreviated, time: .omitted) }
+}

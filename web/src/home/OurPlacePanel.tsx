@@ -6,11 +6,11 @@ import type { PlaceSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
 import { InterestBox, VerdictCard, VisitList, WhatToOrder } from '../place/parts.js';
 import { WANT } from '../theme.js';
-import { GoogleCard } from './GooglePlacePanel.js';
+import { GoogleCard, googleDirectionsUrl } from './GooglePlacePanel.js';
 
 /** Google Maps directions to a place (by its Google id when we have it). */
 export function directionsUrl(place: PlaceSummary['place']): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place.name)}${place.google?.placeId ? `&destination_place_id=${place.google.placeId}` : ''}`;
+  return googleDirectionsUrl(place.name, place.google?.placeId);
 }
 
 /** Figma W1 · chosen restaurant we've been to (or saved as want to go). */

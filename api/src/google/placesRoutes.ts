@@ -11,7 +11,7 @@ import {
 import { MAX_SEARCH_RADIUS_METERS } from '@tedmarks/shared';
 import type { LatLng, PlacesClient } from './placesClient.js';
 import type { SyncStore } from '../sync/syncStore.js';
-import { combineResults, type AreaSearchCache } from './areaSearch.js';
+import { combineResults, searchesFor, type AreaSearchCache } from './areaSearch.js';
 
 function parseOrigin(req: Request): LatLng | null {
   const latitude = Number(req.query['lat']);
@@ -133,7 +133,8 @@ export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMete
 
   /**
    * POST /places/area-search — Google's restaurants inside a map area, for planning where to eat.
-   * One search per cuisine type (Google takes one type at a time), combined; cached for a few days.
+   * One search per cuisine type (Google takes one type at a time), or restaurants plus coffee and
+   * desserts when no cuisine is chosen; combined, and cached for a few days.
    */
   router.post('/area-search', async (req, res) => {
     const parsed = AreaSearchRequest.safeParse(req.body);
@@ -148,8 +149,7 @@ export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMete
         res.json(cached);
         return;
       }
-      const types = request.cuisineTypes?.length ? request.cuisineTypes : [undefined];
-      const results = await Promise.all(types.map((type) => client!.areaSearch(request, type)));
+      const results = await Promise.all(searchesFor(request).map((s) => client!.areaSearch(s.request, s.cuisineType)));
       const body: AreaSearchResponse = {
         restaurants: combineResults(results.map((r) => r.restaurants)),
         truncated: results.some((r) => r.truncated),

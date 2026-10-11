@@ -41,6 +41,7 @@ export class AreaSearchCache {
 export function cacheKey(request: AreaSearchRequest): string {
   const r = (n: number) => Math.round(n * 200) / 200;   // ~0.005° ≈ 500 m
   const key = {
+    v: 4,   // 4: restaurants plus coffee and desserts (earlier entries had restaurants only)
     b: [r(request.bounds.south), r(request.bounds.west), r(request.bounds.north), r(request.bounds.east)],
     q: request.query?.trim().toLowerCase() ?? '',
     c: [...(request.cuisineTypes ?? [])].sort(),
@@ -50,6 +51,21 @@ export function cacheKey(request: AreaSearchRequest): string {
     o: request.openNow ? new Date().toISOString().slice(0, 13) : '',
   };
   return createHash('sha256').update(JSON.stringify(key)).digest('hex');
+}
+
+/**
+ * Google's "restaurants" leaves out places it files as something else (an ice cream shop, a
+ * coffee shop, a bakery), so a search with no cuisine and no query of its own asks for these
+ * too. (Tried against Santa Cruz: this finds the gelato and ice cream shops a longer list of
+ * kinds, or a search by type, missed.)
+ */
+export const CAFES_QUERY = 'coffee and desserts';
+
+/** The Google searches for one area search: one per cuisine; or restaurants plus coffee and desserts. */
+export function searchesFor(request: AreaSearchRequest): { request: AreaSearchRequest; cuisineType?: string }[] {
+  if (request.cuisineTypes?.length) return request.cuisineTypes.map((cuisineType) => ({ request, cuisineType }));
+  if (request.query?.trim()) return [{ request }];
+  return [{ request }, { request: { ...request, query: CAFES_QUERY } }];
 }
 
 /** Results from several searches (one per cuisine), each place once. */

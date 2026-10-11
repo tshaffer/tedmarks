@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import { createApp } from '../server.js';
-import { cacheKey } from './areaSearch.js';
+import { CAFES_QUERY, cacheKey, searchesFor } from './areaSearch.js';
 import { PlacesClient, type FetchFn } from './placesClient.js';
 
 const bounds = { south: 34.40, west: -119.72, north: 34.44, east: -119.68 };   // Santa Barbara
@@ -75,4 +75,10 @@ test('cacheKey: a small pan reuses the search; different filters don’t', () =>
   assert.equal(cacheKey({ bounds }), cacheKey({ bounds: nudged }));
   assert.notEqual(cacheKey({ bounds }), cacheKey({ bounds, minRating: 4.5 }));
   assert.equal(cacheKey({ bounds, cuisineTypes: ['a_restaurant', 'b_restaurant'] }), cacheKey({ bounds, cuisineTypes: ['b_restaurant', 'a_restaurant'] }));
+});
+
+test('with no cuisine or query, an area search also asks for coffee and desserts', () => {
+  assert.deepEqual(searchesFor({ bounds }).map((s) => s.request.query ?? 'restaurants'), ['restaurants', CAFES_QUERY]);
+  assert.deepEqual(searchesFor({ bounds, query: 'breakfast' }).map((s) => s.request.query), ['breakfast']);
+  assert.deepEqual(searchesFor({ bounds, cuisineTypes: ['thai_restaurant', 'pizza_restaurant'] }).map((s) => s.cuisineType), ['thai_restaurant', 'pizza_restaurant']);
 });

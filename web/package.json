@@ -24,6 +24,7 @@
     "@googlemaps/js-api-loader": "^2.1.3",
     "@mui/material": "^7.3.11",
     "@tedmarks/shared": "workspace:*",
+    "pdfjs-dist": "6.3.289",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-markdown": "10.1.0",

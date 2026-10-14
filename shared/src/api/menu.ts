@@ -10,7 +10,8 @@ export const MenuPageImage = z.object({
 /** POST /ai/menu */
 export const MenuReadRequest = z.object({
   placeName: z.string().min(1),
-  pages: z.array(MenuPageImage).min(1).max(12),
+  /** Up to 12 files from the phone; a big PDF read on the website arrives as up to 30 page images. */
+  pages: z.array(MenuPageImage).min(1).max(40),
 });
 export type MenuReadRequest = z.infer<typeof MenuReadRequest>;
 

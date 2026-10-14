@@ -119,14 +119,22 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
               : <Action onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'add' })}>+ Add a menu</Action>}>
             {menu ? (
               <Stack spacing={1}>
-                {sections.slice(0, 6).map((section, i) => (
+                {/* A preview: the first dishes, one per line under their sections. */}
+                {menuPreview(sections, MENU_PREVIEW_DISHES).map((section, i) => (
                   <Box key={i}>
-                    {section.title && <Typography variant="caption" color="text.secondary" fontWeight={600}>{section.title}</Typography>}
-                    <Typography variant="body2">{section.entries.map((e) => (e.price ? `${e.name} ${e.price}` : e.name)).join(' · ')}</Typography>
+                    {section.title && <Typography variant="caption" color="text.secondary" fontWeight={600} display="block">{section.title.toUpperCase()}</Typography>}
+                    {section.entries.map((e, j) => (
+                      <Stack key={j} direction="row" spacing={2} sx={{ py: 0.25 }}>
+                        <Typography variant="body2" sx={{ flex: 1 }}>{e.name}</Typography>
+                        {e.price && <Typography variant="body2" color="text.secondary">{e.price}</Typography>}
+                      </Stack>
+                    ))}
                   </Box>
                 ))}
                 <Link component="button" variant="body2" underline="hover" sx={{ alignSelf: 'flex-start' }}
-                  onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'view' })}>View full menu ›</Link>
+                  onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'view' })}>
+                  {dishCount > MENU_PREVIEW_DISHES ? `View full menu · ${dishCount - MENU_PREVIEW_DISHES} more ›` : 'View full menu ›'}
+                </Link>
               </Stack>
             ) : <Typography color="text.secondary">Add the menu from a PDF or screenshots, and see what we thought of each dish.</Typography>}
           </Card>
@@ -183,4 +191,19 @@ function Card({ title, action, children }: { title?: string; action?: ReactNode;
 
 function Action({ onClick, danger, children }: { onClick: () => void; danger?: boolean; children: ReactNode }) {
   return <Link component="button" variant="body2" underline="hover" onClick={onClick} sx={{ color: danger ? 'error.main' : 'primary.main', fontWeight: 500 }}>{children}</Link>;
+}
+
+const MENU_PREVIEW_DISHES = 12;
+
+/** The menu's first `limit` dishes, keeping their sections. */
+function menuPreview<E, S extends { title: string | null; entries: E[] }>(sections: S[], limit: number): S[] {
+  const out: S[] = [];
+  let left = limit;
+  for (const section of sections) {
+    if (left <= 0) break;
+    const entries = section.entries.slice(0, left);
+    left -= entries.length;
+    if (entries.length) out.push({ ...section, entries });
+  }
+  return out;
 }

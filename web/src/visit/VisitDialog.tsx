@@ -1,7 +1,7 @@
 import type { ItemRatingValue, NearbyPlace, VerdictValue } from '@tedmarks/shared';
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  FormControlLabel, IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography,
+  FormControlLabel, IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography, useMediaQuery,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { isDateUnknown, looseDishKey } from '@tedmarks/shared';
@@ -38,6 +38,8 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
 
   // Form state, filled from the visit when editing.
   const initial = useMemo(() => initialForm(data, editing?.id), [data, editing?.id]);
+  // An iPad in portrait: the whole screen, one column.
+  const narrow = useMediaQuery('(max-width:899.95px)');
   const [date, setDate] = useState(initial.date);
   // A visit from memory: we don't know when (the date is kept, in case it's unticked again).
   const [dateUnknown, setDateUnknown] = useState(initial.dateUnknown);
@@ -102,7 +104,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
   }
 
   return (
-    <Dialog open onClose={onClose} maxWidth="lg" fullWidth slotProps={{ paper: { sx: { height: 'min(92vh, 900px)' } } }}>
+    <Dialog open onClose={onClose} maxWidth="lg" fullWidth fullScreen={narrow} slotProps={{ paper: { sx: narrow ? {} : { height: 'min(92vh, 900px)' } } }}>
       <DialogTitle sx={{ fontWeight: 700 }}>{editing ? 'Edit visit' : 'Add a past visit'} · {placeName}</DialogTitle>
       <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column' }}>
         <Stack spacing={2.5} sx={{ flex: 1, minHeight: 0 }}>
@@ -134,11 +136,12 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
           </Box>
           </Stack>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '5fr 6fr' }, gap: 2.5, flex: 1, minHeight: 0 }}>
-            <Box sx={{ minHeight: 360, maxHeight: { md: '100%' }, height: { md: '100%' } }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '5fr 6fr' }, gap: 2.5, flex: { md: 1 }, minHeight: 0 }}>
+            {/* One column (an iPad in portrait): the menu takes half the screen, the order follows. */}
+            <Box sx={{ minHeight: 360, maxHeight: { md: '100%' }, height: { xs: '50vh', md: '100%' } }}>
               <OrderMenu data={data} placeId={placeId} dishes={dishes} onAdd={addOne} onRemoveOne={removeOne} />
             </Box>
-            <Box sx={{ overflowY: 'auto', minHeight: 0 }}>
+            <Box sx={{ overflowY: { md: 'auto' }, minHeight: 0 }}>
               <Stack direction="row" alignItems="baseline">
                 <Typography fontWeight={700} sx={{ flex: 1 }}>Your order</Typography>
                 {dishes.length > 0 && (

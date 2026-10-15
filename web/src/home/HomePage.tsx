@@ -1,5 +1,5 @@
 import type { AreaRestaurant } from '@tedmarks/shared';
-import { Alert, Box, CircularProgress, Paper, Typography } from '@mui/material';
+import { Alert, Box, CircularProgress, Paper, Typography, useMediaQuery } from '@mui/material';
 import { areaSearch } from '../api.js';
 import { usePlaceActions, useShowPlace } from '../actions/PlaceActions.js';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -18,16 +18,23 @@ import {
 import { PlaceList, type ListItem } from './PlaceList.js';
 import { cityAndTagChoices } from '../places/placesQuery.js';
 import type { Area } from '../places/areas.js';
-import { SearchBox, type SearchResult } from './SearchBox.js';
+import { SEARCH_WIDTH, SearchBox, type SearchResult } from './SearchBox.js';
 
-/** The chosen place's panel, over the map's right side. */
-const PANEL_WIDTH = 420;
+/**
+ * The chosen place's panel, over the map's right side: narrower on an iPad in landscape, and as
+ * wide as fits (up to 380) on one in portrait, where the map sits over the list.
+ */
+const PANEL_WIDTH = { xs: 'min(380px, calc(100% - 32px))', md: '360px', lg: '420px' } as const;
 
 type Selection = { kind: 'ours'; placeId: string } | { kind: 'google'; googlePlaceId: string } | null;
 
 /** Figma W1/W1b: choose a restaurant (search, a map pin, or a row), then act on it in the panel. */
 export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   const { data, error } = useTedmarksData();
+  const wide = useMediaQuery('(min-width:1200px)');
+  const sideBySide = useMediaQuery('(min-width:900px)');
+  // For centering a found place in the part of the map the panel doesn't cover.
+  const panelWidth = wide ? 420 : sideBySide ? 360 : Math.min(380, window.innerWidth - 32);
   const actions = usePlaceActions();
   const [maps, setMaps] = useState<MapsConfig | null>(null);
   const [mapsError, setMapsError] = useState<string | null>(null);
@@ -153,7 +160,7 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
         if ((map.getZoom() ?? 0) < 15) map.setZoom(16);
         map.panTo(result.location);
         // Centered in the part of the map the place panel doesn't cover.
-        map.panBy(PANEL_WIDTH / 2, 0);
+        map.panBy(panelWidth / 2, 0);
       }
     } else if (result.viewport) {
       setSearched(null);
@@ -164,7 +171,7 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
       autoSearch.current = true;
       map.panTo(result.location);
     }
-  }, [map, chooseGoogle]);
+  }, [map, chooseGoogle, panelWidth]);
 
   // From the top bar's search on another page: do it here once the map is ready.
   const [arrivedSearch, setArrivedSearch] = useState(() => arrived?.search ?? null);
@@ -213,9 +220,10 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} width={360} onResult={onSearch} onClear={clearSearched} /> : null} />
+      <TopBar onSignedOut={onSignedOut} search={maps?.googleMapsKey && map ? <SearchBox bias={view?.bounds ?? null} width={SEARCH_WIDTH} onResult={onSearch} onClear={clearSearched} /> : null} />
       {error && <Alert severity="error">{error}</Alert>}
-      <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
+      {/* Side by side from 900 wide; below that (an iPad in portrait) the map is over the list. */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: { xs: 'column-reverse', md: 'row' }, minHeight: 0 }}>
         <PlaceList items={inView} matching={matching} filters={filters} onFilters={setFilters} cuisines={cuisines} tags={tags} onManageTags={actions.manageTags} selectedId={chosenId}
           onSelectOurs={(id) => chooseOurs(id, true)} onSelectGoogle={(id) => setSelection({ kind: 'google', googlePlaceId: id })}
           google={{ loading: googleSearch.loading, error: googleSearch.error, found: googleResults?.length ?? null, truncated: googleSearch.truncated, stale, onSearch: () => void searchGoogle() }}
@@ -224,7 +232,7 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
             next: areas.list.length > 1 ? { name: areas.list[(areas.index + 1) % areas.list.length]!.name, go: () => setAreas({ ...areas, index: (areas.index + 1) % areas.list.length }) } : null,
             onClear: () => setAreas(null),
           } : null} />
-        <Box sx={{ position: 'relative', flex: 1, bgcolor: '#eef0ea' }}>
+        <Box sx={{ position: 'relative', flex: 1, minHeight: 0, bgcolor: '#eef0ea' }}>
           {!maps && !mapsError && <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}><CircularProgress /></Box>}
           {(mapsError || (maps && !maps.googleMapsKey)) && (
             <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', p: 4 }}>

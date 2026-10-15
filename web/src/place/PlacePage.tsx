@@ -69,7 +69,7 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
             </Stack>
           </Box>
           {place.status === 'beenThere' && <Box sx={{ width: { md: 320 } }}><VerdictCard data={data} summary={summary} /></Box>}
-          <Stack spacing={1} sx={{ width: { md: 170 } }}>
+          <Stack direction={{ xs: 'row', md: 'column' }} spacing={1} useFlexGap flexWrap="wrap" sx={{ width: { md: 170 } }}>
             <Button variant="contained" onClick={() => actions.openVisit({ kind: 'ours', placeId: place.id })}>+ Add visit</Button>
             <Button onClick={() => actions.editPlace(place.id)} sx={grey}>Edit place</Button>
             <Button href={directionsUrl(place)} target="_blank" rel="noopener" sx={grey}>Directions ↗</Button>

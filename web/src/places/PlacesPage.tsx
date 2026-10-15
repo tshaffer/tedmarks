@@ -24,6 +24,8 @@ const SORTS: { key: SortKey; label: string }[] = [
 const verdictEmoji = Object.fromEntries(Object.entries(VERDICT).map(([k, v]) => [k, v.emoji]));
 
 const SEARCH_KEY = 'tedmarks.placesSearch';
+/** Columns shown only when there's room (not on an iPad), so place names don't wrap. */
+const WIDE_ONLY = { xs: 'none', lg: 'table-cell' } as const;
 
 /** Sort and filters are remembered; the search only for this browser session (so Back keeps it). */
 function loadQuery(): PlacesQuery {
@@ -77,8 +79,8 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
   const showAreas = (index: number) => { setAreaMenu(null); navigate('/', { state: { areas: mapAreas, areaIndex: index } }); };
 
   const sortBy = (key: SortKey) => set(query.sort === key ? { reversed: !query.reversed } : { sort: key, reversed: false });
-  const header = (label: string, key?: SortKey, width?: number) => (
-    <TableCell sx={{ width, fontSize: 12, fontWeight: 600, color: 'text.secondary', bgcolor: '#fafafb', whiteSpace: 'nowrap' }}>
+  const header = (label: string, key?: SortKey, width?: number, wideOnly = false) => (
+    <TableCell sx={{ width, display: wideOnly ? WIDE_ONLY : undefined, fontSize: 12, fontWeight: 600, color: 'text.secondary', bgcolor: '#fafafb', whiteSpace: 'nowrap' }}>
       {key ? <TableSortLabel active={query.sort === key} direction={query.reversed ? 'asc' : 'desc'} onClick={() => sortBy(key)}>{label}</TableSortLabel> : label}
     </TableCell>
   );
@@ -137,10 +139,10 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
                 <TableRow>
                   {header('PLACE', 'name')}
                   {header('OUR VERDICT', undefined, 220)}
-                  {header('0–10', 'rating', 80)}
+                  {header('0–10', 'rating', 80, true)}
                   {header('VISITS', 'visits', 80)}
                   {header('LAST VISIT', 'lastVisit', 130)}
-                  {header('NOW', undefined, 180)}
+                  {header('NOW', undefined, 180, true)}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -188,10 +190,10 @@ function PlaceTableRow({ row, data, onOpen, onMap }: { row: PlaceRow; data: NonN
           </>
         ) : muted('No verdict yet')}
       </TableCell>
-      <TableCell>{place.refinedRating !== undefined ? <Typography fontWeight={600}>{place.refinedRating}</Typography> : muted('—')}</TableCell>
+      <TableCell sx={{ display: WIDE_ONLY }}>{place.refinedRating !== undefined ? <Typography fontWeight={600}>{place.refinedRating}</Typography> : muted('—')}</TableCell>
       <TableCell>{s.visits.length ? <Typography>{s.visits.length}</Typography> : muted('—')}</TableCell>
       <TableCell>{s.visits[0] ? <Typography variant="body2">{visitDate(s.visits[0])}</Typography> : muted(`Saved ${longDate(savedAt(s))}`)}</TableCell>
-      <TableCell>{s.open ? <Typography variant="body2" fontWeight={500} color={s.open.isOpen ? 'success.main' : 'error.main'}>{s.open.label}</Typography> : muted('—')}</TableCell>
+      <TableCell sx={{ display: WIDE_ONLY }}>{s.open ? <Typography variant="body2" fontWeight={500} color={s.open.isOpen ? 'success.main' : 'error.main'}>{s.open.label}</Typography> : muted('—')}</TableCell>
     </TableRow>
   );
 }

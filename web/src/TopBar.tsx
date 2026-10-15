@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { getMe, signOut } from './api.js';
 import { loadGoogleMaps } from './googleMaps.js';
-import { SearchBox } from './home/SearchBox.js';
+import { SEARCH_WIDTH, SearchBox } from './home/SearchBox.js';
 
 /** The app's top-level pages (Figma web designs). */
 const TABS = [
@@ -23,7 +23,7 @@ let myName: Promise<string | null> | undefined;
 export function TopBar({ search, onSignedOut }: { search?: ReactNode; onSignedOut: () => void }) {
   return (
     <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: '1px solid #e3e3e8', zIndex: 2 }}>
-      <Toolbar sx={{ gap: 3, minHeight: '60px !important' }}>
+      <Toolbar sx={{ gap: { xs: 1.5, md: 3 }, minHeight: '60px !important' }}>
         <Typography variant="h6" fontWeight={700} color="primary">Tedmarks</Typography>
         <Box component="nav" sx={{ display: 'flex', gap: 0.5 }}>
           {TABS.map((tab) => (
@@ -48,7 +48,7 @@ function SiteSearch() {
   const [ready, setReady] = useState(false);
   useEffect(() => { loadGoogleMaps().then((config) => setReady(Boolean(config.googleMapsKey))).catch(() => setReady(false)); }, []);
   if (!ready) return null;
-  return <SearchBox bias={null} width={360} onResult={(result) => navigate('/', { state: { search: result } })} />;
+  return <SearchBox bias={null} width={SEARCH_WIDTH} onResult={(result) => navigate('/', { state: { search: result } })} />;
 }
 
 /** "Ted", with Sign out. */

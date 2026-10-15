@@ -7,8 +7,12 @@ export interface SearchResult { googlePlaceId: string; name: string; rating: num
  * Google's place search box: restaurants by name, or a town / address to move the map. Enter
  * with the text unchanged repeats the last search; clearing the text calls `onClear`.
  */
+/** The top bar's search box: narrower on an iPad, so the tabs, search and name all fit. */
+export const SEARCH_WIDTH = { xs: 220, md: 280, lg: 360 } as const;
+
 export function SearchBox({ bias, onResult, onClear, width = 440 }: {
-  bias: google.maps.LatLngBounds | null; onResult: (result: SearchResult) => void; onClear?: () => void; width?: number;
+  bias: google.maps.LatLngBounds | null; onResult: (result: SearchResult) => void; onClear?: () => void;
+  width?: number | { xs: number; md: number; lg: number };
 }) {
   const host = useRef<HTMLDivElement>(null);
   const element = useRef<google.maps.places.PlaceAutocompleteElement | null>(null);

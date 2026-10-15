@@ -49,7 +49,10 @@ export function PlaceList({ items, matching, filters, onFilters, cuisines, tags,
   const showGoogle = filters.showGoogle && !only;
   const toggles = [...filters.statuses, ...(showGoogle ? ['google'] : [])];
   return (
-    <Box sx={{ width: 400, flexShrink: 0, bgcolor: 'background.paper', borderRight: '1px solid #e3e3e8', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <Box sx={{
+      width: { xs: '100%', md: 320, lg: 400 }, height: { xs: '42%', md: 'auto' }, flexShrink: 0, bgcolor: 'background.paper',
+      borderRight: { md: '1px solid #e3e3e8' }, borderTop: { xs: '1px solid #e3e3e8', md: 'none' }, display: 'flex', flexDirection: 'column', minHeight: 0,
+    }}>
       <Stack spacing={1} sx={{ p: 2, pb: 1.5 }}>
         {only && (
           <Stack direction="row" alignItems="center" sx={{ px: 1.25, py: 0.5, borderRadius: 2, bgcolor: '#fff1dc' }}>

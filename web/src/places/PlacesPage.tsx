@@ -151,7 +151,9 @@ export function PlacesPage({ onSignedOut }: { onSignedOut: () => void }) {
               </TableBody>
             </Table>
             <Typography variant="body2" color="text.secondary" sx={{ px: 2.5, py: 1.5, borderTop: '1px solid #efeff3' }}>
-              {rows.length === 0 ? 'No places match.' : `Showing ${rows.length} of ${counts.all}`} · click a row to open its Place page
+              {rows.length === 0
+                ? 'No places match. Not in Tedmarks yet? Find it with the search at the top, which looks on Google.'
+                : `Showing ${rows.length} of ${counts.all} · click a row to open its Place page`}
             </Typography>
           </Paper>
         )}

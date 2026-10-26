@@ -51,8 +51,8 @@ export interface MenuPage { mediaType: string; data: string }
  * Has Claude read a menu: starts the reading, then checks every few seconds until it's done
  * (a long PDF can take longer than one request may run on Heroku).
  */
-export async function readMenu(placeName: string, pages: MenuPage[]): Promise<MenuReadItem[]> {
-  const { jobId } = await api<{ jobId: string }>('/ai/menu/jobs', { method: 'POST', body: JSON.stringify({ placeName, pages }) });
+export async function readMenu(placeName: string, pages: MenuPage[], text?: string): Promise<MenuReadItem[]> {
+  const { jobId } = await api<{ jobId: string }>('/ai/menu/jobs', { method: 'POST', body: JSON.stringify({ placeName, pages, text: text?.trim() || undefined }) });
   const deadline = Date.now() + 6 * 60_000;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 2500));

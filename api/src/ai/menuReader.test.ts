@@ -31,6 +31,9 @@ test('POST /ai/menu validates pages and returns what the reader found', async ()
     const ok = await post({ placeName: 'Doppio Zero', pages: [{ mediaType: 'image/jpeg', data: 'aGVsbG8=' }] });
     assert.equal(ok.status, 200);
     assert.deepEqual(await ok.json(), { items: [{ section: 'Pizza', name: 'Margherita', price: '18' }] });
+    // Pasted text alone is enough; blank text isn't.
+    assert.equal((await post({ placeName: 'Doppio Zero', text: 'PIZZA\nMargherita $18' })).status, 200);
+    assert.equal((await post({ placeName: 'Doppio Zero', text: '   ' })).status, 400);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

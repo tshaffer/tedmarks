@@ -7,12 +7,17 @@ export const MenuPageImage = z.object({
   data: z.string().min(1),
 });
 
-/** POST /ai/menu */
+/** Pasted menu text: the most kept (a long web menu is ~30,000 characters). */
+export const MAX_MENU_TEXT = 100_000;
+
+/** POST /ai/menu — pages, pasted text, or both. */
 export const MenuReadRequest = z.object({
   placeName: z.string().min(1),
   /** Up to 12 files from the phone; a big PDF read on the website arrives as up to 30 page images. */
-  pages: z.array(MenuPageImage).min(1).max(40),
-});
+  pages: z.array(MenuPageImage).max(40).default([]),
+  /** The menu's text, copied from the restaurant's website (select all, copy, paste). */
+  text: z.string().max(MAX_MENU_TEXT, 'That’s a lot of text — paste just the menu part.').optional(),
+}).refine((r) => r.pages.length > 0 || Boolean(r.text?.trim()), { message: 'Add the menu’s pages or paste its text.' });
 export type MenuReadRequest = z.infer<typeof MenuReadRequest>;
 
 /** A dish or drink read from the menu. */

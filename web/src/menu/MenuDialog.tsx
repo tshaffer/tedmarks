@@ -1,6 +1,6 @@
-import type { NearbyPlace } from '@tedmarks/shared';
+import { MAX_MENU_TEXT, type NearbyPlace } from '@tedmarks/shared';
 import {
-  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Typography,
+  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Stack, TextField, Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { placeDetails, pushChanges, readMenu, refreshPlace } from '../api.js';
@@ -24,7 +24,7 @@ interface Props {
 
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-/** Figma W4 · a place's menu with what we thought of each dish; or adding one from a PDF or screenshots. */
+/** Figma W4 · a place's menu with what we thought of each dish; or adding one from a PDF, screenshots, or the menu’s text. */
 export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) {
   // A Google restaurant becomes ours once its menu is saved.
   const [placeId, setPlaceId] = useState<string | undefined>(() =>
@@ -43,6 +43,8 @@ export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) 
   const name = place?.name ?? google?.name ?? '…';
 
   const [files, setFiles] = useState<File[]>([]);
+  const [text, setText] = useState('');
+  const hasMenu = files.length > 0 || text.trim().length > 0;
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -60,8 +62,8 @@ export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) 
     setError(null);
     try {
       const pages = await toMenuPages(files);
-      const items = await readMenu(name, pages);
-      if (items.length === 0) throw new Error('Claude didn’t find any dishes there. Try clearer pages, or the menu’s PDF.');
+      const items = await readMenu(name, pages, text);
+      if (items.length === 0) throw new Error('Claude didn’t find any dishes there. Try clearer pages, the menu’s PDF, or its text.');
       const { changes, placeId: saved, menuId } = planMenuSave(data, place ? { kind: 'ours', placeId: place.id } : { kind: 'google', details: google! }, items);
       await pushChanges(changes);
       if (!place) refreshPlace(saved);
@@ -69,6 +71,7 @@ export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) 
       setPlaceId(saved);
       setShownId(menuId);
       setFiles([]);
+      setText('');
       setAdding(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Couldn’t read the menu.');
@@ -122,8 +125,14 @@ export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) 
                   ))}
                 </Stack>
               )}
+              <Divider sx={{ color: 'text.secondary', fontSize: 13 }}>or</Divider>
+              <TextField
+                label="Paste the menu’s text" multiline minRows={4} maxRows={10} fullWidth value={text}
+                onChange={(e) => { setText(e.target.value.slice(0, MAX_MENU_TEXT)); setError(null); }}
+                helperText="On the restaurant’s menu page in Chrome: ⌘A to select everything, ⌘C to copy, then paste here (⌘V). Claude picks out the dishes, sections and prices and skips the rest. Works for menus built by ordering sites too."
+              />
               <Typography variant="caption" color="text.secondary">
-                Only the dishes Claude reads are kept — not the files.{shown ? ' The new menu becomes the latest; dishes not on it are marked “not on the latest menu”.' : ''}
+                Only the dishes Claude reads are kept — not the files or text.{shown ? ' The new menu becomes the latest; dishes not on it are marked “not on the latest menu”.' : ''}
               </Typography>
             </Stack>
           )
@@ -170,7 +179,7 @@ export function MenuDialog({ data, target, onClose, onSaved, onDelete }: Props) 
             {shown && <Button onClick={() => { setAdding(false); setError(null); }} disabled={reading}>Back to the menu</Button>}
             <Box sx={{ flex: 1 }} />
             <Button onClick={onClose} disabled={reading}>Cancel</Button>
-            <Button variant="contained" disabled={files.length === 0 || reading || (!place && !google)} onClick={() => void read()}>Read menu</Button>
+            <Button variant="contained" disabled={!hasMenu || reading || (!place && !google)} onClick={() => void read()}>Read menu</Button>
           </>
         ) : (
           <>

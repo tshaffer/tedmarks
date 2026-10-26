@@ -190,10 +190,20 @@ The purple box on a place shows how much and why, with **Edit** and **Delete**. 
     slug: 'menus',
     title: 'Menus',
     category: 'Planning',
-    keywords: ['menu', 'pdf', 'screenshot', 'photo', 'read menu', 'claude', 'newer menu', 'delete menu', 'sections', 'prices', 'not on the latest menu'],
+    keywords: ['menu', 'pdf', 'screenshot', 'photo', 'read menu', 'website', 'web page', 'online menu', 'save as pdf', 'print', 'chrome', 'too big', 'claude', 'newer menu', 'delete menu', 'sections', 'prices', 'not on the latest menu'],
     body: `A place's menu is kept as its **list of dishes**, by section, with prices — read by Claude.
 
 **Add a menu** on a place, or on a Google restaurant (which saves it to Tedmarks). Drop a **PDF**, or photos or screenshots of the pages in order, then **Read menu**. A long menu can take a minute or two. The files aren't kept. On the phone, see *Menu camera*.
+
+### A menu from the restaurant's website
+
+No need to screenshot page by page — save the whole menu as one PDF and add that:
+
+- **The menu opens as a PDF** (Chrome's PDF viewer): click its **download** button (↓, top right), then drop the file into **Add a menu**.
+- **The menu is a web page:** in Chrome press **⌘P**, set **Destination** to **Save as PDF**, **Save**, and drop that PDF in. Open any collapsed sections ("See more", Lunch / Dinner tabs) first — only what's showing is printed.
+- **On an iPhone or iPad (Chrome):** **Share** → **Print** → **Share** again in the preview → **Save to Files**; then choose that file in **Add a menu**.
+
+Any size works: a PDF over 15 MB (a printed web page with lots of photos) is turned into page images automatically, up to 30 pages.
 
 **Menu** on a place shows the latest one. **Add a newer menu** when it changes: dishes we've had that aren't on the new one show as "not on the latest menu". **Delete this menu** removes it (with Undo).
 

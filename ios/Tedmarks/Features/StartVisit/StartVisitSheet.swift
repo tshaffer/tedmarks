@@ -489,7 +489,6 @@ struct Chip: View {
                 Capsule().fill(isOn ? Color.accentColor : Color(.secondarySystemFill))
             }
         }
-        .fixedSize()
     }
 }
 

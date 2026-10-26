@@ -163,7 +163,6 @@ struct VisitHomeView: View {
                                     Capsule().fill(Color(.secondarySystemFill))
                                 }
                             }
-                            .fixedSize()
                         }
                         .buttonStyle(.plain)
                     }

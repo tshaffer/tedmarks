@@ -13,7 +13,7 @@ export const LORI = '00000000-0000-4000-8000-000000000002';
 type Doc = Record<string, unknown> & { id: string; modifiedAt: string };
 export type Changes = Partial<Record<'places' | 'people' | 'placeItems' | 'visits' | 'visitItems' | 'ratings' | 'notes' | 'menus', Doc[]>>;
 
-/** One dish row: one rating for both of us, or one each when we disagree. */
+/** One dish row: one rating for everyone, or one per person who was there. */
 export interface DishRow {
   /** The existing order line when editing. */
   lineId?: string;
@@ -22,11 +22,11 @@ export interface DishRow {
   quantity?: number;
   /** The menu section it came from ("Bagels"), shown beside the name. */
   section?: string | undefined;
-  /** "us" = one joint rating; "split" = Ted's and Lori's own. */
-  ratingMode: 'us' | 'split';
+  /** "us" = one joint rating; "each" = each person's own (guests too; blank = didn't have it). */
+  ratingMode: 'us' | 'each';
   us?: ItemRatingValue | undefined;
-  ted?: ItemRatingValue | undefined;
-  lori?: ItemRatingValue | undefined;
+  /** By person id, or newGuestKey(name) for a guest typed in on this form. */
+  each?: Record<string, ItemRatingValue | undefined>;
   note: string;
 }
 
@@ -52,9 +52,12 @@ export const randomIds: Ids = { next: () => crypto.randomUUID() };
 const meta = (id: string, now: string) => ({ id, createdAt: now, createdBy: TED, modifiedAt: now, modifiedBy: TED });
 const patch = (id: string, now: string, fields: Record<string, unknown>): Doc => ({ id, modifiedAt: now, modifiedBy: TED, ...fields });
 
-/** A dish's one rating when only one of us was there (a split row keeps whichever was set). */
+/** A guest typed in on the form, before they're saved as a person. */
+export const newGuestKey = (name: string) => `new:${name.trim().toLowerCase()}`;
+
+/** A dish's one rating when only one person was there (an "each" row keeps whichever was set). */
 export const singleRating = (dish: DishRow): ItemRatingValue | undefined =>
-  dish.ratingMode === 'us' ? dish.us : dish.ted ?? dish.lori;
+  dish.ratingMode === 'us' ? dish.us : Object.values(dish.each ?? {}).find(Boolean);
 
 /** A visit on this date: midday, so it shows as that day anywhere nearby. */
 export function startedAtIso(date: string): string {
@@ -93,15 +96,15 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
 
   // People: new guests.
   const participantIds = [...form.participantIds];
+  const guestIds = new Map<string, string>();   // newGuestKey(name) → person id
   for (const name of form.newGuests.map((n) => n.trim()).filter(Boolean)) {
     const known = [...data.people.values()].find((p) => p.displayName.toLowerCase() === name.toLowerCase());
-    if (known) { if (!participantIds.includes(known.id)) participantIds.push(known.id); continue; }
-    const id = ids.next();
-    add('people', { ...meta(id, now), displayName: name, kind: 'guest', lastSeenAt: now });
-    participantIds.push(id);
+    const id = known?.id ?? ids.next();
+    if (!known) add('people', { ...meta(id, now), displayName: name, kind: 'guest', lastSeenAt: now });
+    if (!participantIds.includes(id)) participantIds.push(id);
+    guestIds.set(newGuestKey(name), id);
   }
-
-  const bothOfUs = participantIds.includes(TED) && participantIds.includes(LORI);
+  const personId = (key: string) => guestIds.get(key) ?? key;
 
   // The visit. Date unknown: the placeholder date (sorts oldest) and the flag.
   const unknown = form.date === null;
@@ -151,12 +154,14 @@ export function planVisitSave(data: TedmarksRecords, form: VisitForm, now = new 
     } else {
       add('visitItems', { ...meta(lineId, now), visitId, placeItemId, ordered: true, addedVia: 'order', sortOrder: index, ...(quantity > 1 ? { quantity } : {}) });
     }
-    // Only one of us there: one rating (as on the phone), whatever the row was set to.
-    const wanted: { scope: 'joint' | 'person'; personId?: string; value?: ItemRatingValue }[] = !bothOfUs
+    // Only one person there: one rating (as on the phone), whatever the row was set to. Each:
+    // a rating for each person who was there and had it.
+    const wanted: { scope: 'joint' | 'person'; personId?: string; value?: ItemRatingValue }[] = participantIds.length <= 1
       ? [{ scope: 'joint', value: singleRating(dish) }]
       : dish.ratingMode === 'us'
         ? [{ scope: 'joint', value: dish.us }]
-        : [{ scope: 'person', personId: TED, value: dish.ted }, { scope: 'person', personId: LORI, value: dish.lori }];
+        : Object.entries(dish.each ?? {}).map(([key, value]) => ({ scope: 'person' as const, personId: personId(key), value }))
+          .filter((w) => participantIds.includes(w.personId));
     syncRatings(data, 'visitItem', lineId, visitId, placeId, wanted, now, ids, add);
     syncNotes(data, existingNoteFor(data, lineId), dish.note, { placeId, visitId, visitItemId: lineId }, now, ids, add);
   });
@@ -255,7 +260,7 @@ function syncRatings(
     }
   }
   // Ratings of the kinds the form manages that are no longer wanted. (A dish switched between
-  // "us" and "split" drops the other kind; verdicts only manage the joint one.)
+  // "us" and "each" drops the other kind; verdicts only manage the joint one.)
   const managed = subjectType === 'visit' ? existing.filter((r) => r.scope === 'joint') : existing;
   for (const r of managed) if (!keep.has(r.id)) add('ratings', patch(r.id, now, { deletedAt: now }));
 }

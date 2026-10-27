@@ -30,9 +30,24 @@
       "expected": { "kind": "split", "byPerson": [{ "personId": "ted", "value": "tryAgain" }, { "personId": "lori", "value": "wouldReturn" }] }
     },
     {
-      "name": "guest ratings are ignored",
-      "ratings": [{ "scope": "joint", "value": "good" }, { "scope": "person", "personId": "mike", "value": "skip" }],
+      "name": "a guest's differing rating counts like ours (after the household)",
+      "ratings": [{ "scope": "person", "personId": "mike", "value": "skip" }, { "scope": "joint", "value": "good" }],
+      "expected": { "kind": "split", "byPerson": [{ "personId": "ted", "value": "good" }, { "personId": "lori", "value": "good" }, { "personId": "mike", "value": "skip" }] }
+    },
+    {
+      "name": "a guest who agrees keeps it joint",
+      "ratings": [{ "scope": "joint", "value": "loved" }, { "scope": "person", "personId": "mike", "value": "loved" }],
+      "expected": { "kind": "joint", "value": "loved" }
+    },
+    {
+      "name": "only a guest rated",
+      "ratings": [{ "scope": "person", "personId": "sam", "value": "good" }],
       "expected": { "kind": "joint", "value": "good" }
+    },
+    {
+      "name": "the joint rating doesn't fill in for guests; guests in the order they were rated",
+      "ratings": [{ "scope": "person", "personId": "ted", "value": "loved" }, { "scope": "person", "personId": "sam", "value": "good" }, { "scope": "person", "personId": "kristen", "value": "skip" }],
+      "expected": { "kind": "split", "byPerson": [{ "personId": "ted", "value": "loved" }, { "personId": "sam", "value": "good" }, { "personId": "kristen", "value": "skip" }] }
     }
   ]
 }

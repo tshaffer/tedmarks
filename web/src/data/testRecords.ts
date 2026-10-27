@@ -10,7 +10,7 @@ export const NOW = '2026-10-07T18:00:00.000Z';
 export const PLACE = '11111111-1111-4111-8111-111111111111';
 
 export function counter(): Ids {
-  let n = 0;
+  let n = 100;   // past the fixed ids (Ted is …0001, Lori …0002)
   return { next: () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` };
 }
 

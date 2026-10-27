@@ -33,7 +33,7 @@ struct RateDishSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    RateForPicker(selection: $rateFor, household: householdPeople)
+                    RateForPicker(selection: $rateFor, raters: raters)
 
                     if !orderItems.isEmpty {
                         chipSection("Our order") {
@@ -155,6 +155,10 @@ struct RateDishSheet: View {
     private var householdPeople: [Person] {
         let ids = DishCapture.household(for: visit, people: people)
         return ids.compactMap { id in people.first { $0.id == id } }
+    }
+
+    private var raters: [Person] {
+        DishCapture.raters(for: visit, people: people).compactMap { id in people.first { $0.id == id } }
     }
 
     private var names: [String: String] {

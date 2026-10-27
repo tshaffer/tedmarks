@@ -1,16 +1,17 @@
 import SwiftUI
 import TedmarksKit
 
-/// "Us / Ted / Lori": who the next tap rates for. Us = a joint rating.
+/// "Us / Ted / Lori / Sam": who the next tap rates for — a segment per person here, guests too.
+/// Us = a joint rating.
 struct RateForPicker: View {
     @Binding var selection: RateFor
-    let household: [Person]
+    let raters: [Person]
 
     var body: some View {
-        if household.count > 1 {
+        if raters.count > 1 {
             Picker("Rate for", selection: $selection) {
                 Text("Us").tag(RateFor.us)
-                ForEach(household) { person in
+                ForEach(raters) { person in
                     Text(person.displayName).tag(RateFor.person(person.id))
                 }
             }

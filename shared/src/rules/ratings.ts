@@ -14,7 +14,8 @@ export type RatingDisplay<V extends string> =
 /**
  * "Joint unless we disagree".
  *
- * For each household person p: effective(p) = p's own rating ?? the joint rating.
+ * For each household person p: effective(p) = p's own rating ?? the joint rating. Guests count
+ * like us, with their own ratings only (after the household, in the order they were rated).
  * If every recorded effective rating is the same, show it as joint; otherwise split.
  * Pass only live (non-deleted) ratings for one subject.
  *
@@ -34,6 +35,9 @@ export function displayRating<V extends string>(
   for (const personId of householdPersonIds) {
     const value = byPerson.get(personId) ?? joint;
     if (value !== undefined) effective.push({ personId, value });
+  }
+  for (const [personId, value] of byPerson) {
+    if (!householdPersonIds.includes(personId)) effective.push({ personId, value });
   }
 
   if (effective.length === 0) {

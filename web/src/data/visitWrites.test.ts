@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { NOW, PLACE, T0, apply, counter, records } from './testRecords.js';
 import { UNKNOWN_VISIT_DATE } from '@tedmarks/shared';
-import { LORI, TED, planVisitDelete, planVisitSave, startedAtIso, type VisitForm } from './visitWrites.js';
+import { LORI, TED, newGuestKey, planVisitDelete, planVisitSave, startedAtIso, type VisitForm } from './visitWrites.js';
 
 const baseForm: VisitForm = {
   place: { kind: 'ours', placeId: PLACE }, date: '2026-09-20', participantIds: [TED, LORI], newGuests: [],
@@ -16,7 +16,8 @@ describe('adding a past visit', () => {
       newGuests: ['Sam'],
       dishes: [
         { name: 'burrata', ratingMode: 'us', us: 'loved', note: 'Ask for extra bread' },
-        { name: 'Arancini', ratingMode: 'split', ted: 'skip', lori: 'loved', note: '' },
+        { name: 'Arancini', ratingMode: 'each', each: { [TED]: 'skip', [LORI]: 'loved' }, note: '' },
+        { name: 'Gelato', ratingMode: 'each', each: { [TED]: 'loved', [newGuestKey('Sam')]: 'good' }, note: '' },
         { name: '  ', ratingMode: 'us', note: '' },
       ],
       verdict: 'wouldReturn',
@@ -30,12 +31,13 @@ describe('adding a past visit', () => {
     expect(visit.isFirstVisit).toBe(true);
     expect(visit.startedAt).toBe(startedAtIso('2026-09-20'));
     expect(visit.participantIds).toHaveLength(3);
-    expect([...after.people.values()].find((p) => p.displayName === 'Sam')?.kind).toBe('guest');
-    expect([...after.placeItems.values()].map((i) => i.name).sort()).toEqual(['Arancini', 'Burrata']);   // burrata reused
-    expect(after.visitItems.size).toBe(2);   // the blank row is ignored
+    const sam = [...after.people.values()].find((p) => p.displayName === 'Sam')!;
+    expect(sam.kind).toBe('guest');
+    expect([...after.placeItems.values()].map((i) => i.name).sort()).toEqual(['Arancini', 'Burrata', 'Gelato']);   // burrata reused
+    expect(after.visitItems.size).toBe(3);   // the blank row is ignored
     const ratings = [...after.ratings.values()];
     expect(ratings.filter((r) => r.subjectType === 'visitItem').map((r) => `${r.scope}:${r.personId ?? ''}:${r.value}`).sort())
-      .toEqual(['joint::loved', `person:${LORI}:loved`, `person:${TED}:skip`].sort());
+      .toEqual(['joint::loved', `person:${LORI}:loved`, `person:${TED}:skip`, `person:${TED}:loved`, `person:${sam.id}:good`].sort());
     expect(ratings.find((r) => r.subjectType === 'visit')?.value).toBe('wouldReturn');
     expect([...after.notes.values()].map((n) => n.text).sort()).toEqual(['Anniversary dinner', 'Ask for extra bread']);
   });
@@ -70,12 +72,12 @@ describe('editing a visit', () => {
     expect(dated.visits.get(first.visitId)?.dateUnknown).toBeUndefined();
   });
 
-  test('only one of us there: each dish gets one rating, even from a split row', () => {
+  test('only one person there: each dish gets one rating, even from an each row', () => {
     let data = records();
-    const first = planVisitSave(data, { ...baseForm, dishes: [{ name: 'Arancini', ratingMode: 'split', ted: 'skip', lori: 'loved', note: '' }] }, NOW, counter());
+    const first = planVisitSave(data, { ...baseForm, dishes: [{ name: 'Arancini', ratingMode: 'each', each: { [TED]: 'skip', [LORI]: 'loved' }, note: '' }] }, NOW, counter());
     data = apply(data, first.changes);
     const line = [...data.visitItems.values()][0]!;
-    const form: VisitForm = { ...baseForm, visitId: first.visitId, participantIds: [TED], dishes: [{ lineId: line.id, name: 'Arancini', ratingMode: 'split', ted: 'loved', note: '' }] };
+    const form: VisitForm = { ...baseForm, visitId: first.visitId, participantIds: [TED], dishes: [{ lineId: line.id, name: 'Arancini', ratingMode: 'each', each: { [TED]: 'loved' }, note: '' }] };
     const after = apply(data, planVisitSave(data, form, NOW, counter()).changes);
     const live = [...after.ratings.values()].filter((r) => r.subjectId === line.id && !r.deletedAt);
     expect(live.map((r) => `${r.scope}:${r.value}`)).toEqual(['joint:loved']);

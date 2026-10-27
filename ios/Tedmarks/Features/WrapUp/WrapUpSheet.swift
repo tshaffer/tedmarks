@@ -27,9 +27,9 @@ struct WrapUpSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                if householdPeople.count > 1 {
+                if raters.count > 1 {
                     Section {
-                        RateForPicker(selection: $rateFor, household: householdPeople)
+                        RateForPicker(selection: $rateFor, raters: raters)
                     } footer: {
                         Text("Ratings you tap now are for \(rateForLabel).")
                     }
@@ -173,12 +173,12 @@ struct WrapUpSheet: View {
     private var isInProgress: Bool { visit.status == .inProgress }
     private var orderItems: [VisitItem] { _ = allRatings.count; return DishCapture.orderItems(for: visit) }
     private var householdIds: [UUID] { DishCapture.household(for: visit, people: people) }
-    private var householdPeople: [Person] { householdIds.compactMap { id in people.first { $0.id == id } } }
+    private var raters: [Person] { DishCapture.raters(for: visit, people: people).compactMap { id in people.first { $0.id == id } } }
     private var names: [String: String] { Dictionary(uniqueKeysWithValues: people.map { ($0.id.uuidString, $0.displayName) }) }
 
     private var rateForLabel: String {
         switch rateFor {
-        case .us: "both of you"
+        case .us: raters.count == 2 ? "both of you" : "everyone"
         case .person(let id): people.first { $0.id == id }?.displayName ?? "one person"
         }
     }

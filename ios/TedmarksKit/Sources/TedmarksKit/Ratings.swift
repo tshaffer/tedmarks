@@ -63,7 +63,8 @@ public enum RatingDisplay<Value: Hashable & Sendable>: Hashable, Sendable {
 
 /// "Joint unless we disagree".
 ///
-/// For each household person p: effective(p) = p's own rating ?? the joint rating.
+/// For each household person p: effective(p) = p's own rating ?? the joint rating. Guests count
+/// like us, with their own ratings only (after the household, in the order they were rated).
 /// If every recorded effective rating is the same, show it as joint; otherwise split.
 ///
 /// Mirrors shared/src/rules/ratings.ts; both are tested against shared/fixtures/ratings-cases.json.
@@ -73,14 +74,18 @@ public func displayRating<Value>(
 ) -> RatingDisplay<Value> {
     let joint = ratings.first(where: { $0.scope == .joint })?.value
     var byPerson: [String: Value] = [:]
+    var guests: [String] = []
     for rating in ratings where rating.scope == .person {
-        if let personId = rating.personId { byPerson[personId] = rating.value }
+        guard let personId = rating.personId else { continue }
+        if byPerson[personId] == nil, !householdPersonIds.contains(personId) { guests.append(personId) }
+        byPerson[personId] = rating.value
     }
 
-    let effective: [RatingDisplay<Value>.PersonRating] = householdPersonIds.compactMap { personId in
+    var effective: [RatingDisplay<Value>.PersonRating] = householdPersonIds.compactMap { personId in
         guard let value = byPerson[personId] ?? joint else { return nil }
         return .init(personId: personId, value: value)
     }
+    effective += guests.compactMap { personId in byPerson[personId].map { .init(personId: personId, value: $0) } }
 
     guard let first = effective.first?.value else {
         if let joint { return .joint(joint) }

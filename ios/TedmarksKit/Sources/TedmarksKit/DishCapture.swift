@@ -181,6 +181,13 @@ public enum DishCapture {
     }
 
     /// Household participants of the visit (Ted, Lori) — whose opinions count for joint/split.
+    /// Everyone on the visit who can rate (the Rate for switch): Ted and Lori first, then guests.
+    public static func raters(for visit: Visit, people: [Person]) -> [UUID] {
+        let live = Dictionary(people.filter { $0.deletedAt == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let here = visit.participantIds.filter { live[$0] != nil }
+        return here.filter { live[$0]?.kind == .household } + here.filter { live[$0]?.kind != .household }
+    }
+
     public static func household(for visit: Visit, people: [Person]) -> [UUID] {
         let householdIds = Set(people.filter { $0.kind == .household && $0.deletedAt == nil }.map(\.id))
         return visit.participantIds.filter { householdIds.contains($0) }

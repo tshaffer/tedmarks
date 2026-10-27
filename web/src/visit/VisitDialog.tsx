@@ -9,7 +9,7 @@ import { OrderMenu } from './OrderMenu.js';
 import { placeDetails, pushChanges, refreshPlace } from '../api.js';
 import { DISH, VERDICT, visitSummary } from '../data/insights.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
-import { LORI, TED, localDate, planVisitSave, singleRating, type DishRow, type VisitForm } from '../data/visitWrites.js';
+import { LORI, TED, localDate, newGuestKey, planVisitSave, singleRating, type DishRow, type VisitForm } from '../data/visitWrites.js';
 
 export type VisitTarget =
   | { kind: 'ours'; placeId: string; visitId?: string }
@@ -79,9 +79,20 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
 
   const canSave = (dateUnknown || Boolean(date)) && (target.kind === 'ours' || place || google) && !saving;
 
-  // Us / Ted / Lori only when both of us were there (as on the phone).
-  const bothOfUs = participants.includes(TED) && participants.includes(LORI);
+  // Everyone who was there, for Each (guests typed in too). Us / Each only when more than one.
+  const raters = [
+    ...chipPeople.filter((p) => participants.includes(p.id)).map((p) => ({ key: p.id, name: p.displayName })),
+    ...newGuests.map((g) => ({ key: newGuestKey(g), name: g })),
+  ];
+  const several = raters.length > 1;
   const itemCount = dishes.reduce((n, d) => n + (d.quantity ?? 1), 0);
+
+  // A typed guest name counts without pressing Enter (on leaving the box, and on Save).
+  const typedGuest = guestName.trim();
+  const addTypedGuest = () => {
+    if (typedGuest && !newGuests.includes(typedGuest)) setNewGuests((n) => [...n, typedGuest]);
+    setGuestName('');
+  };
 
   async function save() {
     setSaving(true);
@@ -90,7 +101,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
       const form: VisitForm = {
         place: place ? { kind: 'ours', placeId: place.id } : { kind: 'google', details: google! },
         visitId: editing?.id, date: dateUnknown ? null : date,
-        participantIds: participants, newGuests, dishes, verdict, notes,
+        participantIds: participants, newGuests: typedGuest && !newGuests.includes(typedGuest) ? [...newGuests, typedGuest] : newGuests, dishes, verdict, notes,
       };
       const { changes, placeId: savedPlace, visitId } = planVisitSave(data, form);
       await pushChanges(changes);
@@ -130,7 +141,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
               })}
               {newGuests.map((g) => <Chip key={g} label={g} color="primary" onDelete={() => setNewGuests((n) => n.filter((x) => x !== g))} />)}
               <TextField size="small" placeholder="+ Guest" value={guestName} onChange={(e) => setGuestName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && guestName.trim()) { setNewGuests((n) => [...n, guestName.trim()]); setGuestName(''); e.preventDefault(); } }}
+                onBlur={addTypedGuest} onKeyDown={(e) => { if (e.key === 'Enter' && typedGuest) { addTypedGuest(); e.preventDefault(); } }}
                 sx={{ width: 140 }} />
             </Stack>
           </Box>
@@ -161,20 +172,24 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
                     <IconButton size="small" aria-label={`Remove ${row.name}`} onClick={() => setDishes((rows) => rows.filter((_, i) => i !== index))}>✕</IconButton>
                   </Stack>
                   <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mt: 0.5 }}>
-                    {!bothOfUs ? (
+                    {!several ? (
                       <RatingButtons value={singleRating(row)} onChange={(v) => setRow(index, { ratingMode: 'us', us: v })} />
                     ) : (
                       <>
-                        <ToggleButtonGroup size="small" exclusive value={row.ratingMode} onChange={(_, v: 'us' | 'split' | null) => v && setRow(index, { ratingMode: v })}>
+                        <ToggleButtonGroup size="small" exclusive value={row.ratingMode} onChange={(_, v: 'us' | 'each' | null) => v && setRow(index, { ratingMode: v })} sx={{ alignSelf: 'flex-start' }}>
                           <ToggleButton value="us" sx={{ px: 1.25 }}>Us</ToggleButton>
-                          <ToggleButton value="split" sx={{ px: 1.25 }}>Ted / Lori</ToggleButton>
+                          <ToggleButton value="each" sx={{ px: 1.25 }}>Each</ToggleButton>
                         </ToggleButtonGroup>
                         {row.ratingMode === 'us'
                           ? <RatingButtons value={row.us} onChange={(v) => setRow(index, { us: v })} />
                           : (
                             <Stack spacing={0.5}>
-                              <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Ted</Typography><RatingButtons value={row.ted} onChange={(v) => setRow(index, { ted: v })} /></Stack>
-                              <Stack direction="row" spacing={0.75} alignItems="center"><Typography variant="caption" sx={{ width: 30 }}>Lori</Typography><RatingButtons value={row.lori} onChange={(v) => setRow(index, { lori: v })} /></Stack>
+                              {raters.map((r) => (
+                                <Stack key={r.key} direction="row" spacing={0.75} alignItems="center">
+                                  <Typography variant="caption" noWrap title={r.name} sx={{ width: 56 }}>{r.name}</Typography>
+                                  <RatingButtons value={row.each?.[r.key]} onChange={(v) => setRow(index, { each: { ...row.each, [r.key]: v } })} />
+                                </Stack>
+                              ))}
                             </Stack>
                           )}
                       </>
@@ -255,8 +270,12 @@ export function initialForm(data: TedmarksRecords, visitId: string | undefined) 
     const ratings = [...data.ratings.values()].filter((r) => r.subjectId === d.line.id);
     const person = (id: string) => ratings.find((r) => r.scope === 'person' && r.personId === id)?.value as ItemRatingValue | undefined;
     const joint = ratings.find((r) => r.scope === 'joint')?.value as ItemRatingValue | undefined;
-    const split = ratings.some((r) => r.scope === 'person');
-    return { lineId: d.line.id, name: d.name, quantity: d.line.quantity, section: d.line.placeItemId ? data.placeItems.get(d.line.placeItemId)?.section : undefined, ratingMode: split ? 'split' : 'us', us: joint, ted: person(TED) ?? (split ? joint : undefined), lori: person(LORI) ?? (split ? joint : undefined), note: d.notes[0]?.text ?? '' };
+    const each = ratings.some((r) => r.scope === 'person');
+    // Each: everyone's own rating; the joint one stands in for Ted and Lori (as it's shown).
+    const byPerson = Object.fromEntries(visit.participantIds
+      .map((id) => [id, person(id) ?? (data.people.get(id)?.kind === 'household' ? joint : undefined)] as const)
+      .filter(([, v]) => v));
+    return { lineId: d.line.id, name: d.name, quantity: d.line.quantity, section: d.line.placeItemId ? data.placeItems.get(d.line.placeItemId)?.section : undefined, ratingMode: each ? 'each' : 'us', us: joint, each: each ? byPerson : {}, note: d.notes[0]?.text ?? '' };
   });
   const verdict = [...data.ratings.values()].find((r) => r.subjectId === visit.id && r.scope === 'joint')?.value as VerdictValue | undefined;
   return {

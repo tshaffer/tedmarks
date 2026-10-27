@@ -111,7 +111,7 @@ On the right: how many visits and places that year (and new places tried), the *
     body: `**+ Add a past visit** (on a place, a Google restaurant, or the Visits page) records a visit after the fact. **Edit** on a visit opens the same form.
 
 - **Date** — visits are recorded by date. Don't remember when? Tick **I don't remember when**: a visit from memory, shown as "Date unknown". It counts as the oldest visit (a dated visit's verdict wins), its dishes and ratings count like any other, and on the Visits page it's under **Date unknown · from memory** (with All time chosen).
-- **Who was there** — Ted and Lori, plus any guests (type a name to add one).
+- **Who was there** — Ted and Lori, plus any guests (type a name to add one; it's added when you click away or save).
 - **The menu, on the left** — dishes ordered here before (with our last rating and when), then the latest menu by section. **+** adds a dish to the order; **+** again makes it ×2; **−** takes one off. Search the menu if it's long, or add **something not on the menu** at the bottom.
 - **Your order, on the right** — each dish with its rating and a note. A dish ordered twice is still rated once.
 - **Would you come back?** — the verdict, and notes about the visit.
@@ -127,7 +127,7 @@ Saving a visit to a Google restaurant adds it to Tedmarks as **been there**; a w
 
 ### Joint unless we disagree
 
-Most of the time one rating speaks for both of us ("Us"). When we don't agree, rate each person separately (Ted / Lori in the visit form, or on the phone). Tedmarks shows one rating when everyone's is the same, and both side by side (↔ Ted 👎 · Lori 😍) when they differ.
+Most of the time one rating speaks for everyone ("Us"). When we don't agree, or a guest had their own dish, rate each person separately (**Each** in the visit form, or a name in **Rate for** on the phone) — guests too, and leave out anyone who didn't have it. A guest's rating counts like ours. Tedmarks shows one rating when everyone's is the same, and each person's side by side (↔ Ted 😍 · Sam 👍) when they differ.
 
 ### Ordered
 
@@ -266,7 +266,7 @@ On the **Visit** tab, **Start a visit** lists the restaurants around you, neares
 
 ### Rating and wrapping up
 
-**Rate dish** asks "How was the …?" — 😍 👍 👎, with an optional note. **Rate for: Us / Ted / Lori** records one rating for both of us, or one person's.
+**Rate dish** asks "How was the …?" — 😍 👍 👎, with an optional note. **Rate for: Us / Ted / Lori** (plus any guests who are here) records one rating for everyone, or one person's.
 
 **Wrap up** at the end: rate anything left, add notes about the visit, answer **Would you come back?**, and **End visit**. If there's no verdict a while after the visit started, one notification asks (how long is in **Settings → Reminder**).
 

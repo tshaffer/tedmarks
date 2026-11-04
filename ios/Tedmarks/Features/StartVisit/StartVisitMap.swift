@@ -19,10 +19,12 @@ struct StartVisitMap: UIViewRepresentable {
     let pins: [MapPin]
     let selectedId: String?
     let home: CLLocationCoordinate2D?
+    /// Somewhere to move to (a town from the search box).
+    let target: StartVisitModel.MapTarget?
     let onSelect: (String) -> Void
     let onSelectGoogleIcon: (String) -> Void
-    /// Where the map settled, and how far it shows from there (meters, center to edge).
-    let onIdle: (CLLocationCoordinate2D, Double) -> Void
+    /// Where the map settled, how far it shows from there (meters, center to edge), and what's in view.
+    let onIdle: (CLLocationCoordinate2D, Double, MapBounds) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -53,6 +55,7 @@ struct StartVisitMap: UIViewRepresentable {
         private var drawn: [String: Drawn] = [:]
         private var centeredOnHome = false
         private var shownSelection: String?
+        private var shownTarget: UUID?
 
         private struct Drawn: Equatable { let pin: MapPin; let selected: Bool; let label: LabelSide? }
 
@@ -62,6 +65,10 @@ struct StartVisitMap: UIViewRepresentable {
             if !centeredOnHome, let home = parent.home {
                 centeredOnHome = true
                 map.camera = GMSCameraPosition(target: home, zoom: 16)
+            }
+            if let target = parent.target, target.id != shownTarget {
+                shownTarget = target.id
+                map.animate(to: GMSCameraPosition(target: target.coordinate, zoom: Self.townZoom))
             }
             let wanted = Dictionary(parent.pins.map { ($0.place.googlePlaceId, $0) }) { first, _ in first }
             for (id, marker) in markers where wanted[id] == nil {
@@ -128,6 +135,7 @@ struct StartVisitMap: UIViewRepresentable {
         }
 
         private static let labelZoom: Float = 16
+        private static let townZoom: Float = 12
 
         func mapView(_ mapView: GMSMapView, didTap marker: GMSMarker) -> Bool {
             if let id = marker.userData as? String { parent.onSelect(id) }
@@ -142,7 +150,11 @@ struct StartVisitMap: UIViewRepresentable {
             let region = mapView.projection.visibleRegion()
             let reach = CLLocation(latitude: region.farLeft.latitude, longitude: region.farLeft.longitude)
                 .distance(from: CLLocation(latitude: region.nearRight.latitude, longitude: region.nearRight.longitude)) / 2
-            parent.onIdle(position.target, reach)
+            let bounds = GMSCoordinateBounds(region: region)
+            parent.onIdle(position.target, reach, MapBounds(
+                south: bounds.southWest.latitude, west: bounds.southWest.longitude,
+                north: bounds.northEast.latitude, east: bounds.northEast.longitude
+            ))
             update(mapView)   // names follow the new view
         }
     }

@@ -34,14 +34,17 @@ public struct PlaceSuggestion: Codable, Hashable, Sendable, Identifiable {
     public var name: String
     public var secondaryText: String?
     public var distanceMeters: Double?
+    /// A town or neighborhood rather than a business.
+    public var isArea: Bool?
 
     public var id: String { googlePlaceId }
 
-    public init(googlePlaceId: String, name: String, secondaryText: String? = nil, distanceMeters: Double? = nil) {
+    public init(googlePlaceId: String, name: String, secondaryText: String? = nil, distanceMeters: Double? = nil, isArea: Bool? = nil) {
         self.googlePlaceId = googlePlaceId
         self.name = name
         self.secondaryText = secondaryText
         self.distanceMeters = distanceMeters
+        self.isArea = isArea
     }
 }
 
@@ -89,14 +92,16 @@ public struct TedmarksAPI: Sendable, SyncTransport {
     /// Type-ahead suggestions. Use one `sessionToken` for all keystrokes and the final
     /// `placeDetails` call so Google bills the whole search as one lookup.
     public func autocomplete(
-        _ text: String, latitude: Double, longitude: Double, sessionToken: UUID
+        _ text: String, latitude: Double, longitude: Double, sessionToken: UUID, includeAreas: Bool = false
     ) async throws -> [PlaceSuggestion] {
-        let data = try await get(path: "places/autocomplete", query: [
+        var query = [
             URLQueryItem(name: "q", value: text),
             URLQueryItem(name: "lat", value: String(latitude)),
             URLQueryItem(name: "lng", value: String(longitude)),
             URLQueryItem(name: "sessionToken", value: sessionToken.uuidString),
-        ])
+        ]
+        if includeAreas { query.append(URLQueryItem(name: "areas", value: "1")) }
+        let data = try await get(path: "places/autocomplete", query: query)
         return try decode(SuggestionsResponse.self, from: data).suggestions
     }
 

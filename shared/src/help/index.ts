@@ -255,10 +255,16 @@ On the phone, swipe a visit or place to delete it.`,
     slug: 'visits-on-the-phone',
     title: 'Visits on the phone',
     category: 'The iPhone app',
-    keywords: ['start a visit', 'phone', 'iphone', 'nearby', 'location', 'who is here', 'guest', 'widget', 'discard', 'add dish', 'what did you order', 'rate dish', 'rate for', 'wrap up', 'end visit', 'lock screen', 'live activity', 'notification', 'reminder', 'past visits', 'places tab'],
+    keywords: ['start a visit', 'phone', 'iphone', 'map', 'filters', 'town', 'want to go', 'nearby', 'location', 'who is here', 'guest', 'widget', 'discard', 'add dish', 'what did you order', 'rate dish', 'rate for', 'wrap up', 'end visit', 'lock screen', 'live activity', 'notification', 'reminder', 'past visits', 'places tab'],
     body: `### Starting a visit
 
 On the **Visit** tab, **Start a visit** lists the restaurants around you, nearest first — tap the one you're at (or search; **More nearby** looks farther). Choose **Who's here**, adding guests by name, and the visit starts. A **Start visit** widget does it from the Home Screen. How far to look is in **Settings**.
+
+### The map
+
+The **Visit** tab's map shows all our places, wherever you move it: a purple ★ (☆ for Curious) for Want to go, a green ring for Been there. **Search a restaurant or town** — type *Scottsdale* and choose it, and the map goes there. **★ Want to go**, **Been there** and **Google** above the map each turn on and off, in any combination, and stay as you left them. Google's restaurants come from a town search or **Search this area**.
+
+Tap a pin to choose it. Near you, **Start visit** is at the bottom. Far away you're planning, so a card shows why you saved it, with **Directions** and **Place page**.
 
 ### What did you order?
 

@@ -41,6 +41,17 @@ final class StartVisitModel {
 
     enum MoreState: Equatable { case available, loading, exhausted, failed }
 
+    /// Somewhere for the map to go (a town from the search box).
+    struct MapTarget: Equatable {
+        let id = UUID()
+        let coordinate: CLLocationCoordinate2D
+        static func == (a: MapTarget, b: MapTarget) -> Bool { a.id == b.id }
+    }
+
+    var mapTarget: MapTarget?
+    /// A town gets a wider first look than the nearby radius.
+    private static let townRadiusMeters = 8047
+
     private var morePageToken: String?
     private(set) var location: CLLocation?
     private var nearby: [NearbyPlace] = []
@@ -77,11 +88,11 @@ final class StartVisitModel {
     }
 
     /// The map's "Search this area": restaurants around where the map is now.
-    func searchArea(_ center: CLLocationCoordinate2D, savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
+    func searchArea(_ center: CLLocationCoordinate2D, radiusMeters: Int? = nil, savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
         isBusy = true
         defer { isBusy = false }
         do {
-            let found = try await api.nearbyPlaces(latitude: center.latitude, longitude: center.longitude, radiusMeters: NearbySearchSettings.radius())
+            let found = try await api.nearbyPlaces(latitude: center.latitude, longitude: center.longitude, radiusMeters: radiusMeters ?? NearbySearchSettings.radius())
             nearby = PlaceRanking.rank(found, savedStatus: savedStatus)
             searchedCenter = center
             morePlaces = []
@@ -89,10 +100,14 @@ final class StartVisitModel {
             moreState = .available
             isShowingSearchResults = false
             searchText = ""
-            // Keep what's chosen if it's still here.
+            // Keep what's chosen if it's still here. Far from you nothing is chosen for you: you're planning.
             let chosen = selectedId
             show(nearby)
-            if let chosen, nearby.contains(where: { $0.googlePlaceId == chosen }) { selectedId = chosen }
+            if let chosen, nearby.contains(where: { $0.googlePlaceId == chosen }) {
+                selectedId = chosen
+            } else if let first = nearby.first, !isWithinReach(first) {
+                selectedId = nil
+            }
         } catch {
             phase = .failed(Self.failure(for: error))
         }
@@ -121,9 +136,14 @@ final class StartVisitModel {
         }
     }
 
-    func search(savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
+    func search(showGoogle: Bool, savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
         let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let location else { return }
+        // The keyboard's Search on a town goes there, as tapping it would.
+        if let town = suggestions.first, town.isArea == true {
+            await choose(town, showGoogle: showGoogle, savedStatus: savedStatus)
+            return
+        }
         if phase != .loaded { phase = .loading }
         isBusy = true
         defer { isBusy = false }
@@ -178,7 +198,8 @@ final class StartVisitModel {
                 text,
                 latitude: location.coordinate.latitude,
                 longitude: location.coordinate.longitude,
-                sessionToken: sessionToken
+                sessionToken: sessionToken,
+                includeAreas: AppConfig.googleMapsKey != nil
             )
             guard !Task.isCancelled, let self else { return }
             self.suggestions = found ?? []
@@ -186,8 +207,9 @@ final class StartVisitModel {
         }
     }
 
-    /// The user tapped a suggestion: look it up, put it first in the list and select it.
-    func choose(_ suggestion: PlaceSuggestion) async {
+    /// The user tapped a suggestion: look it up, put it first in the list and select it. A town
+    /// moves the map there instead, with Google's restaurants if they're showing.
+    func choose(_ suggestion: PlaceSuggestion, showGoogle: Bool, savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
         guard let location else { return }
         suggestionTask?.cancel()
         if phase != .loaded { phase = .loading }
@@ -205,6 +227,15 @@ final class StartVisitModel {
             searchText = ""
             isSearchPresented = false
             isShowingSearchResults = false
+            if suggestion.isArea == true {
+                let town = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+                mapTarget = MapTarget(coordinate: town)
+                selectedId = nil
+                if showGoogle {
+                    await searchArea(town, radiusMeters: max(NearbySearchSettings.radius(), Self.townRadiusMeters), savedStatus: savedStatus)
+                }
+                return
+            }
             nearby = [place] + nearby.filter { $0.googlePlaceId != place.googlePlaceId }
             show(nearby)
         } catch {
@@ -216,6 +247,12 @@ final class StartVisitModel {
         guard isShowingSearchResults else { return }
         isShowingSearchResults = false
         show(nearby)
+    }
+
+    /// Close enough to start a visit; farther away, the map is for planning.
+    func isWithinReach(_ place: NearbyPlace) -> Bool {
+        guard let location else { return true }
+        return MapPlaces.isWithinReach(place, of: (location.coordinate.latitude, location.coordinate.longitude))
     }
 
     private func show(_ list: [NearbyPlace]) {

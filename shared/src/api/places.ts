@@ -29,6 +29,8 @@ export const PlaceSuggestion = z.object({
   secondaryText: z.string().optional(),
   /** Straight-line distance from the user, in meters, when Google provides it. */
   distanceMeters: z.number().nonnegative().optional(),
+  /** A town or neighborhood rather than a business (only offered when asked for). */
+  isArea: z.boolean().optional(),
 });
 export type PlaceSuggestion = z.infer<typeof PlaceSuggestion>;
 

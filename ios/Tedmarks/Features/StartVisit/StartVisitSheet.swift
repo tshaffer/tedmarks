@@ -25,6 +25,14 @@ struct StartVisitSheet: View {
     @State private var mapReach: Double = 500
     /// Pin glyphs for our been-there places: the verdict's emoji (or ? without one).
     @State private var verdictGlyphs: [String: String] = [:]
+    /// What's in view on the map (for the count of ours).
+    @State private var mapBounds: MapBounds?
+    /// A saved place's page, opened from the map.
+    @State private var openPlace: Place?
+    // What the map shows; remembered between uses.
+    @AppStorage("mapShowWantToGo") private var showWantToGo = true
+    @AppStorage("mapShowBeenThere") private var showBeenThere = true
+    @AppStorage("mapShowGoogle") private var showGoogle = true
 
     private var usesMap: Bool { AppConfig.googleMapsKey != nil }
 
@@ -49,17 +57,28 @@ struct StartVisitSheet: View {
             .navigationBarTitleDisplayMode(usesMap ? .inline : .automatic)
             .toolbar(embedded && usesMap ? .hidden : .automatic, for: .navigationBar)
             .searchable(if: !(embedded && usesMap), text: $model.searchText, isPresented: $model.isSearchPresented,
-                        prompt: usesMap ? "Search a restaurant" : "Somewhere else…")
-            .onSubmit(of: .search) { Task { await model.search(savedStatus: savedStatus) } }
+                        prompt: usesMap ? "Search a restaurant or town" : "Somewhere else…")
+            .onSubmit(of: .search) { Task { await model.search(showGoogle: showGoogle, savedStatus: savedStatus) } }
             .onChange(of: model.searchText) { _, text in
                 if text.isEmpty { model.clearSearch() }
                 model.searchTextChanged()
             }
             .safeAreaInset(edge: .bottom) {
                 // Hidden while picking from suggestions, so it can't start a visit at the wrong place.
-                if !isShowingSuggestions { startButton }
+                if !isShowingSuggestions { bottomBar }
             }
+            .navigationDestination(item: $openPlace) { PlaceDetailView(place: $0) }
         .onChange(of: model.places, initial: true) { refreshVerdicts() }
+        .onChange(of: savedPlaces.count) { refreshVerdicts() }
+        .onChange(of: showWantToGo) { dropHiddenChoice() }
+        .onChange(of: showBeenThere) { dropHiddenChoice() }
+        .onChange(of: showGoogle) { _, isOn in
+            dropHiddenChoice()
+            // Turned on after moving the map: find Google's restaurants for here.
+            if isOn, movedAway, let center = mapCenter {
+                Task { await model.searchArea(center, savedStatus: savedStatus) }
+            }
+        }
         .task {
         // Coming back to the tab keeps the list; pull down to refresh it.
         guard model.phase != .loaded else { return }
@@ -138,11 +157,11 @@ struct StartVisitSheet: View {
         HStack(spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search a restaurant", text: $model.searchText)
+                TextField("Search a restaurant or town", text: $model.searchText)
                     .focused($searchFocused)
                     .submitLabel(.search)
                     .autocorrectionDisabled()
-                    .onSubmit { Task { await model.search(savedStatus: savedStatus) } }
+                    .onSubmit { Task { await model.search(showGoogle: showGoogle, savedStatus: savedStatus) } }
                 if !model.searchText.isEmpty {
                     Button { model.searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
@@ -164,15 +183,17 @@ struct StartVisitSheet: View {
     }
 
     private var mapContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
+            mapFilters
             ZStack(alignment: .top) {
                 StartVisitMap(
                     pins: pins,
                     selectedId: model.selectedId,
                     home: model.location?.coordinate,
+                    target: model.mapTarget,
                     onSelect: { model.selectedId = $0 },
                     onSelectGoogleIcon: { id in Task { await model.choose(googlePlaceId: id) } },
-                    onIdle: { mapCenter = $0; mapReach = $1 }
+                    onIdle: { mapCenter = $0; mapReach = $1; mapBounds = $2 }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 if model.isBusy {
@@ -180,6 +201,8 @@ struct StartVisitSheet: View {
                         .padding(10)
                         .background(.regularMaterial, in: Capsule())
                         .padding(.top, 10)
+                } else if !showGoogle {
+                    ourPlacesCount
                 } else if movedAway, let center = mapCenter {
                     Button {
                         Task { await model.searchArea(center, savedStatus: savedStatus) }
@@ -191,7 +214,7 @@ struct StartVisitSheet: View {
                     .controlSize(.small)
                     .padding(.top, 10)
                 }
-                if pins.isEmpty && !model.isBusy {
+                if showGoogle && model.places.isEmpty && model.morePlaces.isEmpty && !model.isBusy {
                     Text(model.isShowingSearchResults ? "No matches." : "No restaurants found here. Search by name, or move the map and Search this area.")
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
@@ -209,21 +232,72 @@ struct StartVisitSheet: View {
         .background(Color(.systemGroupedBackground))
     }
 
-    /// Every place found, ours colored as on the website.
-    private var pins: [MapPin] {
-        var seen = Set<String>()
-        return (model.places + model.morePlaces).compactMap { place in
-            guard seen.insert(place.googlePlaceId).inserted else { return nil }
-            let saved = savedPlaces.first { $0.googlePlaceId == place.googlePlaceId }
-            switch saved?.status {
-            case .wantToGo:
-                return MapPin(place: place, kind: .wantToGo, glyph: saved?.interestLevel == .curious ? "☆" : "★")
-            case .beenThere:
-                return MapPin(place: place, kind: .beenThere, glyph: verdictGlyphs[place.googlePlaceId] ?? "?")
-            case nil:
-                return MapPin(place: place, kind: .google, glyph: "🍴")
-            }
+    /// Which pins show; each turns on and off by itself.
+    private var mapFilters: some View {
+        HStack(spacing: 8) {
+            MapFilterChip(title: "★ Want to go", color: .purple, isOn: $showWantToGo)
+            MapFilterChip(title: "Been there", color: .green, isOn: $showBeenThere)
+            MapFilterChip(title: "Google", color: .gray, isOn: $showGoogle)
         }
+    }
+
+    /// "7 want to go · 2 been there" in view, while Google's are off (its button has the spot otherwise).
+    @ViewBuilder
+    private var ourPlacesCount: some View {
+        if showWantToGo || showBeenThere, let bounds = mapBounds {
+            let inView = pins.filter { bounds.contains(latitude: $0.place.latitude, longitude: $0.place.longitude) }
+            let count = { (kind: MapPin.Kind) in inView.filter { $0.kind == kind }.count }
+            let parts = (showWantToGo ? ["\(count(.wantToGo)) want to go"] : []) + (showBeenThere ? ["\(count(.beenThere)) been there"] : [])
+            Text(parts.joined(separator: " · "))
+                .font(.footnote.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.top, 10)
+        }
+    }
+
+    /// Everything that could be on the map: what Google found, and all of ours, wherever the map is.
+    private var mapPlaces: [MapPlace] {
+        MapPlaces.merged(
+            found: model.places + model.morePlaces,
+            saved: savedPlaces,
+            from: model.location.map { ($0.coordinate.latitude, $0.coordinate.longitude) }
+        )
+    }
+
+    private var chosen: MapPlace? {
+        mapPlaces.first { $0.place.googlePlaceId == model.selectedId }
+    }
+
+    private func pin(for item: MapPlace) -> MapPin {
+        switch item.saved?.status {
+        case .wantToGo:
+            MapPin(place: item.place, kind: .wantToGo, glyph: item.saved?.interestLevel == .curious ? "☆" : "★")
+        case .beenThere:
+            MapPin(place: item.place, kind: .beenThere, glyph: verdictGlyphs[item.place.googlePlaceId] ?? "?")
+        case nil:
+            MapPin(place: item.place, kind: .google, glyph: "🍴")
+        }
+    }
+
+    private func isShown(_ kind: MapPin.Kind) -> Bool {
+        switch kind {
+        case .wantToGo: showWantToGo
+        case .beenThere: showBeenThere
+        case .google: showGoogle
+        }
+    }
+
+    /// What the filters let through, ours colored as on the website. The chosen place always shows
+    /// (the nearest restaurant, or one of Google's own icons tapped with Google's pins off).
+    private var pins: [MapPin] {
+        mapPlaces.map(pin(for:)).filter { isShown($0.kind) || $0.place.googlePlaceId == model.selectedId }
+    }
+
+    /// A filter was turned off: the chosen place goes if it's one of those.
+    private func dropHiddenChoice() {
+        if let chosen, !isShown(pin(for: chosen).kind) { model.selectedId = nil }
     }
 
     /// The map has moved well away from where the places were searched.
@@ -240,8 +314,7 @@ struct StartVisitSheet: View {
         guard usesMap, let insights = try? PlaceInsights(context: context) else { return }
         var glyphs: [String: String] = [:]
         for place in savedPlaces where place.status == .beenThere {
-            guard let id = place.googlePlaceId, model.places.contains(where: { $0.googlePlaceId == id }) else { continue }
-            glyphs[id] = switch insights.summary(for: place).verdict {
+            glyphs[MapPlaces.pinId(for: place)] = switch insights.summary(for: place).verdict {
             case .joint(let value): value.emoji
             case .split: "↔"
             case .none: "?"
@@ -296,12 +369,12 @@ struct StartVisitSheet: View {
                 ForEach(model.suggestions) { suggestion in
                     Button {
                         searchFocused = false
-                        Task { await model.choose(suggestion) }
+                        Task { await model.choose(suggestion, showGoogle: showGoogle, savedStatus: savedStatus) }
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: "mappin.circle.fill")
                                 .font(.title2)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(suggestion.isArea == true ? Color.accentColor : .red)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(suggestion.name).font(.headline).foregroundStyle(.primary)
                                 if let secondary = suggestion.secondaryText {
@@ -350,6 +423,72 @@ struct StartVisitSheet: View {
         .buttonStyle(.plain)
     }
 
+    /// With the map: Start when you're near the chosen place, a card when it's far away (you're
+    /// planning), or a nudge when nothing's chosen.
+    @ViewBuilder
+    private var bottomBar: some View {
+        if usesMap, let chosen, !model.isWithinReach(chosen.place) {
+            placeCard(chosen)
+        } else if usesMap, chosen == nil {
+            Text("Tap a pin to see the place")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(.bar)
+        } else {
+            startButton
+        }
+    }
+
+    /// A far-away place: why it's saved, how to get there, and its page.
+    private func placeCard(_ item: MapPlace) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.place.name).font(.headline).lineLimit(2)
+                    Text(subtitle(for: item.place)).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                if let status = item.saved?.status { StatusBadge(status: status) }
+            }
+            if let why = whySaved(item.saved) {
+                Text(why).font(.subheadline).lineLimit(3)
+            }
+            HStack(spacing: 10) {
+                Button {
+                    openURL(GoogleMapsLink.directions(name: item.place.name, googlePlaceId: item.saved?.googlePlaceId ?? item.place.googlePlaceId))
+                } label: {
+                    Text("Directions").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                if let saved = item.saved {
+                    Button {
+                        openPlace = saved
+                    } label: {
+                        Text("Place page").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .controlSize(.large)
+        }
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    /// "★ Really want to go · “The chopped salad, everyone says.”"
+    private func whySaved(_ place: Place?) -> String? {
+        guard let place, place.status == .wantToGo else { return nil }
+        let level = place.interestLevel.map { "\($0 == .curious ? "☆" : "★") \($0.label)" }
+        let why = place.interestWhy.map { "“\($0)”" }
+        let parts = [level, why].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     /// Start, with the chosen place's details under its name (one control, not a card and a
     /// button), and Directions to it beside.
     private var startButton: some View {
@@ -358,10 +497,10 @@ struct StartVisitSheet: View {
                 startVisit()
             } label: {
                 VStack(spacing: 2) {
-                    Text(model.selectedPlace.map { "Start visit at \($0.name)" } ?? "Start visit")
+                    Text(chosen.map { "Start visit at \($0.place.name)" } ?? "Start visit")
                         .font(.headline)
                         .lineLimit(1)
-                    if let place = model.selectedPlace {
+                    if let place = chosen?.place {
                         Text(startDetails(place))
                             .font(.footnote)
                             .lineLimit(1)
@@ -373,11 +512,11 @@ struct StartVisitSheet: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(model.selectedPlace == nil)
+            .disabled(chosen == nil)
 
-            if let place = model.selectedPlace {
+            if let place = chosen?.place {
                 Button {
-                    openURL(GoogleMapsLink.directions(name: place.name, googlePlaceId: place.googlePlaceId))
+                    openURL(GoogleMapsLink.directions(name: place.name, googlePlaceId: chosen?.saved?.googlePlaceId ?? place.googlePlaceId))
                 } label: {
                     Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
                         .font(.title2)
@@ -451,11 +590,15 @@ struct StartVisitSheet: View {
     }
 
     private func startVisit() {
-        guard let place = model.selectedPlace else { return }
+        guard let chosen else { return }
         // Ted and Lori to start; who's here can be changed on the Current visit page.
         let household = people.filter { $0.kind == .household }.map(\.id)
         do {
-            try VisitStarter.startVisit(at: place, participantIds: household, in: context)
+            if model.selectedPlace == nil, let saved = chosen.saved {
+                try VisitStarter.startVisit(at: saved, participantIds: household, in: context)   // ours, not in Google's results
+            } else {
+                try VisitStarter.startVisit(at: chosen.place, participantIds: household, in: context)
+            }
             // Ask once (iOS remembers): needed for the "How was it?" prompt.
             Task { await VisitPrompt.requestAuthorization() }
             dismiss()
@@ -489,6 +632,36 @@ struct Chip: View {
                 Capsule().fill(isOn ? Color.accentColor : Color(.secondarySystemFill))
             }
         }
+    }
+}
+
+/// One of the map's filters: filled in its color when on, outlined when off.
+private struct MapFilterChip: View {
+    let title: String
+    let color: Color
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .foregroundStyle(isOn ? Color.white : Color.secondary)
+                .background {
+                    if isOn {
+                        Capsule().fill(color)
+                    } else {
+                        Capsule().strokeBorder(Color.secondary.opacity(0.4))
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(isOn ? "On" : "Off")
     }
 }
 

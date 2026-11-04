@@ -55,8 +55,12 @@ interface GoogleSuggestion {
     text?: { text?: string };
     structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
     distanceMeters?: number;
+    types?: string[];
   };
 }
+
+/** Town-like suggestions, for moving the phone's map (Google allows five included types). */
+const AREA_TYPES = ['locality', 'sublocality', 'neighborhood', 'administrative_area_level_3'];
 
 export type FetchFn = typeof fetch;
 
@@ -134,8 +138,9 @@ export class PlacesClient {
    * Type-ahead suggestions (like Google Maps). Pass the same sessionToken for every
    * keystroke and for the final details() call: Google then bills the session as
    * one Place Details request and the autocomplete requests are free.
+   * With includeAreas, towns are suggested too.
    */
-  async autocomplete(input: string, origin: LatLng, sessionToken: string): Promise<PlaceSuggestion[]> {
+  async autocomplete(input: string, origin: LatLng, sessionToken: string, includeAreas = false): Promise<PlaceSuggestion[]> {
     const text = input.trim();
     if (!text) return [];
     const response = await this.request('places:autocomplete', {
@@ -146,7 +151,7 @@ export class PlacesClient {
         origin,
         locationBias: { circle: { center: origin, radius: SEARCH_BIAS_RADIUS_METERS } },
         // Businesses only — no bare street addresses.
-        includedPrimaryTypes: ['establishment'],
+        includedPrimaryTypes: includeAreas ? ['establishment', ...AREA_TYPES] : ['establishment'],
       }),
     });
     const payload = (await response.json()) as { suggestions?: GoogleSuggestion[] };
@@ -159,6 +164,7 @@ export class PlacesClient {
       const secondary = p.structuredFormat?.secondaryText?.text;
       if (secondary) suggestion.secondaryText = secondary;
       if (typeof p.distanceMeters === 'number') suggestion.distanceMeters = p.distanceMeters;
+      if (p.types?.some((type) => AREA_TYPES.includes(type))) suggestion.isArea = true;
       suggestions.push(suggestion);
     }
     return suggestions;

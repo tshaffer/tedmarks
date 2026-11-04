@@ -69,3 +69,37 @@ private func place(_ id: String, _ meters: Double) -> NearbyPlace {
     #expect(visit.participantIds == [Household.tedId, sam.id])
     #expect(sam.lastSeenAt != nil)
 }
+
+private func saved(_ name: String, googleId: String?, status: PlaceStatus = .wantToGo, latitude: Double = 33.49, longitude: Double = -111.92) -> Place {
+    let place = Place(status: status, name: name, latitude: latitude, longitude: longitude)
+    place.googlePlaceId = googleId
+    return place
+}
+
+@MainActor
+@Test func theMapHasEverySavedPlaceWithoutRepeats() {
+    let both = saved("Doppio", googleId: "doppio")
+    let farAway = saved("FnB", googleId: "fnb")
+    let noGoogleId = saved("Old favorite", googleId: nil)
+    let nowhere = saved("Nowhere", googleId: "nowhere", latitude: 0, longitude: 0)
+    let items = MapPlaces.merged(found: [place("doppio", 30), place("cafe", 50), place("cafe", 50)], saved: [both, farAway, noGoogleId, nowhere], from: (37.39, -122.08))
+    #expect(items.map(\.place.googlePlaceId) == ["doppio", "cafe", "fnb", noGoogleId.id.uuidString])
+    #expect(items[0].saved === both)
+    #expect(items[1].saved == nil)
+    #expect(items[2].place.name == "FnB")
+    #expect(items[2].place.distanceMeters > 900_000)
+}
+
+@MainActor
+@Test func startVisitOnlyReachesNearbyPlaces() {
+    let home = (latitude: 37.39, longitude: -122.08)
+    #expect(MapPlaces.isWithinReach(place("doppio", 30), of: home))
+    let scottsdale = NearbyPlace(googlePlaceId: "fnb", name: "FnB", latitude: 33.49, longitude: -111.92, distanceMeters: 0)
+    #expect(!MapPlaces.isWithinReach(scottsdale, of: home))
+}
+
+@Test func mapBoundsContainWhatsInView() {
+    let bounds = MapBounds(south: 33, west: -112, north: 34, east: -111)
+    #expect(bounds.contains(latitude: 33.5, longitude: -111.9))
+    #expect(!bounds.contains(latitude: 37.4, longitude: -122.1))
+}

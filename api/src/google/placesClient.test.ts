@@ -99,6 +99,30 @@ test('autocomplete maps predictions and sends the session token', async () => {
   assert.equal(JSON.parse(String(capture.init?.body)).sessionToken, 'session-1');
 });
 
+test('autocomplete offers towns only when asked, and marks them', async () => {
+  const capture: { url?: string; init?: RequestInit } = {};
+  const client = new PlacesClient(
+    'k',
+    fakeFetch(
+      {
+        suggestions: [
+          { placePrediction: { placeId: 'town', structuredFormat: { mainText: { text: 'Scottsdale' } }, types: ['geocode', 'locality', 'political'] } },
+          { placePrediction: { placeId: 'dz', structuredFormat: { mainText: { text: 'Doppio Zero' } }, types: ['establishment', 'restaurant'] } },
+        ],
+      },
+      capture,
+    ),
+  );
+  const suggestions = await client.autocomplete('scot', origin, 'session-1', true);
+  assert.deepEqual(suggestions, [
+    { googlePlaceId: 'town', name: 'Scottsdale', isArea: true },
+    { googlePlaceId: 'dz', name: 'Doppio Zero' },
+  ]);
+  assert.ok(JSON.parse(String(capture.init?.body)).includedPrimaryTypes.includes('locality'));
+  await client.autocomplete('scot', origin, 'session-1');
+  assert.deepEqual(JSON.parse(String(capture.init?.body)).includedPrimaryTypes, ['establishment']);
+});
+
 test('details returns the place with distance and passes the session token', async () => {
   const capture: { url?: string; init?: RequestInit } = {};
   const client = new PlacesClient(

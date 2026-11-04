@@ -150,11 +150,15 @@ public struct PlaceInsights {
     }
 
     public static func distanceMeters(to place: Place, from origin: (latitude: Double, longitude: Double)) -> Double {
+        distanceMeters(latitude: place.latitude, longitude: place.longitude, from: origin)
+    }
+
+    public static func distanceMeters(latitude: Double, longitude: Double, from origin: (latitude: Double, longitude: Double)) -> Double {
         let radians = { (degrees: Double) in degrees * .pi / 180 }
-        let dLat = radians(place.latitude - origin.latitude)
-        let dLon = radians(place.longitude - origin.longitude)
+        let dLat = radians(latitude - origin.latitude)
+        let dLon = radians(longitude - origin.longitude)
         let a = sin(dLat / 2) * sin(dLat / 2)
-            + cos(radians(origin.latitude)) * cos(radians(place.latitude)) * sin(dLon / 2) * sin(dLon / 2)
+            + cos(radians(origin.latitude)) * cos(radians(latitude)) * sin(dLon / 2) * sin(dLon / 2)
         return 6_371_000 * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 

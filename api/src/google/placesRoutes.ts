@@ -104,7 +104,7 @@ export function placesRoutes(client: PlacesClient | undefined, defaultRadiusMete
       return;
     }
     try {
-      const body: PlaceSuggestionsResponse = { suggestions: await client!.autocomplete(q, origin, sessionToken) };
+      const body: PlaceSuggestionsResponse = { suggestions: await client!.autocomplete(q, origin, sessionToken, req.query['areas'] === '1') };
       res.json(body);
     } catch (error) {
       sendError(res, error);

@@ -123,13 +123,26 @@ struct MenuPanel: View {
                 capture.message = "The camera isn't available here. Choose photos of the menu instead."
             }
         } label: {
-            Label("Snap the menu", systemImage: "camera.viewfinder")
+            MenuButtonLabel(title: "Snap the menu", systemImage: "camera.viewfinder")
         }
     }
 
     private var photosButton: some View {
         PhotosPicker(selection: $pickedPhotos, maxSelectionCount: 12, matching: .images, photoLibrary: .shared()) {
-            Label("From Photos", systemImage: "photo.on.rectangle")
+            MenuButtonLabel(title: "From Photos", systemImage: "photo.on.rectangle")
+        }
+    }
+}
+
+/// Image + Text (not Label), which newer iOS versions can collapse inside a List.
+private struct MenuButtonLabel: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+            Text(title).lineLimit(1)
         }
     }
 }

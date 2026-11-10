@@ -61,6 +61,12 @@ final class StartVisitModel {
     var isBusy = false
     private let api = AppConfig.api
 
+    /// The map's filters. With ones that need Google's details (hours, price, rating), Google's
+    /// restaurants come from the area search instead of the nearby list.
+    var filters = MapFilters()
+    /// What the area search was last asked (nil: the pins came from the nearby list).
+    private(set) var detailsRequest: AreaSearchFilters?
+
     var selectedPlace: NearbyPlace? {
         places.first { $0.googlePlaceId == selectedId } ?? morePlaces.first { $0.googlePlaceId == selectedId }
     }
@@ -74,11 +80,7 @@ final class StartVisitModel {
             let location = try await LocationService.currentLocation()
             self.location = location
             phase = .loading
-            let found = try await api.nearbyPlaces(
-                latitude: location.coordinate.latitude,
-                longitude: location.coordinate.longitude,
-                radiusMeters: NearbySearchSettings.radius()
-            )
+            let found = try await restaurants(around: location.coordinate, radiusMeters: NearbySearchSettings.radius(), bounds: nil)
             nearby = PlaceRanking.rank(found, savedStatus: savedStatus)
             searchedCenter = location.coordinate
             show(nearby)
@@ -88,16 +90,18 @@ final class StartVisitModel {
     }
 
     /// The map's "Search this area": restaurants around where the map is now.
-    func searchArea(_ center: CLLocationCoordinate2D, radiusMeters: Int? = nil, savedStatus: @escaping (NearbyPlace) -> PlaceStatus?) async {
+    func searchArea(
+        _ center: CLLocationCoordinate2D, radiusMeters: Int? = nil, bounds: MapBounds? = nil, savedStatus: @escaping (NearbyPlace) -> PlaceStatus?
+    ) async {
         isBusy = true
         defer { isBusy = false }
         do {
-            let found = try await api.nearbyPlaces(latitude: center.latitude, longitude: center.longitude, radiusMeters: radiusMeters ?? NearbySearchSettings.radius())
+            let found = try await restaurants(around: center, radiusMeters: radiusMeters ?? NearbySearchSettings.radius(), bounds: bounds)
             nearby = PlaceRanking.rank(found, savedStatus: savedStatus)
             searchedCenter = center
             morePlaces = []
             morePageToken = nil
-            moreState = .available
+            moreState = detailsRequest == nil ? .available : .exhausted
             isShowingSearchResults = false
             searchText = ""
             // Keep what's chosen if it's still here. Far from you nothing is chosen for you: you're planning.
@@ -250,6 +254,27 @@ final class StartVisitModel {
     }
 
     /// Close enough to start a visit; farther away, the map is for planning.
+    /// Google's restaurants around `center`: the nearby list, or the area search (inside `bounds`,
+    /// else a square around the center) when the filters need their details.
+    private func restaurants(around center: CLLocationCoordinate2D, radiusMeters: Int, bounds: MapBounds?) async throws -> [NearbyPlace] {
+        guard filters.needsGoogleDetails else {
+            detailsRequest = nil
+            return try await api.nearbyPlaces(latitude: center.latitude, longitude: center.longitude, radiusMeters: radiusMeters)
+        }
+        let request = filters.googleRequest()
+        let origin = location.map { ($0.coordinate.latitude, $0.coordinate.longitude) }
+        let found = try await api.areaSearch(bounds: bounds ?? Self.bounds(around: center, meters: Double(radiusMeters)), filters: request, from: origin)
+        detailsRequest = request
+        moreState = .exhausted
+        return found
+    }
+
+    static func bounds(around center: CLLocationCoordinate2D, meters: Double) -> MapBounds {
+        let dLat = meters / 111_320
+        let dLng = meters / (111_320 * max(0.01, cos(center.latitude * .pi / 180)))
+        return MapBounds(south: center.latitude - dLat, west: center.longitude - dLng, north: center.latitude + dLat, east: center.longitude + dLng)
+    }
+
     func isWithinReach(_ place: NearbyPlace) -> Bool {
         guard let location else { return true }
         return MapPlaces.isWithinReach(place, of: (location.coordinate.latitude, location.coordinate.longitude))

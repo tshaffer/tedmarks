@@ -59,6 +59,14 @@ public final class Place {
     public var googleRatingsCount: Int?
     public var googlePriceLevel: Int?
     public var googleWeekdayText: [String]?
+    /// Google's opening periods as JSON ([OpeningPeriod]), for the map's When filter.
+    public var googleOpeningPeriodsData: Data?
+    /// The place's offset from UTC, so "open now" uses its own time.
+    public var googleUTCOffsetMinutes: Int?
+    /// Meals served, when set by hand on the website (attributes.mealsServed); read only here.
+    public var servesBreakfast: Bool?
+    public var servesLunch: Bool?
+    public var servesDinner: Bool?
     /// memorapp's 0–10 rating, kept as the "refined rating" (read only on the phone).
     public var refinedRating: Int?
 
@@ -71,6 +79,16 @@ public final class Place {
     public var interestSavedAt: Date?
     /// The most recently read menu (its dishes are the "On the menu" choices).
     public var latestMenuId: UUID?
+
+    public var googleOpeningPeriods: [OpeningPeriod]? {
+        get { googleOpeningPeriodsData.flatMap { try? JSONDecoder().decode([OpeningPeriod].self, from: $0) } }
+        set { googleOpeningPeriodsData = newValue.flatMap { try? JSONEncoder().encode($0) } }
+    }
+
+    public var mealsServed: MealsServed? {
+        guard let servesBreakfast, let servesLunch, let servesDinner else { return nil }
+        return MealsServed(breakfast: servesBreakfast, lunch: servesLunch, dinner: servesDinner)
+    }
 
     public var interestLevel: InterestLevel? {
         get { interestLevelRaw.flatMap(InterestLevel.init) }

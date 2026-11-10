@@ -153,7 +153,7 @@ public struct PlaceInsights {
         distanceMeters(latitude: place.latitude, longitude: place.longitude, from: origin)
     }
 
-    public static func distanceMeters(latitude: Double, longitude: Double, from origin: (latitude: Double, longitude: Double)) -> Double {
+    public nonisolated static func distanceMeters(latitude: Double, longitude: Double, from origin: (latitude: Double, longitude: Double)) -> Double {
         let radians = { (degrees: Double) in degrees * .pi / 180 }
         let dLat = radians(latitude - origin.latitude)
         let dLon = radians(longitude - origin.longitude)

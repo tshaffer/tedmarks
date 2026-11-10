@@ -11,11 +11,24 @@ public struct NearbyPlace: Codable, Hashable, Sendable, Identifiable {
     public var primaryTypeLabel: String?
     public var distanceMeters: Double
 
+    // From the area search only (what the map's filters use); nil from the nearby list.
+    public var rating: Double?
+    public var ratingsCount: Int?
+    public var priceLevel: Int?
+    public var openingHours: Hours?
+    public var utcOffsetMinutes: Int?
+
+    public struct Hours: Codable, Hashable, Sendable {
+        public var periods: [OpeningPeriod]
+        public init(periods: [OpeningPeriod]) { self.periods = periods }
+    }
+
     public var id: String { googlePlaceId }
 
     public init(
         googlePlaceId: String, name: String, address: String? = nil, latitude: Double, longitude: Double,
-        primaryType: String? = nil, primaryTypeLabel: String? = nil, distanceMeters: Double
+        primaryType: String? = nil, primaryTypeLabel: String? = nil, distanceMeters: Double,
+        rating: Double? = nil, ratingsCount: Int? = nil, priceLevel: Int? = nil, openingHours: Hours? = nil, utcOffsetMinutes: Int? = nil
     ) {
         self.googlePlaceId = googlePlaceId
         self.name = name
@@ -25,6 +38,11 @@ public struct NearbyPlace: Codable, Hashable, Sendable, Identifiable {
         self.primaryType = primaryType
         self.primaryTypeLabel = primaryTypeLabel
         self.distanceMeters = distanceMeters
+        self.rating = rating
+        self.ratingsCount = ratingsCount
+        self.priceLevel = priceLevel
+        self.openingHours = openingHours
+        self.utcOffsetMinutes = utcOffsetMinutes
     }
 }
 
@@ -134,6 +152,35 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         let body = Body(lat: latitude, lng: longitude, radiusMeters: radiusMeters, excludeIds: shownIds, pageToken: pageToken)
         let data = try await send(path: "places/more", method: "POST", query: [], body: try JSONEncoder().encode(body))
         return try decode(MorePlaces.self, from: data)
+    }
+
+    /// Google's restaurants inside a map area, with what the map filters on (hours, price,
+    /// rating). Google applies what it can of `filters`; the server caches answers for a few days.
+    public func areaSearch(
+        bounds: MapBounds, filters: AreaSearchFilters, from origin: (latitude: Double, longitude: Double)?
+    ) async throws -> [NearbyPlace] {
+        struct Body: Encodable {
+            var bounds: MapBounds
+            var query: String?, cuisineTypes: [String]?, minRating: Double?, priceLevels: [Int]?, openNow: Bool?
+        }
+        struct Restaurant: Decodable {
+            var googlePlaceId: String, name: String, latitude: Double, longitude: Double
+            var address: String?, primaryType: String?, primaryTypeLabel: String?
+            var rating: Double?, ratingsCount: Int?, priceLevel: Int?
+            var openingHours: NearbyPlace.Hours?, utcOffsetMinutes: Int?
+        }
+        struct Response: Decodable { var restaurants: [Restaurant] }
+        let body = Body(bounds: bounds, query: filters.query, cuisineTypes: filters.cuisineTypes, minRating: filters.minRating,
+                        priceLevels: filters.priceLevels, openNow: filters.openNow)
+        let data = try await send(path: "places/area-search", method: "POST", query: [], body: try JSONEncoder().encode(body))
+        return try decode(Response.self, from: data).restaurants.map { r in
+            NearbyPlace(
+                googlePlaceId: r.googlePlaceId, name: r.name, address: r.address, latitude: r.latitude, longitude: r.longitude,
+                primaryType: r.primaryType, primaryTypeLabel: r.primaryTypeLabel,
+                distanceMeters: origin.map { PlaceInsights.distanceMeters(latitude: r.latitude, longitude: r.longitude, from: $0) } ?? 0,
+                rating: r.rating, ratingsCount: r.ratingsCount, priceLevel: r.priceLevel, openingHours: r.openingHours, utcOffsetMinutes: r.utcOffsetMinutes
+            )
+        }.sorted { $0.distanceMeters < $1.distanceMeters }
     }
 
     // MARK: - Voice notes

@@ -7,7 +7,7 @@ public struct MapPlace {
 }
 
 /// What the map has in view.
-public struct MapBounds: Equatable, Sendable {
+public struct MapBounds: Equatable, Sendable, Encodable {
     public let south: Double, west: Double, north: Double, east: Double
 
     public init(south: Double, west: Double, north: Double, east: Double) {

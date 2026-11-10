@@ -33,6 +33,10 @@ struct StartVisitSheet: View {
     @AppStorage("mapShowWantToGo") private var showWantToGo = true
     @AppStorage("mapShowBeenThere") private var showBeenThere = true
     @AppStorage("mapShowGoogle") private var showGoogle = true
+    /// When · Cuisine · Price · Our verdict · Tags · Google rating (MapFilters as JSON).
+    @AppStorage("mapFilters") private var filtersJSON = "{}"
+    /// For the filters: each of our places' verdict and cuisine, by pin id.
+    @State private var ourFacts: [String: (verdict: VerdictChoice, cuisine: String?)] = [:]
 
     private var usesMap: Bool { AppConfig.googleMapsKey != nil }
 
@@ -74,14 +78,23 @@ struct StartVisitSheet: View {
         .onChange(of: showBeenThere) { dropHiddenChoice() }
         .onChange(of: showGoogle) { _, isOn in
             dropHiddenChoice()
-            // Turned on after moving the map: find Google's restaurants for here.
-            if isOn, movedAway, let center = mapCenter {
-                Task { await model.searchArea(center, savedStatus: savedStatus) }
+            // Turned on after moving the map, or with filters the pins don't have the details for:
+            // find Google's restaurants for here.
+            if isOn, movedAway || googleNeedsSearching, let center = mapCenter {
+                Task { await model.searchArea(center, bounds: mapBounds, savedStatus: savedStatus) }
+            }
+        }
+        .onChange(of: filtersJSON) {
+            model.filters = filters
+            dropFilteredChoice()
+            if showGoogle, googleNeedsSearching, let center = mapCenter ?? model.searchedCenter {
+                Task { await model.searchArea(center, bounds: mapBounds, savedStatus: savedStatus) }
             }
         }
         .task {
         // Coming back to the tab keeps the list; pull down to refresh it.
         guard model.phase != .loaded else { return }
+        model.filters = filters
         await model.load(savedStatus: savedStatus)
         #if DEBUG
         // Dev/testing: `-showMore` loads one "Show more" batch without a tap.
@@ -185,6 +198,7 @@ struct StartVisitSheet: View {
     private var mapContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             mapFilters
+            MapFilterBar(filters: filtersBinding, cuisines: cuisineChoices, tags: tagChoices, showsGoogle: showGoogle)
             ZStack(alignment: .top) {
                 StartVisitMap(
                     pins: pins,
@@ -214,7 +228,15 @@ struct StartVisitSheet: View {
                     .controlSize(.small)
                     .padding(.top, 10)
                 }
-                if showGoogle && model.places.isEmpty && model.morePlaces.isEmpty && !model.isBusy {
+                if !model.isBusy && filters.activeCount > 0 && !pinsInView {
+                    Text("Nothing here matches your filters.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .padding(12)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.top, 54)
+                        .padding(.horizontal, 24)
+                } else if showGoogle && model.places.isEmpty && model.morePlaces.isEmpty && !model.isBusy {
                     Text(model.isShowingSearchResults ? "No matches." : "No restaurants found here. Search by name, or move the map and Search this area.")
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
@@ -230,6 +252,12 @@ struct StartVisitSheet: View {
         .padding(.top, 4)
         .padding(.bottom, 8)
         .background(Color(.systemGroupedBackground))
+    }
+
+    /// Whether any pin shows in the map's view (pins also include our places elsewhere).
+    private var pinsInView: Bool {
+        guard let bounds = mapBounds else { return !pins.isEmpty }
+        return pins.contains { bounds.contains(latitude: $0.place.latitude, longitude: $0.place.longitude) }
     }
 
     /// Which pins show; each turns on and off by itself.
@@ -292,12 +320,65 @@ struct StartVisitSheet: View {
     /// What the filters let through, ours colored as on the website. The chosen place always shows
     /// (the nearest restaurant, or one of Google's own icons tapped with Google's pins off).
     private var pins: [MapPin] {
-        mapPlaces.map(pin(for:)).filter { isShown($0.kind) || $0.place.googlePlaceId == model.selectedId }
+        let f = filters
+        return mapPlaces.filter { $0.place.googlePlaceId == model.selectedId || passes($0, f) }.map(pin(for:))
+    }
+
+    /// Through the toggles (Want to go, Been there, Google) and the filters.
+    private func passes(_ item: MapPlace, _ f: MapFilters) -> Bool {
+        guard isShown(pin(for: item).kind) else { return false }
+        if let saved = item.saved {
+            let facts = ourFacts[MapPlaces.pinId(for: saved)]
+            return MapFiltering.matchesOurs(saved, verdict: facts?.verdict ?? .none, cuisine: facts?.cuisine, f)
+        }
+        return MapFiltering.matchesGoogle(item.place, f)
+    }
+
+    private func cuisine(of item: MapPlace) -> String? {
+        if let saved = item.saved { return ourFacts[MapPlaces.pinId(for: saved)]?.cuisine }
+        return MapFiltering.cuisine(ofGoogle: item.place)
+    }
+
+    private var inView: [MapPlace] {
+        guard let bounds = mapBounds else { return mapPlaces }
+        return mapPlaces.filter { bounds.contains(latitude: $0.place.latitude, longitude: $0.place.longitude) }
+    }
+
+    /// Cuisines among what the other filters leave in view (with counts), then the common ones.
+    private var cuisineChoices: [MapFiltering.Choice] {
+        var others = filters
+        others.cuisines = []
+        return MapFiltering.withCommonCuisines(MapFiltering.counts(inView.filter { passes($0, others) }.map(cuisine(of:))))
+    }
+
+    /// Our tags among what the other filters leave in view (so a second can be added: OR).
+    private var tagChoices: [MapFiltering.Choice] {
+        var others = filters
+        others.tags = []
+        let tags = inView.filter { $0.saved != nil && passes($0, others) }.flatMap { $0.saved?.tags ?? [] }
+        return MapFiltering.counts(tags).filter { $0.value != MapFilters.notSet }
+    }
+
+    private var filters: MapFilters { MapFilters(json: filtersJSON) }
+
+    private var filtersBinding: Binding<MapFilters> {
+        Binding(get: { filters }, set: { filtersJSON = $0.json })
+    }
+
+    /// Google's pins lack the details the filters need, or were found for other filters.
+    private var googleNeedsSearching: Bool {
+        let f = filters
+        return f.needsGoogleDetails ? model.detailsRequest != f.googleRequest() : model.detailsRequest != nil
     }
 
     /// A filter was turned off: the chosen place goes if it's one of those.
     private func dropHiddenChoice() {
         if let chosen, !isShown(pin(for: chosen).kind) { model.selectedId = nil }
+    }
+
+    /// The filters changed: the chosen place goes if they leave it out.
+    private func dropFilteredChoice() {
+        if let chosen, !passes(chosen, filters) { model.selectedId = nil }
     }
 
     /// The map has moved well away from where the places were searched.
@@ -312,15 +393,23 @@ struct StartVisitSheet: View {
 
     private func refreshVerdicts() {
         guard usesMap, let insights = try? PlaceInsights(context: context) else { return }
+        let subtypes = Dictionary(((try? context.fetch(FetchDescriptor<PlaceSubtype>())) ?? []).map { ($0.id, $0.name) }) { a, _ in a }
         var glyphs: [String: String] = [:]
-        for place in savedPlaces where place.status == .beenThere {
-            glyphs[MapPlaces.pinId(for: place)] = switch insights.summary(for: place).verdict {
-            case .joint(let value): value.emoji
-            case .split: "↔"
-            case .none: "?"
+        var facts: [String: (verdict: VerdictChoice, cuisine: String?)] = [:]
+        for place in savedPlaces {
+            let id = MapPlaces.pinId(for: place)
+            let verdict = place.status == .beenThere ? insights.summary(for: place).verdict : .none
+            if place.status == .beenThere {
+                glyphs[id] = switch verdict {
+                case .joint(let value): value.emoji
+                case .split: "↔"
+                case .none: "?"
+                }
             }
+            facts[id] = (VerdictChoice(verdict), MapFiltering.cuisine(of: place, subtypeName: place.subtypeId.flatMap { subtypes[$0] }))
         }
         verdictGlyphs = glyphs
+        ourFacts = facts
     }
 
     private var isShowingSuggestions: Bool {

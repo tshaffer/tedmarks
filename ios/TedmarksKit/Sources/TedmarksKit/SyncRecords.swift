@@ -90,6 +90,16 @@ enum SyncValue {
     }
     static func parseId(_ value: JSONValue?) -> UUID? { value?.string.flatMap(UUID.init(uuidString:)) }
 
+    /// One of Google's opening periods ({open: {day, time}, close?}).
+    static func openingPeriod(_ value: JSONValue) -> OpeningPeriod? {
+        func point(_ value: JSONValue?) -> OpeningPeriod.Point? {
+            guard let object = value?.object, let day = object["day"]?.number, let time = object["time"]?.string else { return nil }
+            return OpeningPeriod.Point(day: Int(day), time: time)
+        }
+        guard let open = point(value.object?["open"]) else { return nil }
+        return OpeningPeriod(open: open, close: point(value.object?["close"]))
+    }
+
     static func hash(_ record: SyncRecord) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
@@ -465,6 +475,12 @@ enum SyncDecoder {
             place.googleRatingsCount = google?["ratingsCount"]?.number.map { Int($0) }
             place.googlePriceLevel = google?["priceLevel"]?.number.map { Int($0) }
             place.googleWeekdayText = google?["openingHours"]?.object?["weekdayText"]?.array?.compactMap(\.string)
+            place.googleOpeningPeriods = google?["openingHours"]?.object?["periods"]?.array?.compactMap(SyncValue.openingPeriod)
+            place.googleUTCOffsetMinutes = google?["utcOffsetMinutes"]?.number.map { Int($0) }
+            let meals = record["attributes"]?.object?["mealsServed"]?.object
+            place.servesBreakfast = meals?["breakfast"]?.bool
+            place.servesLunch = meals?["lunch"]?.bool
+            place.servesDinner = meals?["dinner"]?.bool
             place.subtypeId = SyncValue.parseId(record["subtypeId"])
             place.review = string("review")
             place.refinedRating = record["refinedRating"]?.number.map { Int($0) }

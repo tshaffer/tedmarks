@@ -173,7 +173,7 @@ The purple box on a place shows how much and why, with **Edit** and **Delete**. 
     title: 'Search filters',
     category: 'Planning',
     keywords: ['filter', 'filters', 'when', 'open now', 'meal', 'breakfast', 'lunch', 'dinner', 'cuisine', 'price', 'verdict', 'tags', 'google rating', 'reviews', 'clear'],
-    body: `The map and the Places page share one set of filters, and they're remembered.
+    body: `The map and the Places page share one set of filters, and they're remembered. The phone's map has the same filters, remembered separately.
 
 **How they combine:** choices *within* a filter are either/or (Mexican **or** Italian); *different* filters must all match (Mexican or Italian, **and** open for breakfast on Saturday).
 
@@ -263,6 +263,8 @@ On the **Visit** tab, **Start a visit** lists the restaurants around you, neares
 ### The map
 
 The **Visit** tab's map shows all our places, wherever you move it: a purple ★ (☆ for Curious) for Want to go, a green ring for Been there. **Search a restaurant or town** — type *Scottsdale* and choose it, and the map goes there. **★ Want to go**, **Been there** and **Google** above the map each turn on and off, in any combination, and stay as you left them. Google's restaurants come from a town search or **Search this area**.
+
+Under those, the same **filters** as the website — **When**, **Cuisine**, **Price**, **Our verdict**, **Tags**, and **Google rating** while Google's pins show — narrow the pins, and they're remembered. Filters that need Google's details (When, Cuisine, Price, Google rating) search Google again with them. **Clear** resets them. See *Search filters* for how they combine.
 
 Tap a pin to choose it. Near you, **Start visit** is at the bottom. Far away you're planning, so a card shows why you saved it, with **Directions** and **Place page**.
 

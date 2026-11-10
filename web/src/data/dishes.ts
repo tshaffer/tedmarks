@@ -1,4 +1,4 @@
-import { looseDishKey, normalizeItemName, similarDishNames, type PlaceItem } from '@tedmarks/shared';
+import { canRenameDish, looseDishKey, normalizeItemName, similarDishNames, type PlaceItem } from '@tedmarks/shared';
 import type { TedmarksRecords } from './TedmarksData.js';
 import { inverse } from './undo.js';
 import { TED, type Changes } from './visitWrites.js';
@@ -76,4 +76,23 @@ export function planDishMerge(data: TedmarksRecords, keepId: string, mergeIds: s
   };
   if (!changes.visitItems!.length) delete changes.visitItems;
   return { changes, undo: (later) => inverse(data, changes, later) };
+}
+
+/**
+ * Renames a dish we named ourselves ("Casio e Pepe" → "Cacio e Pepe"), everywhere it was ordered
+ * and rated — they all point at the one dish. A name another dish here already has is refused:
+ * that's Merge dishes. Throws with a message to show.
+ */
+export function planDishRename(data: TedmarksRecords, itemId: string, name: string, now = new Date().toISOString()): Changes {
+  const item = data.placeItems.get(itemId);
+  const trimmed = name.trim().replace(/\s+/g, ' ');
+  if (!item) throw new Error('That dish is gone.');
+  if (!trimmed) throw new Error('A dish needs a name.');
+  if (!canRenameDish(item.sources)) throw new Error('This dish is from the menu, so it keeps the menu’s name.');
+  if (trimmed === item.name) return {};
+  const normalized = normalizeItemName(trimmed);
+  const other = [...data.placeItems.values()].find((i) => i.id !== itemId && i.placeId === item.placeId
+    && (i.normalizedName === normalized || (i.aliases ?? []).includes(normalized)));
+  if (other) throw new Error(`There’s already “${other.name}” here. To make them one dish, use Merge dishes on the place page.`);
+  return { placeItems: [{ id: itemId, modifiedAt: now, modifiedBy: TED, name: trimmed, normalizedName: normalized }] };
 }

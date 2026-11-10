@@ -1,4 +1,4 @@
-import { looseDishKey, isDateUnknown } from '@tedmarks/shared';
+import { canRenameDish, looseDishKey, isDateUnknown } from '@tedmarks/shared';
 import { Box, IconButton, InputAdornment, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { DISH, dishesAt } from '../data/insights.js';
@@ -6,20 +6,23 @@ import { menuSections } from '../data/menuWrites.js';
 import type { TedmarksRecords } from '../data/TedmarksData.js';
 import type { DishRow } from '../data/visitWrites.js';
 import { longDate } from '../place/parts.js';
+import { DishName } from './DishName.js';
 
-interface Entry { key: string; name: string; section?: string | undefined; price?: string | undefined; ours?: string | undefined; sub?: string | undefined }
+interface Entry { key: string; name: string; itemId?: string | undefined; renamable?: boolean; section?: string | undefined; price?: string | undefined; ours?: string | undefined; sub?: string | undefined }
 
 /**
  * Figma W3 · order from the menu, like shopping: dishes ordered here before (with our last
  * rating), then the latest menu by section; each with a stepper. + adds the dish to the order
  * (again makes it ×2), − takes one off (at 0 it leaves the order).
  */
-export function OrderMenu({ data, placeId, dishes, onAdd, onRemoveOne }: {
+export function OrderMenu({ data, placeId, dishes, onAdd, onRemoveOne, onRename }: {
   data: TedmarksRecords;
   placeId: string | undefined;
   dishes: DishRow[];
   onAdd: (name: string, section?: string) => void;
   onRemoveOne: (name: string) => void;
+  /** Renames a dish we named (one ordered before); the menu's own dishes keep their names. */
+  onRename?: (itemId: string, name: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState('');
   const [other, setOther] = useState('');
@@ -33,7 +36,7 @@ export function OrderMenu({ data, placeId, dishes, onAdd, onRemoveOne }: {
     const beforeList: Entry[] = dishesAt(data, placeId).map((d) => {
       const last = lastOrdered(d.item.id);
       return {
-        key: looseDishKey(d.item.name), name: d.item.name, section: d.item.section, price: d.item.price,
+        key: looseDishKey(d.item.name), name: d.item.name, itemId: d.item.id, renamable: canRenameDish(d.item.sources), section: d.item.section, price: d.item.price,
         ours: d.latest.kind === 'joint' ? DISH[d.latest.value] : d.latest.kind === 'split' ? '↔' : undefined,
         sub: `Ordered ${d.timesOrdered === 1 ? 'once' : `${d.timesOrdered} times`}${last ? ` · ${d.timesOrdered > 1 ? 'last ' : ''}${longDate(last)}` : ''}`,
       };
@@ -58,7 +61,8 @@ export function OrderMenu({ data, placeId, dishes, onAdd, onRemoveOne }: {
     return (
       <Stack key={e.key} direction="row" alignItems="center" spacing={1} sx={{ px: 1, py: 0.5, borderRadius: 2, bgcolor: n ? '#fff6ea' : undefined }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" fontWeight={n ? 600 : 400}>{e.ours && <span style={{ marginRight: 6 }}>{e.ours}</span>}{e.name}</Typography>
+          <DishName variant="body2" fontWeight={n ? 600 : 400} name={e.name} before={e.ours && <span style={{ marginRight: 6 }}>{e.ours}</span>}
+            onRename={onRename && e.itemId && e.renamable ? (name) => onRename(e.itemId!, name) : undefined} />
           {e.sub && <Typography variant="caption" color="text.secondary">{e.sub}</Typography>}
         </Box>
         {e.price && <Typography variant="body2" color="text.secondary">{e.price}</Typography>}

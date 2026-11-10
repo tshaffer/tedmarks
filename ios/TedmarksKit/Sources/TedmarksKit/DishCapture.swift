@@ -260,3 +260,45 @@ public enum DishCapture {
         (visit.items.map(\.sortOrder).max() ?? -1) + 1
     }
 }
+
+// MARK: - Renaming a dish
+
+public enum DishRenameError: LocalizedError, Equatable {
+    case emptyName
+    case fromTheMenu
+    case alreadyHere(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .emptyName: "A dish needs a name."
+        case .fromTheMenu: "This dish is from the menu, so it keeps the menu's name."
+        case .alreadyHere(let name): "There's already “\(name)” here. To make them one dish, use Merge dishes on the website."
+        }
+    }
+}
+
+extension PlaceItem {
+    /// Dishes we named ourselves (typed, spoken, from a receipt or imported) can be renamed; a dish
+    /// read from a menu keeps the menu's name, so the next menu still finds it (shared canRenameDish).
+    public var canRename: Bool { !sources.contains("menu") }
+}
+
+extension DishCapture {
+    /// Renames a dish we named ("Casio e Pepe" → "Cacio e Pepe") everywhere it was ordered and
+    /// rated. A name another dish here already has is refused (that's merging, on the website).
+    public static func rename(_ item: PlaceItem, to name: String, in context: ModelContext, now: Date = .now) throws {
+        let trimmed = name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !trimmed.isEmpty else { throw DishRenameError.emptyName }
+        guard item.canRename else { throw DishRenameError.fromTheMenu }
+        guard trimmed != item.name else { return }
+        let normalized = normalizeItemName(trimmed)
+        if let other = item.place?.items.first(where: { $0.id != item.id && $0.deletedAt == nil && $0.normalizedName == normalized }) {
+            throw DishRenameError.alreadyHere(other.name)
+        }
+        item.name = trimmed
+        item.normalizedName = normalized
+        item.modifiedAt = now
+        try context.save()
+        VisitSideEffects.reconcile(in: context)
+    }
+}

@@ -165,6 +165,7 @@ struct VisitHomeView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .renamesDish(item.placeItem)
                     }
                 }
             }

@@ -41,7 +41,7 @@ struct AddToOrderSheet: View {
                                 .padding(.vertical, 6)
                         } else {
                             ForEach(orderItems) { item in
-                                row(item.displayName, detail: item.placeItem?.price, count: item.count,
+                                row(item.displayName, dish: item.placeItem, detail: item.placeItem?.price, count: item.count,
                                     onAdd: { addOne(item) }, onRemove: { removeOne(item) })
                             }
                         }
@@ -50,7 +50,7 @@ struct AddToOrderSheet: View {
                     if !suggestions.isEmpty {
                         rowSection(trimmedName.isEmpty ? "Ordered before" : "Ordered before · matches") {
                             ForEach(suggestions) { placeItem in
-                                row(placeItem.name, detail: lastOrderedText(placeItem), count: 0,
+                                row(placeItem.name, dish: placeItem, detail: lastOrderedText(placeItem), count: 0,
                                     onAdd: { add(placeItem) }, onRemove: {})
                             }
                         }
@@ -58,7 +58,7 @@ struct AddToOrderSheet: View {
 
                     if let place = visit.place {
                         MenuChipSections(place: place, exclude: shownElsewhere, filter: trimmedName, asRows: true) { placeItem in
-                            row(placeItem.name, detail: placeItem.price, count: 0, onAdd: { add(placeItem) }, onRemove: {})
+                            row(placeItem.name, dish: placeItem, detail: placeItem.price, count: 0, onAdd: { add(placeItem) }, onRemove: {})
                         }
                     }
                 }
@@ -105,7 +105,8 @@ struct AddToOrderSheet: View {
     }
 
     /// A dish with a stepper, like a shopping list: [+] at 0, [−] n [+] once ordered.
-    private func row(_ name: String, detail: String?, count: Int, onAdd: @escaping () -> Void, onRemove: @escaping () -> Void) -> some View {
+    /// Long-press a dish we named to rename it.
+    private func row(_ name: String, dish: PlaceItem?, detail: String?, count: Int, onAdd: @escaping () -> Void, onRemove: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(name).font(.body.weight(count > 0 ? .semibold : .regular))
@@ -119,6 +120,8 @@ struct AddToOrderSheet: View {
         .padding(.vertical, 7)
         .padding(.horizontal, 10)
         .background(count > 0 ? Color.orange.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 10))
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .renamesDish(dish)
     }
 
     // MARK: - Logic

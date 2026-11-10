@@ -4,7 +4,9 @@ import {
   FormControlLabel, IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography, useMediaQuery,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
-import { isDateUnknown, looseDishKey } from '@tedmarks/shared';
+import { canRenameDish, isDateUnknown, looseDishKey } from '@tedmarks/shared';
+import { dishFinder } from '../data/dishes.js';
+import { DishName } from './DishName.js';
 import { OrderMenu } from './OrderMenu.js';
 import { placeDetails, pushChanges, refreshPlace } from '../api.js';
 import { DISH, VERDICT, visitSummary } from '../data/insights.js';
@@ -21,13 +23,15 @@ interface Props {
   onClose: () => void;
   onSaved: (placeId: string, visitId: string) => void;
   onDelete?: (visitId: string) => void;
+  /** Renames a dish we named, everywhere (saved right away). */
+  onRenameDish?: (itemId: string, name: string) => Promise<void>;
 }
 
 const today = () => new Date().toLocaleDateString('en-CA');   // YYYY-MM-DD
 const emptyRow = (): DishRow => ({ name: '', ratingMode: 'us', note: '' });
 
 /** Figma W3 · Add a past visit / Edit visit. */
-export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props) {
+export function VisitDialog({ data, target, onClose, onSaved, onDelete, onRenameDish }: Props) {
   const editing = target.kind === 'ours' && target.visitId ? data.visits.get(target.visitId) : undefined;
   const [google, setGoogle] = useState<NearbyPlace | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +80,21 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
     const q = (r.quantity ?? 1) - 1;
     return q > 0 ? [{ ...r, quantity: q }] : [];
   }));
+
+  // Renaming a dish we named renames it everywhere; rows of it in this order follow.
+  const renameDish = onRenameDish && (async (itemId: string, name: string) => {
+    const old = data.placeItems.get(itemId)?.name;
+    await onRenameDish(itemId, name);
+    if (old) setDishes((rows) => rows.map((r) => (sameDish(r.name, old) ? { ...r, name: name.trim() } : r)));
+  });
+  // A row's dish: its order line's, else the dish its name finds here. None = typed just now.
+  const find = useMemo(() => (placeId ? dishFinder(data, placeId) : () => undefined), [data, placeId]);
+  const rowRename = (row: DishRow, index: number) => {
+    const lineItem = row.lineId ? data.visitItems.get(row.lineId)?.placeItemId : undefined;
+    const item = lineItem ? data.placeItems.get(lineItem) : find(row.name);
+    if (!item) return async (name: string) => { if (name.trim()) setRow(index, { name: name.trim() }); else throw new Error('A dish needs a name.'); };
+    return renameDish && canRenameDish(item.sources) ? (name: string) => renameDish(item.id, name) : undefined;
+  };
 
   const canSave = (dateUnknown || Boolean(date)) && (target.kind === 'ours' || place || google) && !saving;
 
@@ -150,7 +169,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '5fr 6fr' }, gap: 2.5, flex: { md: 1 }, minHeight: 0 }}>
             {/* One column (an iPad in portrait): the menu takes half the screen, the order follows. */}
             <Box sx={{ minHeight: 360, maxHeight: { md: '100%' }, height: { xs: '50vh', md: '100%' } }}>
-              <OrderMenu data={data} placeId={placeId} dishes={dishes} onAdd={addOne} onRemoveOne={removeOne} />
+              <OrderMenu data={data} placeId={placeId} dishes={dishes} onAdd={addOne} onRemoveOne={removeOne} onRename={renameDish} />
             </Box>
             <Box sx={{ overflowY: { md: 'auto' }, minHeight: 0 }}>
               <Stack direction="row" alignItems="baseline">
@@ -165,7 +184,7 @@ export function VisitDialog({ data, target, onClose, onSaved, onDelete }: Props)
               {dishes.map((row, index) => (
                 <Box key={`${row.lineId ?? 'new'}-${index}`} sx={{ borderTop: '1px solid #efeff3', py: 1.25 }}>
                   <Stack direction="row" alignItems="center" spacing={1}>
-                    <Typography fontWeight={600}>{row.name}</Typography>
+                    <DishName fontWeight={600} name={row.name} onRename={rowRename(row, index)} />
                     {(row.quantity ?? 1) > 1 && <Typography fontWeight={700} color="#c26a00">×{row.quantity}</Typography>}
                     {row.section && <Typography variant="caption" color="text.secondary">{row.section}</Typography>}
                     <Box sx={{ flex: 1 }} />

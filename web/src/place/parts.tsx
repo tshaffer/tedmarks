@@ -1,4 +1,4 @@
-import { isDateUnknown, type Place, type Visit } from '@tedmarks/shared';
+import { canRenameDish, isDateUnknown, type Place, type Visit } from '@tedmarks/shared';
 import { Box, Button, Collapse, Stack, Typography } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 import type { Interest } from '../data/placeWrites.js';
@@ -6,6 +6,7 @@ import { DISH, dishesAt, ratingText, VERDICT, visitSummary, type PlaceSummary } 
 import type { TedmarksRecords } from '../data/TedmarksData.js';
 import { WantToGoForm } from '../home/WantToGoForm.js';
 import { WANT } from '../theme.js';
+import { DishName } from '../visit/DishName.js';
 
 // Pieces shared by the map's place panel (W1) and the Place page (W2).
 
@@ -16,7 +17,11 @@ export const visitDate = (visit: Visit, format: (iso: string) => string = longDa
 const verdictEmoji = Object.fromEntries(Object.entries(VERDICT).map(([k, v]) => [k, v.emoji]));
 
 /** "Ordered" across every visit: each dish once, grouped by its latest rating. */
-export function WhatToOrder({ data, placeId, visitCount, title = true }: { data: TedmarksRecords; placeId: string; visitCount: number; title?: boolean }) {
+export function WhatToOrder({ data, placeId, visitCount, title = true, onRename }: {
+  data: TedmarksRecords; placeId: string; visitCount: number; title?: boolean;
+  /** Offers ✎ on dishes we named (not ones from the menu). */
+  onRename?: ((itemId: string, name: string) => Promise<void>) | undefined;
+}) {
   const dishes = dishesAt(data, placeId);
   if (dishes.length === 0) return null;
   return (
@@ -32,10 +37,10 @@ export function WhatToOrder({ data, placeId, visitCount, title = true }: { data:
               <Stack key={d.item.id} direction="row" spacing={1} sx={{ py: 0.25, opacity: d.item.onLatestMenu === false ? 0.55 : 1 }}>
                 <Typography sx={{ width: 22 }}>{d.latest.kind === 'joint' ? DISH[d.latest.value] : d.latest.kind === 'split' ? '↔' : '–'}</Typography>
                 <Box>
-                  <Typography variant="body2" fontWeight={500}>
-                    {d.item.name}{d.timesOrdered > 1 ? ` ×${d.timesOrdered}` : ''}{d.latest.kind === 'split' ? ` — ${ratingText(data, d.latest, DISH)}` : ''}
-                    {d.item.onLatestMenu === false && <Typography component="span" variant="body2" color="text.secondary"> — not on the latest menu</Typography>}
-                  </Typography>
+                  <DishName variant="body2" fontWeight={500} name={d.item.name}
+                    onRename={onRename && canRenameDish(d.item.sources) ? (name) => onRename(d.item.id, name) : undefined}
+                    after={<>{d.timesOrdered > 1 ? ` ×${d.timesOrdered}` : ''}{d.latest.kind === 'split' ? ` — ${ratingText(data, d.latest, DISH)}` : ''}
+                      {d.item.onLatestMenu === false && <Typography component="span" variant="body2" color="text.secondary"> — not on the latest menu</Typography>}</>} />
                   {d.comments.slice(0, 2).map((c, i) => <Typography key={i} variant="caption" color="text.secondary" display="block">{c}</Typography>)}
                 </Box>
               </Stack>

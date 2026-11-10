@@ -147,6 +147,7 @@ struct WrapUpSheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Notes about this dish")
+                .renamesDish(item.placeItem)
                 ForEach(dishNotes) { note in
                     Text(note.text).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }

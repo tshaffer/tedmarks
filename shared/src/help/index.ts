@@ -224,6 +224,18 @@ Menus make ordering a tap — in the visit form here, and in What did you order?
 Merging moves every visit's order and rating to the kept dish, so its history is whole, and the other name is remembered so it's recognized later. It can be undone.`,
   },
   {
+    slug: 'rename-a-dish',
+    title: 'Rename a dish',
+    category: 'Tidying up',
+    keywords: ['rename', 'dish name', 'typo', 'spelling', 'fix', 'edit dish', 'pencil'],
+    body: `A dish you named yourself — typed, spoken or imported — can be renamed, to fix a typo ("Casio e Pepe" → "Cacio e Pepe") or say it better. It's renamed everywhere it was ordered and rated, since they're all the same dish.
+
+- **Website:** click the **✎** beside the dish's name — under **Ordered before** or **Your order** in a visit, or in **Ordered** on the place's page. Type the new name; Enter saves, Esc cancels.
+- **Phone:** touch and hold the dish — in **Add dish**, on the visit card, in **Wrap up**, or on the place's page — then **Rename dish…**.
+
+A dish from the menu keeps the menu's name, so the next menu still finds it. A name another dish here already has isn't allowed: if they're the same dish, use **Merge dishes…** instead.`,
+  },
+  {
     slug: 'deleting-and-undo',
     title: 'Deleting and Undo',
     category: 'Tidying up',

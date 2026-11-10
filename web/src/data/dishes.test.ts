@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { dishFinder, mergeSuggestions, planDishMerge } from './dishes.js';
+import { dishFinder, mergeSuggestions, planDishMerge, planDishRename } from './dishes.js';
 import { menuSections, planMenuSave } from './menuWrites.js';
 import { NOW, PLACE, T0, apply, counter, records } from './testRecords.js';
 import { LORI, TED, planVisitSave } from './visitWrites.js';
@@ -51,5 +51,31 @@ describe('merging dishes', () => {
     expect(restored.placeItems.get(suggestion.merge.id)?.mergedIntoId).toBeUndefined();
     expect(restored.placeItems.get(suggestion.keep.id)?.aliases).toBeUndefined();
     expect([...restored.visitItems.values()].filter((l) => l.placeItemId === suggestion.merge.id)).toHaveLength(1);
+  });
+});
+
+describe('renaming a dish', () => {
+  test('a dish we typed is renamed everywhere; its orders keep pointing at it', () => {
+    let data = records();
+    data = apply(data, visit(data, ['Casio e Pepe']).changes);
+    const id = item(data, 'Casio e Pepe').id;
+    data = apply(data, planDishRename(data, id, '  Cacio  e Pepe '));
+    expect(data.placeItems.get(id)).toMatchObject({ name: 'Cacio e Pepe', normalizedName: 'cacio e pepe' });
+    expect([...data.visitItems.values()].filter((l) => l.placeItemId === id)).toHaveLength(1);
+    // Typing the new name on the next visit finds the same dish.
+    data = apply(data, visit(data, ['cacio e pepe'], '2026-09-27').changes);
+    expect([...data.placeItems.values()].filter((i) => i.normalizedName === 'cacio e pepe')).toHaveLength(1);
+  });
+
+  test('refuses a menu dish, an empty name, and another dish’s name', () => {
+    let data = records();
+    data = apply(data, visit(data, ['Salad']).changes);
+    const saved = planMenuSave(data, { kind: 'ours', placeId: PLACE }, [{ section: 'Mains', name: 'Lasagna', price: '20' }], NOW, ids);
+    data = apply(data, saved.changes);
+    const salad = item(data, 'Salad').id;
+    expect(() => planDishRename(data, item(data, 'Lasagna').id, 'Lasagne')).toThrow(/menu/);
+    expect(() => planDishRename(data, salad, '  ')).toThrow(/name/);
+    expect(() => planDishRename(data, salad, 'burrata')).toThrow(/Merge dishes/);
+    expect(planDishRename(data, salad, 'Salad')).toEqual({});
   });
 });

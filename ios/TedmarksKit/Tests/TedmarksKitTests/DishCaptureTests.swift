@@ -100,3 +100,24 @@ private struct Fixture {
     #expect(line.deletedAt != nil)
     #expect(DishCapture.orderItems(for: f.visit).isEmpty)
 }
+
+@MainActor
+@Test func aDishWeNamedCanBeRenamedButNotAMenuDishOrToAnotherDishsName() throws {
+    let f = try Fixture()
+    let line = try #require(try DishCapture.addItem(named: "Casio e Pepe", to: f.visit, addedVia: .order, in: f.context))
+    let dish = try #require(line.placeItem)
+    try DishCapture.rename(dish, to: "  Cacio  e Pepe ", in: f.context)
+    #expect(dish.name == "Cacio e Pepe")
+    #expect(dish.normalizedName == "cacio e pepe")
+    #expect(line.displayName == "Cacio e Pepe")
+    // Typing the new name finds the same dish.
+    let again = try DishCapture.addItem(named: "cacio e pepe", to: f.visit, addedVia: .order, in: f.context)
+    #expect(again?.placeItem?.id == dish.id)
+
+    let salad = try #require(try DishCapture.addItem(named: "Salad", to: f.visit, addedVia: .order, in: f.context)?.placeItem)
+    #expect(throws: DishRenameError.alreadyHere("Cacio e Pepe")) { try DishCapture.rename(salad, to: "CACIO E PEPE", in: f.context) }
+    #expect(throws: DishRenameError.emptyName) { try DishCapture.rename(salad, to: "   ", in: f.context) }
+    salad.sources.append("menu")
+    #expect(!salad.canRename)
+    #expect(throws: DishRenameError.fromTheMenu) { try DishCapture.rename(salad, to: "Green salad", in: f.context) }
+}

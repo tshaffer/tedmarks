@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { looseDishKey, similarDishNames } from './dishNames.js';
+import { canRenameDish, looseDishKey, similarDishNames } from './dishNames.js';
 
 test('looseDishKey ignores case, parentheses, punctuation and simple plurals', () => {
   assert.equal(looseDishKey('Beer (draft)'), looseDishKey('beers'));
@@ -26,4 +26,10 @@ test('similarDishNames suggests containment and near-typos, not different dishes
   assert.equal(similarDishNames('Cheddar', 'Roasted Garlic Bagel Sandwich with Egg, Cheddar & Pesto'), false);
   assert.equal(similarDishNames('Pesto', 'Roasted Garlic Bagel Sandwich with Egg, Cheddar & Pesto'), false);
   assert.equal(similarDishNames('Chai', 'Chai Latte'), true);
+});
+
+test('canRenameDish: dishes we named, not ones from a menu', () => {
+  assert.equal(canRenameDish(['manual']), true);
+  assert.equal(canRenameDish(['imported', 'voice']), true);
+  assert.equal(canRenameDish(['manual', 'menu']), false);
 });

@@ -2,7 +2,7 @@ import { isDateUnknown } from '@tedmarks/shared';
 import { Alert, Button, Snackbar } from '@mui/material';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, placeDetails, pushChanges, refreshPlace } from '../api.js';
-import { planDishMerge } from '../data/dishes.js';
+import { planDishMerge, planDishRename } from '../data/dishes.js';
 import { planMenuDelete } from '../data/menuWrites.js';
 import { planClearInterest, planInterest, planPlaceDelete, planSaveWantToGo, type Interest } from '../data/placeWrites.js';
 import { planPlaceEdit, planReviewDelete, type PlaceEdit } from '../data/placeEdit.js';
@@ -32,6 +32,8 @@ export interface PlaceActions {
   clearInterest(placeId: string): Promise<void>;
   saveWantToGo(googlePlaceId: string, interest: Interest, origin: google.maps.LatLngLiteral): Promise<void>;
   refreshFromGoogle(placeId: string): Promise<void>;
+  /** Renames a dish we named; throws with a message to show beside the name. */
+  renameDish(itemId: string, name: string): Promise<void>;
 }
 
 const Context = createContext<PlaceActions | null>(null);
@@ -162,6 +164,16 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
       await reload();
       setToast({ message: 'Updated from Google' });
     }, 'Couldn’t update from Google.'),
+
+    renameDish: async (itemId, name) => {
+      if (!data) return;
+      const before = data.placeItems.get(itemId)?.name;
+      const changes = planDishRename(data, itemId, name);
+      if (!changes.placeItems?.length) return;
+      await pushChanges(changes);
+      await reload();
+      setToast({ message: `Renamed “${before}” to “${name.trim()}”` });
+    },
   }), [data, reload, attempt, undoable]);
 
   return (
@@ -171,6 +183,7 @@ export function PlaceActionsProvider({ children }: { children: ReactNode }) {
       {data && visitTarget && (
         <VisitDialog data={data} target={visitTarget} onClose={() => setVisitTarget(null)}
           onDelete={(visitId) => void actions.deleteVisit(visitId)}
+          onRenameDish={actions.renameDish}
           onSaved={async (placeId) => {
             setVisitTarget(null);
             await reload();

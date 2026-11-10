@@ -94,7 +94,7 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
           <Card title={`Ordered${summary.visits.length ? ` · from ${summary.visits.length === 1 ? '1 visit' : `all ${summary.visits.length} visits`}` : ''}`}
             action={dishCountAll > 1 ? <Action onClick={() => actions.mergeDishes(place.id)}>Merge dishes…{suggested ? ` (${suggested})` : ''}</Action> : undefined}>
             {summary.visits.length
-              ? <WhatToOrder data={data} placeId={place.id} visitCount={summary.visits.length} title={false} />
+              ? <WhatToOrder data={data} placeId={place.id} visitCount={summary.visits.length} title={false} onRename={actions.renameDish} />
               : <Typography color="text.secondary">Dishes you rate on visits show up here.</Typography>}
           </Card>
           <Card title="Visits · click one to open it" action={<Action onClick={() => actions.openVisit({ kind: 'ours', placeId: place.id })}>+ Add a past visit</Action>}>

@@ -181,6 +181,7 @@ struct PlaceDetailView: View {
                             Text(comment).font(.subheadline).foregroundStyle(.secondary)
                         }
                     }
+                    .renamesDish(dish.item)
                 }
             }
         }

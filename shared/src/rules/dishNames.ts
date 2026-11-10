@@ -55,3 +55,11 @@ function editDistance(a: string, b: string): number {
   }
   return previous[b.length]!;
 }
+
+/**
+ * Dishes we named ourselves (typed, spoken, from a receipt or imported) can be renamed — to fix
+ * "Casio e Pepe", say. A dish read from a menu keeps the menu's name, so the next menu still finds it.
+ */
+export function canRenameDish(sources: readonly string[]): boolean {
+  return !sources.includes('menu');
+}

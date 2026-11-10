@@ -1,9 +1,12 @@
 import { AppBar, Box, Chip, ListItemText, Menu, MenuItem, Toolbar, Typography } from '@mui/material';
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { getMe, signOut } from './api.js';
 import { loadGoogleMaps } from './googleMaps.js';
 import { SEARCH_WIDTH, SearchBox } from './home/SearchBox.js';
+
+/** Where the Tedmarks logo goes. The home screen is the map for now; it may become its own page. */
+const HOME = '/';
 
 /** The app's top-level pages (Figma web designs). */
 const TABS = [
@@ -24,7 +27,8 @@ export function TopBar({ search, onSignedOut }: { search?: ReactNode; onSignedOu
   return (
     <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: '1px solid #e3e3e8', zIndex: 2 }}>
       <Toolbar sx={{ gap: { xs: 1.5, md: 3 }, minHeight: '60px !important' }}>
-        <Typography variant="h6" fontWeight={700} color="primary">Tedmarks</Typography>
+        <Typography variant="h6" fontWeight={700} color="primary" component={Link} to={HOME} aria-label="Tedmarks home"
+          sx={{ textDecoration: 'none', '&:hover': { opacity: 0.8 } }}>Tedmarks</Typography>
         <Box component="nav" sx={{ display: 'flex', gap: 0.5 }}>
           {TABS.map((tab) => (
             <Box key={tab.to} component={NavLink} to={tab.to} end

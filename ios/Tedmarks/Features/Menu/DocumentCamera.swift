@@ -3,8 +3,8 @@ import VisionKit
 
 /// Apple's document camera: finds and crops each page; one shutter tap per page; Save (n).
 struct DocumentCamera: UIViewControllerRepresentable {
-    /// Called with the pages as JPEG (empty if cancelled).
-    let onFinish: ([Data]) -> Void
+    /// Called with the pages (empty if cancelled).
+    let onFinish: ([UIImage]) -> Void
 
     static var isAvailable: Bool { VNDocumentCameraViewController.isSupported }
 
@@ -19,11 +19,11 @@ struct DocumentCamera: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
 
     final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
-        let onFinish: ([Data]) -> Void
-        init(onFinish: @escaping ([Data]) -> Void) { self.onFinish = onFinish }
+        let onFinish: ([UIImage]) -> Void
+        init(onFinish: @escaping ([UIImage]) -> Void) { self.onFinish = onFinish }
 
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
-            onFinish((0..<scan.pageCount).compactMap { menuPageJPEG(scan.imageOfPage(at: $0)) })
+            onFinish((0..<scan.pageCount).map { scan.imageOfPage(at: $0) })
         }
 
         func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {

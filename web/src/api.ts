@@ -45,13 +45,31 @@ export function refreshPlace(placeId: string): void {
   void api(`/places/${placeId}/refresh`, { method: 'POST' }).catch(() => {});
 }
 
-export interface MenuPage { mediaType: string; data: string }
+/** A page sent to Claude for reading (base64). */
+export interface MenuReadPage { mediaType: string; data: string }
+
+/** Where a stored menu page is served (the session cookie comes along, so it works in <img>). */
+export const menuPageUrl = (id: string) => `/menu-pages/${id}`;
+
+/** Stores a menu page on the server under its id. */
+export async function uploadMenuPage(id: string, file: Blob, mediaType: string): Promise<void> {
+  const response = await fetch(menuPageUrl(id), { method: 'PUT', credentials: 'same-origin', headers: { 'content-type': mediaType }, body: file });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { message?: string };
+    throw new ApiError(response.status, body.message ?? 'Couldn’t save the menu’s pages.');
+  }
+}
+
+/** Deletes pages a menu no longer has (fire and forget: a leftover file harms nothing). */
+export function deleteMenuPages(ids: string[]): void {
+  for (const id of ids) void fetch(menuPageUrl(id), { method: 'DELETE', credentials: 'same-origin' }).catch(() => {});
+}
 
 /**
  * Has Claude read a menu: starts the reading, then checks every few seconds until it's done
  * (a long PDF can take longer than one request may run on Heroku).
  */
-export async function readMenu(placeName: string, pages: MenuPage[], text?: string): Promise<MenuReadItem[]> {
+export async function readMenu(placeName: string, pages: MenuReadPage[], text?: string): Promise<MenuReadItem[]> {
   const { jobId } = await api<{ jobId: string }>('/ai/menu/jobs', { method: 'POST', body: JSON.stringify({ placeName, pages, text: text?.trim() || undefined }) });
   const deadline = Date.now() + 6 * 60_000;
   while (Date.now() < deadline) {

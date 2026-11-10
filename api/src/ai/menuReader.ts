@@ -14,9 +14,9 @@ const MAX_ITEMS = 400;
 
 const SYSTEM_PROMPT = `You read restaurant menus — photos, screenshots, a PDF, or text copied from the restaurant's website — for Tedmarks, an app where a couple records what they ordered and how it was. The dish names you return become tappable choices when they say what they ordered, so they should read the way the menu names them.
 
-Return every orderable dish and drink on the pages, in menu order, with the menu's own section heading for each (null if the page has none) and its price as printed (null if none). Use the dish name only — leave descriptions and ingredient lists out unless the name alone would be ambiguous ("Margherita" under Pizza is fine as is). Fix obvious capitalization, but keep the menu's spelling of foreign names. Skip things that aren't orderable, like hours, notes about allergens, or "add chicken +4" style modifiers. If the pages aren't a menu or can't be read, return an empty list.
+Return every orderable dish and drink on the pages, in menu order, with the menu's own section heading for each (null if the page has none), its price as printed (null if none), and its description as printed under or beside it (null if none; keep it as the menu words it, trimmed of dietary icons and prices). Keep the name to the dish name itself — the description goes in its own field — unless the name alone would be ambiguous ("Margherita" under Pizza is fine as is). Fix obvious capitalization, but keep the menu's spelling of foreign names. Skip things that aren't orderable, like hours, notes about allergens, or "add chicken +4" style modifiers. If the pages aren't a menu or can't be read, return an empty list.
 
-Text copied from a website also carries the page around the menu — navigation, headings like "Our Menu", taglines, dish descriptions, dietary labels ("Vegetarian"), notes like "Dish photography coming soon". Use it only to find each dish's name, section and price. Where a dish has both an Italian (or other) name and an English one, keep the name the menu leads with.`;
+Text copied from a website also carries the page around the menu — navigation, headings like "Our Menu", taglines, dish descriptions, dietary labels ("Vegetarian"), notes like "Dish photography coming soon". Use it only to find each dish's name, section, price and description. Where a dish has both an Italian (or other) name and an English one, keep the name the menu leads with.`;
 
 /** Trims, drops blanks and repeats (same name in the same section), and caps the list. */
 export function cleanMenuItems(items: MenuReadItem[]): MenuReadItem[] {
@@ -29,7 +29,7 @@ export function cleanMenuItems(items: MenuReadItem[]): MenuReadItem[] {
     const key = `${normalizeItemName(section ?? '')}|${normalizeItemName(name)}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    cleaned.push({ section, name, price: item.price?.trim() || null });
+    cleaned.push({ section, name, price: item.price?.trim() || null, description: item.description?.replace(/\s+/g, ' ').trim() || null });
     if (cleaned.length >= MAX_ITEMS) break;
   }
   return cleaned;

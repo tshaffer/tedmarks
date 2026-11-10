@@ -1,10 +1,9 @@
-import PhotosUI
 import SwiftData
 import SwiftUI
 import TedmarksKit
 
-/// The menu row on "What did you order?": snap or pick the menu, show that it's being read,
-/// or offer to try again / snap new pages.
+/// The menu row on "What did you order?" (and the Place page before there's a menu): add the
+/// menu's pages, show that it's being read, or offer to try again / add pages.
 struct MenuPanel: View {
     let place: Place
     let visit: Visit?
@@ -13,8 +12,6 @@ struct MenuPanel: View {
     @Query(filter: #Predicate<PlaceMenu> { $0.deletedAt == nil }, sort: \PlaceMenu.capturedAt, order: .reverse)
     private var menus: [PlaceMenu]
 
-    @State private var showingCamera = false
-    @State private var pickedPhotos: [PhotosPickerItem] = []
     private var capture: MenuCapture { MenuCapture.shared }
 
     var body: some View {
@@ -23,25 +20,11 @@ struct MenuPanel: View {
                 status(menu)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    buttons(primary: true)
+                    MenuPageSources(place: place, visit: visit, style: .firstMenu(primary: true))
                     Text("Claude reads the dishes so you can just tap what you ordered.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
-        }
-        .fullScreenCover(isPresented: $showingCamera) {
-            DocumentCamera { pages in
-                showingCamera = false
-                guard !pages.isEmpty else { return }
-                Task { await capture.capture(pages: pages, place: place, visit: visit, in: context) }
-            }
-            .ignoresSafeArea()
-        }
-        .onChange(of: pickedPhotos) { _, items in
-            let ids = items.compactMap(\.itemIdentifier)
-            pickedPhotos = []
-            guard !ids.isEmpty else { return }
-            Task { await capture.useExisting(localIdentifiers: ids, place: place, visit: visit, in: context) }
         }
         #if DEBUG
         .task {
@@ -55,7 +38,10 @@ struct MenuPanel: View {
         } message: { Text(capture.message ?? "") }
     }
 
-    private var latestMenu: PlaceMenu? { menus.first { $0.placeId == place.id } }
+    private var latestMenu: PlaceMenu? {
+        let mine = menus.filter { $0.placeId == place.id }
+        return mine.first { $0.id == place.latestMenuId } ?? mine.first
+    }
 
     @ViewBuilder
     private func status(_ menu: PlaceMenu) -> some View {
@@ -78,71 +64,17 @@ struct MenuPanel: View {
             case .failed:
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Couldn't read the menu", systemImage: "exclamationmark.triangle").font(.subheadline).foregroundStyle(.orange)
-                    buttons(primary: false)
+                    MenuPageSources(place: place, visit: visit, style: .firstMenu(primary: false))
                 }
             case .read:
                 HStack(spacing: 6) {
                     Text("Menu from \(menu.capturedAt.formatted(date: .abbreviated, time: .omitted))")
                         .font(.footnote).foregroundStyle(.secondary)
                     Spacer()
-                    Menu("Snap new pages") {
-                        cameraButton
-                        photosButton
-                    }
-                    .font(.footnote)
+                    MenuPageSources(place: place, visit: visit, style: .addPages)
+                        .font(.footnote)
                 }
             }
-        }
-    }
-
-    private func buttons(primary: Bool) -> some View {
-        // Side by side when there's room (Add dish), stacked in narrower lists (Place page).
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) { buttonPair(primary: primary) }
-            VStack(alignment: .leading, spacing: 8) { buttonPair(primary: primary) }
-        }
-        .controlSize(.regular)
-    }
-
-    @ViewBuilder
-    private func buttonPair(primary: Bool) -> some View {
-        cameraButton
-            .buttonStyle(.borderedProminent)
-            .tint(primary ? .accentColor : .secondary)
-            .fixedSize()
-        photosButton
-            .buttonStyle(.bordered)
-            .fixedSize()
-    }
-
-    private var cameraButton: some View {
-        Button {
-            if DocumentCamera.isAvailable {
-                showingCamera = true
-            } else {
-                capture.message = "The camera isn't available here. Choose photos of the menu instead."
-            }
-        } label: {
-            MenuButtonLabel(title: "Snap the menu", systemImage: "camera.viewfinder")
-        }
-    }
-
-    private var photosButton: some View {
-        PhotosPicker(selection: $pickedPhotos, maxSelectionCount: 12, matching: .images, photoLibrary: .shared()) {
-            MenuButtonLabel(title: "From Photos", systemImage: "photo.on.rectangle")
-        }
-    }
-}
-
-/// Image + Text (not Label), which newer iOS versions can collapse inside a List.
-private struct MenuButtonLabel: View {
-    let title: String
-    let systemImage: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage)
-            Text(title).lineLimit(1)
         }
     }
 }

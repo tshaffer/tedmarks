@@ -191,9 +191,9 @@ The purple box on a place shows how much and why, with **Edit** and **Delete**. 
     title: 'Menus',
     category: 'Planning',
     keywords: ['menu', 'pdf', 'screenshot', 'photo', 'read menu', 'website', 'web page', 'online menu', 'save as pdf', 'print', 'chrome', 'too big', 'claude', 'newer menu', 'delete menu', 'sections', 'prices', 'not on the latest menu', 'paste', 'copy', 'text'],
-    body: `A place's menu is kept as its **list of dishes**, by section, with prices — read by Claude.
+    body: `A place's menu is its **pages** (photos, screenshots or a PDF, kept privately) and its **list of dishes**, by section, with prices and descriptions — read by Claude, and yours to fix.
 
-**Add a menu** on a place, or on a Google restaurant (which saves it to Tedmarks). Drop a **PDF**, or photos or screenshots of the pages in order, or paste the menu's text, then **Read menu**. A long menu can take a minute or two. The files and text aren't kept. On the phone, see *Menu camera*.
+**Add a menu** on a place, or on a Google restaurant (which saves it to Tedmarks). Drop a **PDF**, or photos or screenshots of the pages in order, or paste the menu's text, then **Read menu**. A long menu can take a minute or two. Before saving you **check what Claude read**: fix a dish, remove one it got wrong (✕), or add one it missed. Photos are kept at about 3,000 pixels; screenshots and PDFs as they are. On the phone, see *Menu camera*.
 
 ### A menu from the restaurant's website
 
@@ -204,9 +204,15 @@ No need to screenshot page by page:
 - **Or print the web page:** in Chrome press **⌘P**, set **Destination** to **Save as PDF**, **Save**, and drop that PDF in. Open any collapsed sections ("See more", Lunch / Dinner tabs) first — only what's showing is printed.
 - **On an iPhone or iPad (Chrome):** **Share** → **Print** → **Share** again in the preview → **Save to Files**; then choose that file in **Add a menu**.
 
-Any size works: a PDF over 15 MB (a printed web page with lots of photos) is turned into page images automatically, up to 30 pages.
+Any size works: a PDF over 15 MB (a printed web page with lots of photos) is read as page images automatically, up to 30 pages.
 
-**Menu** on a place shows the latest one. **Add a newer menu** when it changes: dishes we've had that aren't on the new one show as "not on the latest menu". **Delete this menu** removes it (with Undo).
+### Looking at and changing a menu
+
+The **Menu** card on a place shows the pages; click one to see it large (zoom, ‹ ›, or the arrow keys), or **View full menu** for the dishes. Click **✎** next to a dish to change its name, price, section or description, or delete it; **+ Add a dish** adds one. Renaming a dish renames it everywhere we've ordered it.
+
+- **Add pages** — a page you missed, or the dessert menu: only the new pages are read, and their dishes join the menu (one already on it gets the new price).
+- **Replace** — the menu changed: the old pages are deleted and the new ones read as a new menu. Dishes we've had that aren't on it show as "not on the latest menu".
+- **Delete menu** removes it (with Undo).
 
 Menus make ordering a tap — in the visit form here, and in What did you order? on the phone.`,
   },
@@ -313,10 +319,14 @@ The **Inbox** tab holds voice notes waiting for your OK, and ones that couldn't 
     slug: 'menu-camera',
     title: 'Menu camera',
     category: 'The iPhone app',
-    keywords: ['snap the menu', 'camera', 'scan', 'from photos', 'menu photo', 'tedmarks album'],
-    body: `In **What did you order?**, **Snap the menu** scans the menu's pages with the camera, or **From Photos** picks pictures you've already taken. Claude reads the dishes so you can just tap what you ordered — you can keep going while it reads.
+    keywords: ['snap the menu', 'camera', 'scan', 'from photos', 'menu photo', 'pdf', 'add pages', 'replace', 'menu read', 'review', 'check new dishes', 'edit dish', 'offline'],
+    body: `In **What did you order?** (or on a place, under **Menu**), **Snap the menu** scans the menu's pages with the camera, or **Photos or a PDF** picks pictures you've already taken, screenshots, or a PDF from Files. Claude reads the dishes in the background so you can just tap what you ordered — you can keep going while it reads.
 
-The pages you snap are saved to a **Tedmarks** album in Photos; the server reads them and doesn't keep them. The menu itself (the list of dishes) is shared with the website — see *Menus*.`,
+When it's done, the place shows **Menu read: review**. The dishes are usable right away; the review is a chance to check them: swipe to remove one Claude got wrong (a new dish comes off the menu, a changed price goes back), tap one to fix it, or **Add a dish**. **Later** keeps the review for another time.
+
+On a place, **Add pages** adds a page you missed (only the new pages are read) — **Take photos**, **Choose from Photos**, or **Choose a PDF or file** — and **Replace all pages…** starts a new menu. Tap a page to see it large; pinch or double-tap to zoom. **Dishes** lists the menu; tap a dish to edit it.
+
+The pages are stored with Tedmarks (not in Photos) and kept on the phone once opened. Pages taken offline are sent, and read, when you're back online; pages added on the website appear when you're online. The menu is shared with the website — see *Menus*.`,
   },
   {
     slug: 'sync',

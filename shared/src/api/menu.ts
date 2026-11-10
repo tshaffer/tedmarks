@@ -27,6 +27,8 @@ export const MenuReadItem = z.object({
   name: z.string(),
   /** As printed ("18", "$14.50", "MP"). */
   price: z.string().nullable(),
+  /** The menu's description of it, as printed (null if none). */
+  description: z.string().nullable().optional(),
 });
 export type MenuReadItem = z.infer<typeof MenuReadItem>;
 

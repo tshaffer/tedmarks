@@ -14,6 +14,8 @@ import { AppleTokenVerifier } from './auth/appleAuth.js';
 import { authRoutes } from './auth/authRoutes.js';
 import type { PlacesClient } from './google/placesClient.js';
 import { placesRoutes } from './google/placesRoutes.js';
+import { menuPageRoutes } from './menuPages/menuPageRoutes.js';
+import type { MenuPageStore } from './menuPages/pageStore.js';
 import { syncRoutes } from './sync/syncRoutes.js';
 import { SyncStore } from './sync/syncStore.js';
 
@@ -27,6 +29,8 @@ export interface AppDeps {
   voice?: VoiceStructurer | undefined;
   /** Claude for menu photos. Unset = /ai/menu reports not configured. */
   menu?: MenuReader | undefined;
+  /** Where menu pictures are kept. Unset = /menu-pages reports not configured. */
+  menuPages?: MenuPageStore | undefined;
   /** Claude for the website's Help questions. Unset = /ai/help reports not configured. */
   help?: HelpAnswerer | undefined;
   /** Sign in with Apple for the website. */
@@ -43,14 +47,16 @@ export interface AppDeps {
   webDist?: string | undefined;
 }
 
-const API_PREFIXES = ['/sync', '/places', '/ai', '/auth', '/health', '/config'];
+const API_PREFIXES = ['/sync', '/places', '/ai', '/auth', '/health', '/config', '/menu-pages'];
 /** Website pages (exact paths) — the app, never the API. */
 const WEB_PAGES = ['/places', '/visits', '/help'];
 
 export function createApp(deps: AppDeps = {}): Express {
   const app = express();
   app.use(cors());
-  app.use(express.json({ limit: '25mb' }));
+  // JSON everywhere except menu pages, which are sent as the file itself.
+  const json = express.json({ limit: '25mb' });
+  app.use((req, res, next) => (req.path.startsWith('/menu-pages/') ? next() : json(req, res, next)));
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'tedmarks-api', db: deps.db ? 'connected' : 'not configured' });
@@ -79,6 +85,7 @@ export function createApp(deps: AppDeps = {}): Express {
   app.use('/sync', access, syncRoutes(store));
   app.use('/places', access, placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS, store, deps.db ? new AreaSearchCache(deps.db) : undefined));
   app.use('/ai', access, aiRoutes(deps.voice, deps.menu, deps.help));
+  app.use('/menu-pages', access, menuPageRoutes(deps.menuPages));
   /** GET /config — the website's Google Maps key and Map ID. */
   app.get('/config', access, (_req, res) => {
     res.json({ googleMapsKey: deps.web?.googleMapsBrowserKey ?? null, mapId: deps.web?.googleMapId ?? null });

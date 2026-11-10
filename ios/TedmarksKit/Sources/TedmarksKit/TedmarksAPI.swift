@@ -200,14 +200,46 @@ public struct TedmarksAPI: Sendable, SyncTransport {
 
     // MARK: - Menus
 
-    /// Claude reads dishes from menu pages (JPEG data, in order). Pages aren't kept on the server.
-    public func readMenu(placeName: String, pages: [Data]) async throws -> [MenuItem] {
-        struct Page: Encodable { var mediaType = "image/jpeg"; var data: String }
+    /// A page sent to Claude: image/jpeg, image/png or application/pdf.
+    public struct MenuReadPage: Sendable {
+        public var mediaType: String
+        public var data: Data
+        public init(mediaType: String, data: Data) {
+            self.mediaType = mediaType
+            self.data = data
+        }
+    }
+
+    /// Claude reads dishes from menu pages (in order). Starts a reading job and checks on it
+    /// until it's done, since a long menu can take longer than one request may.
+    public func readMenu(placeName: String, pages: [MenuReadPage]) async throws -> [MenuItem] {
+        struct Page: Encodable { var mediaType: String; var data: String }
         struct Body: Encodable { var placeName: String; var pages: [Page] }
-        struct Response: Decodable { var items: [MenuItem] }
-        let body = Body(placeName: placeName, pages: pages.map { Page(data: $0.base64EncodedString()) })
-        let data = try await send(path: "ai/menu", method: "POST", query: [], body: try JSONEncoder().encode(body))
-        return try decode(Response.self, from: data).items
+        struct Started: Decodable { var jobId: String }
+        struct Job: Decodable { var status: String; var items: [MenuItem]?; var message: String? }
+        let body = Body(placeName: placeName, pages: pages.map { Page(mediaType: $0.mediaType, data: $0.data.base64EncodedString()) })
+        let started = try decode(Started.self, from: try await send(path: "ai/menu/jobs", method: "POST", query: [], body: try JSONEncoder().encode(body)))
+        let deadline = Date.now.addingTimeInterval(6 * 60)
+        while Date.now < deadline {
+            try await Task.sleep(for: .seconds(2.5))
+            let job = try decode(Job.self, from: try await get(path: "ai/menu/jobs/\(started.jobId)", query: []))
+            if job.status == "done" { return job.items ?? [] }
+            if job.status == "failed" { throw TedmarksAPIError.server(status: 502, message: job.message) }
+        }
+        throw TedmarksAPIError.server(status: 504, message: "Reading the menu is taking too long. Try fewer pages.")
+    }
+
+    /// Stores a menu page on the server under its id (pages never change once stored).
+    public func uploadMenuPage(id: UUID, data: Data, mediaType: String) async throws {
+        _ = try await send(path: "menu-pages/\(id.uuidString.lowercased())", method: "PUT", query: [], body: data, contentType: mediaType, timeout: 120)
+    }
+
+    public func downloadMenuPage(id: UUID) async throws -> Data {
+        try await send(path: "menu-pages/\(id.uuidString.lowercased())", method: "GET", query: [], body: nil, timeout: 60)
+    }
+
+    public func deleteMenuPage(id: UUID) async throws {
+        _ = try await send(path: "menu-pages/\(id.uuidString.lowercased())", method: "DELETE", query: [], body: nil)
     }
 
     // MARK: - Sync
@@ -246,15 +278,15 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         try await send(path: path, method: "GET", query: query, body: nil)
     }
 
-    private func send(path: String, method: String, query: [URLQueryItem], body: Data?) async throws -> Data {
+    private func send(path: String, method: String, query: [URLQueryItem], body: Data?, contentType: String = "application/json", timeout: TimeInterval? = nil) async throws -> Data {
         var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
         if !query.isEmpty { components.queryItems = query }
         var request = URLRequest(url: components.url!)
         request.httpMethod = method
-        request.timeoutInterval = path == "ai/menu" ? 180 : path.hasPrefix("ai/") ? 60 : 20
+        request.timeoutInterval = timeout ?? (path.hasPrefix("ai/") ? 60 : 20)
         if let body {
             request.httpBody = body
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         }
         if let accessKey { request.setValue(accessKey, forHTTPHeaderField: "X-Tedmarks-Key") }
 

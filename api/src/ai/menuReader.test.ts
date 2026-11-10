@@ -6,16 +6,16 @@ import { cleanMenuItems } from './menuReader.js';
 
 test('cleanMenuItems trims, drops blanks and repeats, keeps menu order', () => {
   const items = cleanMenuItems([
-    { section: ' Pizza ', name: ' Margherita ', price: ' 18 ' },
+    { section: ' Pizza ', name: ' Margherita ', price: ' 18 ', description: ' Tomato,\n basil ' },
     { section: 'Pizza', name: 'margherita', price: '18' },
     { section: 'Dessert', name: 'Margherita', price: null },
     { section: null, name: '   ', price: '4' },
     { section: '', name: 'Tiramisu', price: '' },
   ]);
   assert.deepEqual(items, [
-    { section: 'Pizza', name: 'Margherita', price: '18' },
-    { section: 'Dessert', name: 'Margherita', price: null },
-    { section: null, name: 'Tiramisu', price: null },
+    { section: 'Pizza', name: 'Margherita', price: '18', description: 'Tomato, basil' },
+    { section: 'Dessert', name: 'Margherita', price: null, description: null },
+    { section: null, name: 'Tiramisu', price: null, description: null },
   ]);
 });
 

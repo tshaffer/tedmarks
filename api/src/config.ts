@@ -19,6 +19,9 @@ export interface Config {
   googleMapsBrowserKey: string | undefined;
   /** Map ID (Google Cloud → Map management) for the website's map. */
   googleMapId: string | undefined;
+  /** Amazon S3 region and private bucket for menu pictures (credentials: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY). */
+  awsRegion: string;
+  menuImagesBucket: string | undefined;
   /** Interim shared key required on every request except /health (until Sign in with Apple). */
   accessKey: string | undefined;
 }
@@ -46,6 +49,8 @@ export function loadConfig(): Config {
     accessKey: optional('API_ACCESS_KEY'),
     googleMapsBrowserKey: optional('GOOGLE_MAPS_BROWSER_KEY'),
     googleMapId: optional('GOOGLE_MAP_ID'),
+    awsRegion: optional('AWS_REGION') ?? 'us-east-1',
+    menuImagesBucket: optional('MENU_IMAGES_BUCKET'),
   };
 }
 
@@ -58,6 +63,7 @@ export function missingSettings(config: Config): string[] {
   if (!config.sessionSecret) missing.push('SESSION_SECRET');
   if (!config.googlePlacesApiKey) missing.push('GOOGLE_PLACES_API_KEY');
   if (!config.anthropicApiKey) missing.push('ANTHROPIC_API_KEY');
+  if (!config.menuImagesBucket) missing.push('MENU_IMAGES_BUCKET (menu pictures)');
   if (!config.accessKey) missing.push('API_ACCESS_KEY (requests are not protected)');
   return missing;
 }

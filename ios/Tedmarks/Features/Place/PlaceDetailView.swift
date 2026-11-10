@@ -20,7 +20,8 @@ struct PlaceDetailView: View {
     @State private var errorMessage: String?
     @State private var isEditing = false
     @State private var isRefreshing = false
-    @State private var showingMenu: PlaceMenu?
+    @State private var showingMenu: MenuSheetTarget?
+    @State private var reviewingMenu: PlaceMenu?
     @Query(filter: #Predicate<PlaceMenu> { $0.deletedAt == nil }) private var menus: [PlaceMenu]
 
     var body: some View {
@@ -65,7 +66,8 @@ struct PlaceDetailView: View {
         .safeAreaInset(edge: .bottom) { startVisitButton }
         .sheet(item: $wrapUpVisit) { WrapUpSheet(visit: $0) }
         .sheet(isPresented: $isEditing) { EditPlaceSheet(place: place) }
-        .sheet(item: $showingMenu) { MenuSheet(menu: $0, place: place) }
+        .sheet(item: $showingMenu) { MenuSheet(target: $0, place: place) }
+        .sheet(item: $reviewingMenu) { MenuReviewSheet(menu: $0, place: place) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) { Button("Edit") { isEditing = true } }
         }
@@ -73,7 +75,16 @@ struct PlaceDetailView: View {
         #if DEBUG
         .task {
             if ProcessInfo.processInfo.arguments.contains("-editPlace") { isEditing = true }
-            if ProcessInfo.processInfo.arguments.contains("-viewMenu") { showingMenu = latestReadMenu }
+            if ProcessInfo.processInfo.arguments.contains("-viewMenu"), let menu = latestReadMenu { showingMenu = MenuSheetTarget(menu: menu) }
+            if ProcessInfo.processInfo.arguments.contains("-viewMenuPages"), let menu = latestReadMenu { showingMenu = MenuSheetTarget(menu: menu, tab: .pages) }
+            if ProcessInfo.processInfo.arguments.contains("-reviewMenu"), let menu = latestReadMenu, menu.review != nil { reviewingMenu = menu }
+            #if DEBUG
+            // Dev/testing: `-menuAddFiles "a.pdf,b.png"` adds pages to the latest menu (`-menuReplace` replaces them).
+            if latestReadMenu != nil, let paths = UserDefaults.standard.string(forKey: "menuAddFiles") {
+                let replace = ProcessInfo.processInfo.arguments.contains("-menuReplace")
+                Task { await MenuCapture.shared.debugAdd(files: paths.split(separator: ",").map(String.init), place: place, replace: replace, in: context) }
+            }
+            #endif
         }
         #endif
         .alert("Couldn't start the visit", isPresented: .constant(errorMessage != nil)) {
@@ -206,22 +217,88 @@ struct PlaceDetailView: View {
         .contentShape(Rectangle())
     }
 
-    /// View the latest menu, or snap / pick one (no visit needed).
+    /// Figma 12 · the latest menu: its pages, its dishes, a reading to check, and adding pages
+    /// (no visit needed). Before there's a menu: snap or pick one.
     private var menuSection: some View {
-        Section("Menu") {
+        Section {
             if let menu = latestReadMenu {
-                Button { showingMenu = menu } label: {
-                    let count = menu.extracted?.count ?? 0
-                    Label("View menu · \(count) dish\(count == 1 ? "" : "es")", systemImage: "menucard")
+                if !menu.pages.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(Array(menu.pages.enumerated()), id: \.element.id) { index, page in
+                                Button { showingMenu = MenuSheetTarget(menu: menu, tab: .pages, page: index) } label: {
+                                    MenuPageThumb(page: page)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    if menu.pages.contains(where: { !MenuPageCache.shared.isCached($0.id) }) && !Connectivity.shared.isOnline {
+                        Text("New pages will appear when you're back online.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                } else if !menu.pagePhotoIds.isEmpty {
+                    Button { showingMenu = MenuSheetTarget(menu: menu, tab: .pages) } label: {
+                        Label("Menu photos", systemImage: "photo.on.rectangle")
+                    }
                 }
+                Button { showingMenu = MenuSheetTarget(menu: menu) } label: {
+                    let count = menu.extracted?.count ?? 0
+                    HStack {
+                        Label("Dishes", systemImage: "menucard")
+                        Spacer()
+                        Text("\(count)").foregroundStyle(.secondary)
+                    }
+                }
+                if menus.contains(where: { $0.placeId == place.id && MenuCapture.shared.reading.contains($0.id) }) {
+                    Label {
+                        Text("Reading new pages…")
+                    } icon: {
+                        ProgressView()
+                    }
+                    .font(.subheadline)
+                } else if let review = menu.review {
+                    Button { reviewingMenu = menu } label: {
+                        HStack {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Menu read: review").foregroundStyle(.primary)
+                                    Text(reviewSummary(review)).font(.footnote).foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "checklist").foregroundStyle(.orange)
+                            }
+                            Spacer()
+                            Circle().fill(.orange).frame(width: 8, height: 8)
+                        }
+                    }
+                }
+                MenuPageSources(place: place, visit: nil, style: .addPages)
+            } else {
+                MenuPanel(place: place, visit: nil)
+                    .padding(.vertical, 2)
             }
-            MenuPanel(place: place, visit: nil)
-                .padding(.vertical, 2)
+        } header: {
+            if let menu = latestReadMenu {
+                Text("Menu · read \(menu.readAt ?? menu.capturedAt, format: .dateTime.month(.abbreviated).day().year())")
+            } else {
+                Text("Menu")
+            }
         }
     }
 
+    private func reviewSummary(_ review: MenuReview) -> String {
+        let added = review.items.filter { $0.status == .new }.count
+        let changed = review.items.filter { $0.status == .changed }.count
+        var parts = ["\(added) new dish\(added == 1 ? "" : "es")"]
+        if changed > 0 { parts.append("\(changed) new price\(changed == 1 ? "" : "s")") }
+        return parts.joined(separator: " · ")
+    }
+
     private var latestReadMenu: PlaceMenu? {
-        menus.filter { $0.placeId == place.id && $0.readStatus == .read }.max { $0.capturedAt < $1.capturedAt }
+        let read = menus.filter { $0.placeId == place.id && $0.readStatus == .read }
+        return read.first { $0.id == place.latestMenuId } ?? read.max { $0.capturedAt < $1.capturedAt }
     }
 
     private var hoursSection: some View {

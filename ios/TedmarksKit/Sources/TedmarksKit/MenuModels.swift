@@ -47,17 +47,41 @@ public final class Photo {
     public var role: PhotoRole { PhotoRole(rawValue: roleRaw) ?? .visit }
 }
 
-/// A dish read from a menu photo.
+/// A dish on a menu's list (read by Claude, or added by hand).
 public struct MenuItem: Codable, Hashable, Sendable {
     public var section: String?
     public var name: String
     public var price: String?
+    /// As printed under the dish ("San Marzano tomato, fior di latte, basil").
+    public var description: String?
 
-    public init(section: String?, name: String, price: String?) {
+    public init(section: String?, name: String, price: String?, description: String? = nil) {
         self.section = section
         self.name = name
         self.price = price
+        self.description = description
     }
+}
+
+/// One picture of a menu (a photo, a screenshot or a PDF), stored on the server under its id
+/// and kept on the phone once opened. Never changes: adding or replacing pages makes new ones.
+public struct MenuPageRef: Codable, Hashable, Sendable, Identifiable {
+    public var id: UUID
+    /// image/jpeg, image/png or application/pdf.
+    public var mediaType: String
+    public var pixelWidth: Int?
+    public var pixelHeight: Int?
+    public var addedAt: Date
+
+    public init(id: UUID = UUID(), mediaType: String, pixelWidth: Int? = nil, pixelHeight: Int? = nil, addedAt: Date = .now) {
+        self.id = id
+        self.mediaType = mediaType
+        self.pixelWidth = pixelWidth
+        self.pixelHeight = pixelHeight
+        self.addedAt = addedAt
+    }
+
+    public var isPDF: Bool { mediaType == "application/pdf" }
 }
 
 public enum MenuReadStatus: String, Sendable { case pending, read, failed }
@@ -75,6 +99,10 @@ public final class PlaceMenu {
     public var readAt: Date?
     /// [MenuItem] as JSON, in menu order.
     public var extractedData: Data?
+    /// [MenuPageRef] as JSON: the menu's pictures, in order (older menus use pagePhotoIds).
+    public var pagesData: Data?
+    /// MenuReview as JSON while a reading waits to be checked ("Menu read: review").
+    public var reviewData: Data?
     public var createdAt: Date
     public var modifiedAt: Date
     public var deletedAt: Date?
@@ -98,6 +126,16 @@ public final class PlaceMenu {
     public var extracted: [MenuItem]? {
         get { extractedData.flatMap { try? JSONDecoder().decode([MenuItem].self, from: $0) } }
         set { extractedData = newValue.flatMap { try? JSONEncoder().encode($0) } }
+    }
+
+    public var pages: [MenuPageRef] {
+        get { pagesData.flatMap { try? JSONDecoder().decode([MenuPageRef].self, from: $0) } ?? [] }
+        set { pagesData = newValue.isEmpty ? nil : try? JSONEncoder().encode(newValue) }
+    }
+
+    public var review: MenuReview? {
+        get { reviewData.flatMap { try? JSONDecoder().decode(MenuReview.self, from: $0) } }
+        set { reviewData = newValue.flatMap { try? JSONEncoder().encode($0) } }
     }
 }
 

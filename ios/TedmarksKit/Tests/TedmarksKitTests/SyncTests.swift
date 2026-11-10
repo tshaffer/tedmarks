@@ -284,6 +284,19 @@ private let doppio = NearbyPlace(googlePlaceId: "doppio", name: "Doppio Zero", a
     #expect(sections[0].items.first?.price == "18")
     let photo = try #require(try other.context.fetch(FetchDescriptor<Photo>()).first)
     #expect(photo.role == .menuPage && photo.cloudIdentifier == "cloud-1" && photo.menuId == menu.id)
+
+    // Pages, descriptions and a reading waiting to be checked come along too.
+    let newPage = MenuPageRef(mediaType: "application/pdf", pixelWidth: nil, pixelHeight: nil)
+    menu.pages = [newPage]
+    try MenuReading.applyAdded([MenuItem(section: "Dolci", name: "Tiramisu", price: "10", description: "Mascarpone")],
+                               pageIds: [newPage.id], to: menu, in: ted.context)
+    await ted.engine.sync()
+    await other.engine.sync()
+    let menuCopy = try #require(try other.context.fetch(FetchDescriptor<PlaceMenu>()).first)
+    #expect(menuCopy.pages.map(\.id) == [newPage.id] && menuCopy.pages.first?.isPDF == true)
+    #expect(menuCopy.extracted?.last?.description == "Mascarpone")
+    #expect(menuCopy.review?.items.first?.status == .changed, "Tiramisu had no price")
+    #expect(menuCopy.review?.pageIds == [newPage.id])
 }
 
 @MainActor

@@ -58,9 +58,10 @@ public final class SyncEngine {
     /// re-reads everything once (v2: place details, notes and subtypes from the memorapp import;
     /// v3: notes become two-way, plus voice notes and drafts; v4: place review, interest,
     /// status and type become editable on the phone; v5: dish prices, latest menu, photos, menus;
-    /// v6: opening periods, time zone and meals served, for the map's filters).
+    /// v6: opening periods, time zone and meals served, for the map's filters; v7: menu pages,
+    /// dish descriptions and the menu review).
     private static let formatKey = "sync.format"
-    private static let format = 6
+    private static let format = 7
     private static let lastSyncedKey = "sync.lastSyncedAt"
     private static let pushBatchSize = 200
 

@@ -33,6 +33,11 @@ struct TedmarksApp: App {
                 // Catch up the Live Activity and prompt (e.g. after Lock Screen taps), and sync.
                 VisitSideEffects.reconcile(in: TedmarksStore.context)
                 Task { await SyncEngine.shared.sync() }
+                // Menu pages taken offline: send them, and read what couldn't be read.
+                Task {
+                    await MenuPageCache.shared.flush(using: AppConfig.api)
+                    await MenuCapture.shared.resumePending(in: TedmarksStore.context)
+                }
             case .background:
                 syncBeforeSuspending()
             default:

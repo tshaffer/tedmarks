@@ -289,13 +289,34 @@ enum SyncEncoder {
 
     static func record(_ menu: PlaceMenu) -> SyncRecord {
         // Inside an array, leave absent fields out (null only clears top-level/nested fields).
-        let extracted: JSONValue = menu.extracted.map { items in
-            .array(items.map { item in
-                var object: [String: JSONValue] = ["name": .string(item.name)]
-                if let section = item.section { object["section"] = .string(section) }
-                if let price = item.price { object["price"] = .string(price) }
-                return .object(object)
-            })
+        func dish(_ item: MenuItem) -> [String: JSONValue] {
+            var object: [String: JSONValue] = ["name": .string(item.name)]
+            if let section = item.section { object["section"] = .string(section) }
+            if let price = item.price { object["price"] = .string(price) }
+            if let description = item.description { object["description"] = .string(description) }
+            return object
+        }
+        let extracted: JSONValue = menu.extracted.map { items in .array(items.map { .object(dish($0)) }) } ?? .null
+        let pages = menu.pages
+        let pagesValue: JSONValue = pages.isEmpty ? .null : .array(pages.map { page in
+            var object: [String: JSONValue] = [
+                "id": SyncValue.id(page.id), "mediaType": .string(page.mediaType), "addedAt": SyncValue.date(page.addedAt),
+            ]
+            if let width = page.pixelWidth { object["pixelWidth"] = SyncValue.int(width) }
+            if let height = page.pixelHeight { object["pixelHeight"] = SyncValue.int(height) }
+            return .object(object)
+        })
+        let review: JSONValue = menu.review.map { review in
+            .object([
+                "readAt": SyncValue.date(review.readAt),
+                "pageIds": .array(review.pageIds.map { SyncValue.id($0) }),
+                "items": .array(review.items.map { item in
+                    var object = dish(item.item)
+                    object["status"] = .string(item.status.rawValue)
+                    if let previous = item.previousPrice { object["previousPrice"] = .string(previous) }
+                    return .object(object)
+                }),
+            ])
         } ?? .null
         return base(id: menu.id, createdAt: menu.createdAt, modifiedAt: menu.modifiedAt, deletedAt: menu.deletedAt)
             .merging([
@@ -306,6 +327,8 @@ enum SyncEncoder {
                 "readStatus": .string(menu.readStatusRaw),
                 "readAt": SyncValue.date(menu.readAt),
                 "extracted": extracted,
+                "pages": pagesValue,
+                "review": review,
             ]) { $1 }
     }
 
@@ -718,8 +741,23 @@ enum SyncDecoder {
             menu.extracted = record["extracted"]?.array.map { items in
                 items.compactMap { value in
                     guard let object = value.object, let name = object["name"]?.string else { return nil }
-                    return MenuItem(section: object["section"]?.string, name: name, price: object["price"]?.string)
+                    return MenuItem(section: object["section"]?.string, name: name, price: object["price"]?.string, description: object["description"]?.string)
                 }
+            }
+            menu.pages = record["pages"]?.array?.compactMap { value in
+                guard let object = value.object, let pageId = SyncValue.parseId(object["id"]), let type = object["mediaType"]?.string else { return nil }
+                return MenuPageRef(id: pageId, mediaType: type, pixelWidth: object["pixelWidth"]?.number.map { Int($0) },
+                                   pixelHeight: object["pixelHeight"]?.number.map { Int($0) }, addedAt: SyncValue.parseDate(object["addedAt"]) ?? createdAt)
+            } ?? []
+            menu.review = record["review"]?.object.flatMap { object in
+                guard let readAt = SyncValue.parseDate(object["readAt"]) else { return nil }
+                let items: [MenuReviewItem] = object["items"]?.array?.compactMap { value in
+                    guard let item = value.object, let name = item["name"]?.string,
+                          let status = item["status"]?.string.flatMap(MenuDishStatus.init(rawValue:)) else { return nil }
+                    return MenuReviewItem(MenuItem(section: item["section"]?.string, name: name, price: item["price"]?.string, description: item["description"]?.string),
+                                          status: status, previousPrice: item["previousPrice"]?.string)
+                } ?? []
+                return MenuReview(readAt: readAt, pageIds: object["pageIds"]?.array?.compactMap { SyncValue.parseId($0) } ?? [], items: items)
             }
             menu.createdAt = createdAt
             menu.modifiedAt = modifiedAt

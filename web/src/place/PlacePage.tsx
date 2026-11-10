@@ -5,6 +5,8 @@ import { usePlaceActions, useShowPlace } from '../actions/PlaceActions.js';
 import { summarize } from '../data/insights.js';
 import { mergeSuggestions } from '../data/dishes.js';
 import { menuSections } from '../data/menuWrites.js';
+import { usePageViews } from '../menu/menuPageViews.js';
+import { PageThumb } from '../menu/MenuPagesView.js';
 import { useTedmarksData } from '../data/TedmarksData.js';
 import { directionsUrl } from '../home/OurPlacePanel.js';
 import { WANT } from '../theme.js';
@@ -113,12 +115,13 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
             {place.review ? <Typography sx={{ whiteSpace: 'pre-wrap' }}>{place.review}</Typography> : <Typography color="text.secondary">No review yet.</Typography>}
           </Card>
 
-          <Card title={menu ? `Menu · read ${longDate(menu.readAt ?? menu.capturedAt)} · ${dishCount} dishes` : 'Menu'}
+          <Card title={menu ? `Menu · read ${longDate(menu.readAt ?? menu.capturedAt)}` : 'Menu'}
             action={menu
-              ? <><Action onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'add' })}>Replace</Action><Action danger onClick={() => void actions.deleteMenu(menu.id)}>Delete</Action></>
+              ? <><Action onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'add' })}>Add pages</Action><Action onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'add', replace: true })}>Replace</Action><Action danger onClick={() => void actions.deleteMenu(menu.id)}>Delete</Action></>
               : <Action onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'add' })}>+ Add a menu</Action>}>
             {menu ? (
               <Stack spacing={1}>
+                {menu.pages?.length ? <MenuPageStrip pages={menu.pages} onOpen={(page) => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'view', tab: 'pages', page })} /> : null}
                 {/* A preview: the first dishes, one per line under their sections. */}
                 {menuPreview(sections, MENU_PREVIEW_DISHES).map((section, i) => (
                   <Box key={i}>
@@ -132,11 +135,11 @@ export function PlacePage({ onSignedOut }: { onSignedOut: () => void }) {
                   </Box>
                 ))}
                 <Link component="button" variant="body2" underline="hover" sx={{ alignSelf: 'flex-start' }}
-                  onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'view' })}>
+                  onClick={() => actions.openMenu({ kind: 'ours', placeId: place.id, mode: 'view', tab: 'dishes' })}>
                   {dishCount > MENU_PREVIEW_DISHES ? `View full menu · ${dishCount - MENU_PREVIEW_DISHES} more ›` : 'View full menu ›'}
                 </Link>
               </Stack>
-            ) : <Typography color="text.secondary">Add the menu from a PDF or screenshots, and see what we thought of each dish.</Typography>}
+            ) : <Typography color="text.secondary">Add the menu from photos, screenshots or a PDF, and see what we thought of each dish.</Typography>}
           </Card>
 
           <Card title="Hours" action={place.google?.placeId ? <Action onClick={() => void actions.refreshFromGoogle(place.id)}>Refresh from Google</Action> : undefined}>
@@ -194,6 +197,21 @@ function Action({ onClick, danger, children }: { onClick: () => void; danger?: b
 }
 
 const MENU_PREVIEW_DISHES = 12;
+
+/** Figma W9a · the menu's pages as thumbnails; click one to see it full size. */
+function MenuPageStrip({ pages, onOpen }: { pages: NonNullable<import('@tedmarks/shared').Menu['pages']>; onOpen: (page: number) => void }) {
+  const { views } = usePageViews(pages);
+  const shown = views.slice(0, 4);
+  return (
+    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ pb: 1.5, mb: 0.5, borderBottom: '1px solid #ececf0' }}>
+      {shown.map((view, i) => <PageThumb key={view.key} view={view} width={84} label={`Page ${i + 1}`} onClick={() => onOpen(i)} />)}
+      <Box sx={{ pl: 1 }}>
+        <Typography variant="body2" fontWeight={600}>{views.length === 1 ? '1 page' : `${views.length} pages`}</Typography>
+        <Typography variant="caption" color="text.secondary">Click a page to see it full size</Typography>
+      </Box>
+    </Stack>
+  );
+}
 
 /** The menu's first `limit` dishes, keeping their sections. */
 function menuPreview<E, S extends { title: string | null; entries: E[] }>(sections: S[], limit: number): S[] {

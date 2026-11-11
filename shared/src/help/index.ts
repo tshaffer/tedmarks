@@ -190,7 +190,7 @@ The purple box on a place shows how much and why, with **Edit** and **Delete**. 
     slug: 'menus',
     title: 'Menus',
     category: 'Planning',
-    keywords: ['menu', 'pdf', 'screenshot', 'photo', 'read menu', 'website', 'web page', 'online menu', 'save as pdf', 'print', 'chrome', 'too big', 'claude', 'newer menu', 'delete menu', 'sections', 'prices', 'not on the latest menu', 'paste', 'copy', 'text'],
+    keywords: ['menu', 'pdf', 'screenshot', 'photo', 'read menu', 'website', 'web page', 'online menu', 'save as pdf', 'print', 'chrome', 'too big', 'claude', 'newer menu', 'delete menu', 'sections', 'prices', 'not on the latest menu', 'paste', 'copy', 'text', 'full size screenshot', 'tall', 'one picture', 'save image', 'devtools', 'black'],
     body: `A place's menu is its **pages** (photos, screenshots or a PDF, kept privately) and its **list of dishes**, by section, with prices and descriptions — read by Claude, and yours to fix.
 
 **Add a menu** on a place, or on a Google restaurant (which saves it to Tedmarks). Drop a **PDF**, or photos or screenshots of the pages in order, or paste the menu's text, then **Read menu**. A long menu can take a minute or two. Before saving you **check what Claude read**: fix a dish, remove one it got wrong (✕), or add one it missed. Photos are kept at about 3,000 pixels; screenshots and PDFs as they are. On the phone, see *Menu camera*.
@@ -203,6 +203,14 @@ No need to screenshot page by page:
 - **The menu opens as a PDF** (Chrome's PDF viewer): click its **download** button (↓, top right), then drop the file into **Add a menu**.
 - **Or print the web page:** in Chrome press **⌘P**, set **Destination** to **Save as PDF**, **Save**, and drop that PDF in. Open any collapsed sections ("See more", Lunch / Dinner tabs) first — only what's showing is printed.
 - **On an iPhone or iPad (Chrome):** **Share** → **Print** → **Share** again in the preview → **Save to Files**; then choose that file in **Add a menu**.
+
+### The menu as one tall picture
+
+So you can scroll the whole menu as one page instead of piecing screenshots together:
+
+- **The menu is a picture** (designed menu boards, not text you can select): right-click it and choose **Save Image As…** (or **Open Image in New Tab**, then save). That's the restaurant's own file, at full size — drop it into **Add a menu**.
+- **Otherwise, capture the whole page:** first scroll slowly to the bottom so everything loads, then back to the top. Press **⌘⌥I** (DevTools), then **⌘⇧P**, type **full size**, and choose **Capture full size screenshot**. Chrome saves one tall PNG to Downloads. If parts come out black, the site only draws them as you scroll — use a saved image, a PDF, or screenshots instead.
+- **Screenshots:** press **⌘⇧4** and drag over just the menu, not the whole screen, so the pages aren't shrunk by the browser's tabs and the Dock.
 
 Any size works: a PDF over 15 MB (a printed web page with lots of photos) is read as page images automatically, up to 30 pages.
 

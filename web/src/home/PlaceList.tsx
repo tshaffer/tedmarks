@@ -42,6 +42,8 @@ interface Props {
 }
 
 const price = (level: number | undefined) => (level ? '$'.repeat(level) : null);
+/** Google's rating, e.g. "★ 4.6". */
+const googleRating = (rating: number | undefined) => (rating === undefined ? null : `★ ${rating.toFixed(1)}`);
 
 /** Left panel: our places and Google's restaurants in the map view, through the filters. */
 export function PlaceList({ items, matching, filters, onFilters, cuisines, tags, onManageTags, selectedId, onSelectOurs, onSelectGoogle, google, only }: Props) {
@@ -107,7 +109,7 @@ const rowSx = (selected: boolean) => ({
 
 function OurRow({ item, selected, onSelect }: { item: Extract<ListItem, { kind: 'ours' }>; selected: boolean; onSelect: () => void }) {
   const { summary, meters } = item;
-  const details = [summary.subtype, price(summary.place.google?.priceLevel), summary.city, meters === null ? null : miles(meters)].filter(Boolean).join(' · ');
+  const details = [summary.subtype, googleRating(summary.place.google?.rating), summary.city, meters === null ? null : miles(meters)].filter(Boolean).join(' · ');
   return (
     <ListItemButton selected={selected} onClick={onSelect} sx={rowSx(selected)}>
       <Box sx={{ flex: 1, minWidth: 0 }}>

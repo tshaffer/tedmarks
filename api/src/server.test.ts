@@ -178,7 +178,7 @@ test('ask: not configured without a key; validated; answered by the injected Cla
     const ok = await post({ question: 'Best tacos?', history: [{ question: 'Hi', answer: 'Hello' }] });
     assert.equal(ok.status, 200);
     assert.deepEqual(await ok.json(), reply);
-    assert.deepEqual(asked, { question: 'Best tacos?', history: [{ question: 'Hi', answer: 'Hello' }] });
+    assert.deepEqual(asked, { question: 'Best tacos?', history: [{ question: 'Hi', answer: 'Hello' }], client: 'web' });
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

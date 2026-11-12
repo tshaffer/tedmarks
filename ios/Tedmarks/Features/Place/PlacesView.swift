@@ -20,6 +20,8 @@ struct PlacesView: View {
     @State private var path: [UUID] = []
     @State private var errorMessage: String?
     @State private var isSavingPlace = false
+    @State private var isAsking = false
+    @State private var conversation = AskConversation()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -62,6 +64,9 @@ struct PlacesView: View {
                     Button { isSavingPlace = true } label: { Label("Save a place to try", systemImage: "plus") }
                 }
                 ToolbarItem(placement: .primaryAction) {
+                    Button { isAsking = true } label: { Label("Ask Tedmarks", systemImage: "sparkles") }
+                }
+                ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Picker("Sort by", selection: $sort) {
                             ForEach(PlaceSort.allCases, id: \.self) { Text($0.label).tag($0) }
@@ -78,6 +83,9 @@ struct PlacesView: View {
                     search = ""
                 }
             }
+            .sheet(isPresented: $isAsking) {
+                AskSheet(conversation: conversation) { id in path = [id] }
+            }
             .navigationDestination(for: UUID.self) { id in
                 if let place = places.first(where: { $0.id == id }) { PlaceDetailView(place: place) }
             }
@@ -86,9 +94,11 @@ struct PlacesView: View {
                 location = try? await LocationService.currentLocation()
             }
             #if DEBUG
-            // Dev/testing: `-openPlace <name>` opens that Place page; `-savePlace` opens Save a place.
+            // Dev/testing: `-openPlace <name>` opens that Place page; `-savePlace` opens Save a place;
+            // `-openAsk` opens Ask Tedmarks.
             .task {
                 if ProcessInfo.processInfo.arguments.contains("-savePlace") { isSavingPlace = true }
+                if ProcessInfo.processInfo.arguments.contains("-openAsk") { isAsking = true }
                 if let name = UserDefaults.standard.string(forKey: "openPlace"),
                    let place = places.first(where: { $0.name == name }) ?? places.first(where: { $0.name.localizedStandardContains(name) }) {
                     path = [place.id]

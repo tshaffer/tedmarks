@@ -34,6 +34,9 @@ You can't change anything in Tedmarks; if asked to, say how to do it in the app.
 
 When done, give the answer, the refs of the places the answer mentions (most relevant first, at most 8; none if it mentions none), and the slugs of the help topics you drew on (none if you didn't use the help).`;
 
+/** Added to questions from the iPhone app (kept out of the cached system prompt). */
+const IOS_NOTE = '. Asked from the iPhone app: the help topics mostly describe the website, so for how-to questions say where it’s done (website or iPhone) and don’t describe iPhone screens the topics don’t mention';
+
 const Answer = z.object({
   answer: z.string().describe('The answer, in Markdown.'),
   places: z.array(z.string()).describe('Refs ("p12") of the places the answer mentions, most relevant first.'),
@@ -102,7 +105,7 @@ export class ClaudeAskAnswerer implements AskAnswerer {
         // The data changes with every edit, so it goes last, cached until then.
         { type: 'text', text: `# Tedmarks data\n\n${digest.text}`, cache_control: { type: 'ephemeral' } },
       ],
-      messages: [...history, { role: 'user', content: `(Now: ${now()})\n\n${request.question}` }],
+      messages: [...history, { role: 'user', content: `(Now: ${now()}${request.client === 'ios' ? IOS_NOTE : ''})\n\n${request.question}` }],
     });
 
     if (final.stop_reason === 'refusal') throw new AskDeclinedError();

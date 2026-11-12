@@ -266,7 +266,7 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         try decode(PlacesResponse.self, from: try await get(path: path, query: query)).places
     }
 
-    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+    func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
@@ -278,7 +278,7 @@ public struct TedmarksAPI: Sendable, SyncTransport {
         try await send(path: path, method: "GET", query: query, body: nil)
     }
 
-    private func send(path: String, method: String, query: [URLQueryItem], body: Data?, contentType: String = "application/json", timeout: TimeInterval? = nil) async throws -> Data {
+    func send(path: String, method: String, query: [URLQueryItem], body: Data?, contentType: String = "application/json", timeout: TimeInterval? = nil) async throws -> Data {
         var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
         if !query.isEmpty { components.queryItems = query }
         var request = URLRequest(url: components.url!)

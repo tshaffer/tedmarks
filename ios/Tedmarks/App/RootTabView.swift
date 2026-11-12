@@ -24,12 +24,12 @@ struct RootTabView: View {
         }
         #if DEBUG
         // Dev/testing: `simctl launch … -openSettings` / `-openInbox` (More) / `-openPlaces` / `-openPlace <name>` /
-        // `-openPastVisits` (Visits) skip taps.
+        // `-openPastVisits` (Visits) / `-openAsk` (Places) skip taps.
         .onAppear {
             let arguments = ProcessInfo.processInfo.arguments
             if arguments.contains("-openSettings") || arguments.contains("-openInbox") { selectedTab = .more }
             if arguments.contains("-openPastVisits") { selectedTab = .visits }
-            if arguments.contains("-openPlaces") || arguments.contains("-openPlace") { selectedTab = .places }
+            if arguments.contains("-openPlaces") || arguments.contains("-openPlace") || arguments.contains("-openAsk") { selectedTab = .places }
         }
         #endif
         // Deep links from the Lock Screen widget (01), Live Activity (03) and notifications (06).

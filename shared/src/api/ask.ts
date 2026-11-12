@@ -9,6 +9,8 @@ export const AskRequest = z.object({
   question: z.string().trim().min(1).max(1000),
   /** Earlier questions and answers in this conversation, for follow-ups ("which of those…"). */
   history: z.array(HelpTurn).max(20).default([]),
+  /** Which app is asking: the help topics describe the website, so the iPhone app says so. */
+  client: z.enum(['web', 'ios']).default('web'),
 });
 export type AskRequest = z.infer<typeof AskRequest>;
 

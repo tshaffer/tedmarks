@@ -160,3 +160,26 @@ test('help questions: not configured without a key; validated; answered by the i
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test('ask: not configured without a key; validated; answered by the injected Claude', async () => {
+  await withServer(async (base) => {
+    const res = await fetch(`${base}/ai/ask`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ question: 'Best tacos?' }) });
+    assert.equal(res.status, 503);
+  });
+  let asked: unknown;
+  const reply = { answer: 'Tacos Sinaloa.', places: [{ id: 'x', name: 'Tacos Sinaloa' }], topics: [] };
+  const ask = { answer: async (request: unknown) => { asked = request; return reply; } };
+  const server = createApp({ ask }).listen(0);
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const post = (body: unknown) => fetch(`${base}/ai/ask`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await post({ question: '' })).status, 400);
+    const ok = await post({ question: 'Best tacos?', history: [{ question: 'Hi', answer: 'Hello' }] });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), reply);
+    assert.deepEqual(asked, { question: 'Best tacos?', history: [{ question: 'Hi', answer: 'Hello' }] });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

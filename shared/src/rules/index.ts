@@ -5,3 +5,4 @@ export * from './placeWithoutVisits.js';
 export * from './meals.js';
 export * from './dishNames.js';
 export * from './menuDishes.js';
+export * from './address.js';

@@ -6,6 +6,7 @@ import type { Db } from 'mongodb';
 import { DEFAULT_NEARBY_RADIUS_METERS } from '@tedmarks/shared';
 import { aiRoutes } from './ai/aiRoutes.js';
 import type { HelpAnswerer } from './ai/helpAnswerer.js';
+import type { AskAnswerer } from './ai/askAnswerer.js';
 import type { MenuReader } from './ai/menuReader.js';
 import type { VoiceStructurer } from './ai/voiceStructurer.js';
 import { requireAccess } from './auth/accessKey.js';
@@ -33,6 +34,8 @@ export interface AppDeps {
   menuPages?: MenuPageStore | undefined;
   /** Claude for the website's Help questions. Unset = /ai/help reports not configured. */
   help?: HelpAnswerer | undefined;
+  /** Claude for Ask Tedmarks (our data and the help). Unset = /ai/ask reports not configured. */
+  ask?: AskAnswerer | undefined;
   /** Sign in with Apple for the website. */
   auth?: {
     servicesId?: string | undefined;
@@ -84,7 +87,7 @@ export function createApp(deps: AppDeps = {}): Express {
   const store = deps.db ? new SyncStore(deps.db) : undefined;
   app.use('/sync', access, syncRoutes(store));
   app.use('/places', access, placesRoutes(deps.places, deps.nearbyRadiusMeters ?? DEFAULT_NEARBY_RADIUS_METERS, store, deps.db ? new AreaSearchCache(deps.db) : undefined));
-  app.use('/ai', access, aiRoutes(deps.voice, deps.menu, deps.help));
+  app.use('/ai', access, aiRoutes(deps.voice, deps.menu, deps.help, deps.ask));
   app.use('/menu-pages', access, menuPageRoutes(deps.menuPages));
   /** GET /config — the website's Google Maps key and Map ID. */
   app.get('/config', access, (_req, res) => {

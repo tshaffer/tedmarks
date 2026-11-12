@@ -35,7 +35,9 @@ Everything is shared between Ted and Lori. The places, visits and dishes from **
 - **Map** — our places and Google's restaurants on a map, for choosing somewhere to eat.
 - **Places** — every place in Tedmarks as a list.
 - **Visits** — every visit, newest first.
-- **Help** — this page.`,
+- **Help** — this page.
+
+**✦ Ask** (top right, on every page) answers questions about our places and visits, or about using Tedmarks. See **Ask Tedmarks**.`,
   },
   {
     slug: 'the-map',
@@ -100,6 +102,26 @@ Click a row (or **Place page ›** on the map) for everything about a place: our
 On the right: how many visits and places that year (and new places tried), the **Most visited** places, and **Not finished** — visits still to rate, with **Show them ›**.
 
 **+ Add a past visit** asks which restaurant (one of ours or any on Google), then opens the visit form.`,
+  },
+  {
+    slug: 'ask-tedmarks',
+    title: 'Ask Tedmarks',
+    category: 'Basics',
+    keywords: ['ask', 'question', 'claude', 'ai', 'chat', 'search', 'best', 'where did we', 'what did we order', 'open sunday', 'who has'],
+    body: `**✦ Ask** in the top bar opens Ask Tedmarks: type a question in your own words, and Claude answers from everything in Tedmarks and from these help pages.
+
+Two kinds of question:
+
+- **About our restaurants:** "Where did we have the best tacos?", "What did Lori order last time at Amarin?", "Which want-to-go places in Bend are open Sunday night?", "Who has a Reuben on the menu?" It knows every place, visit, dish, rating and note, the menus we've saved (dishes, descriptions and prices), and Google's hours.
+- **About using Tedmarks:** "How do I merge two dishes?" Those answers come from these help pages.
+
+Under an answer, **📍 chips** are the places it mentions: click one to open it on the map. **? chips** are help pages.
+
+- **Follow-ups** keep the conversation going ("Which of those are open Sundays?").
+- **Closing the panel** (✕ or Esc) keeps the conversation; **✦ Ask** picks up where you left off. **Clear conversation** starts over.
+- The **Ask box on this page** asks in the same place.
+- Ask only answers; it never changes anything. If Tedmarks doesn't have the answer, it says so.
+- Hours are as of the last time the place was refreshed from Google.`,
   },
 
   // ─── Recording ─────────────────────────────────────────────────────────────

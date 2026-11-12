@@ -1,9 +1,9 @@
-import { HELP_CATEGORIES, helpTopics, type HelpAskResponse, type HelpTopic, type HelpTurn } from '@tedmarks/shared';
-import { Alert, Box, Button, Chip, CircularProgress, Link, List, ListItemButton, Paper, Stack, TextField, Typography } from '@mui/material';
-import { useMemo, useRef, useState } from 'react';
+import { HELP_CATEGORIES, helpTopics, type HelpTopic } from '@tedmarks/shared';
+import { Box, Button, List, ListItemButton, Paper, Stack, TextField, Typography } from '@mui/material';
+import { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useSearchParams } from 'react-router-dom';
-import { api } from '../api.js';
+import { useAsk } from '../ask/AskTedmarks.js';
 import { TopBar } from '../TopBar.js';
 
 /** Markdown from the topics and answers, in the page's type. */
@@ -21,7 +21,8 @@ const matches = (topic: HelpTopic, q: string) => !q
 
 /**
  * Figma W8 · Help, like Tedography's: topics by category on the left (with a filter), the chosen
- * topic on the right, and an Ask box answered by Claude from the same topics.
+ * topic on the right, and an Ask box: the question goes to Ask Tedmarks (W10), which answers from
+ * these topics and from our own places and visits.
  */
 export function HelpPage({ onSignedOut }: { onSignedOut: () => void }) {
   const [params, setParams] = useSearchParams();
@@ -35,31 +36,13 @@ export function HelpPage({ onSignedOut }: { onSignedOut: () => void }) {
     .map((category) => ({ category, topics: helpTopics.filter((t) => t.category === category && matches(t, q)) }))
     .filter((g) => g.topics.length), [q]);
 
+  const asker = useAsk();
   const [question, setQuestion] = useState('');
-  const [turns, setTurns] = useState<(HelpTurn & { topics: string[] })[]>([]);
-  const [asking, setAsking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-
-  async function ask() {
-    const text = question.trim();
-    if (!text || asking) return;
-    setAsking(true);
-    setError(null);
-    try {
-      const result = await api<HelpAskResponse>('/ai/help', {
-        method: 'POST',
-        body: JSON.stringify({ question: text, history: turns.map(({ question: q2, answer }) => ({ question: q2, answer })) }),
-      });
-      setTurns((t) => [...t, { question: text, answer: result.answer, topics: result.topics }]);
-      setQuestion('');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Couldn’t get an answer.');
-    } finally {
-      setAsking(false);
-      input.current?.focus();
-    }
-  }
+  const ask = () => {
+    if (!question.trim() || !asker) return;
+    asker.ask(question);
+    setQuestion('');
+  };
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f7' }}>
@@ -87,38 +70,15 @@ export function HelpPage({ onSignedOut }: { onSignedOut: () => void }) {
         <Stack spacing={2} sx={{ flex: 1, minWidth: 0, width: '100%' }}>
           <Box>
             <Typography variant="h4" fontWeight={700}>Help</Typography>
-            <Typography color="text.secondary">Browse the topics, or ask a question — Claude answers from these help pages.</Typography>
+            <Typography color="text.secondary">Browse the topics, or ask a question: Claude answers from these pages and from what’s in Tedmarks.</Typography>
           </Box>
 
           <Paper elevation={0} sx={{ p: 2.5, borderRadius: 4 }}>
             <Stack direction="row" spacing={1}>
-              <TextField inputRef={input} size="small" fullWidth placeholder="Ask a question about Tedmarks…" value={question}
-                onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void ask(); }} />
-              <Button variant="contained" onClick={() => void ask()} sx={{ minWidth: 72, '&.Mui-disabled': { bgcolor: 'primary.main', color: '#fff', opacity: 0.7 } }} disabled={asking}>
-                {asking ? <CircularProgress size={18} color="inherit" /> : 'Ask'}
-              </Button>
+              <TextField size="small" fullWidth placeholder="Ask about using Tedmarks, or about our places…" value={question}
+                onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') ask(); }} />
+              <Button variant="contained" onClick={ask} sx={{ minWidth: 72 }}>Ask</Button>
             </Stack>
-            {error && <Alert severity="error" sx={{ mt: 1.5 }}>{error}</Alert>}
-            {turns.length > 0 && (
-              <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-                {turns.map((turn, i) => (
-                  <Box key={i} sx={{ px: 2, py: 1.5, borderRadius: 3, bgcolor: '#fffaf2', border: '1px solid #ffe1b0' }}>
-                    <Typography variant="caption" fontWeight={600} color="text.secondary">You asked: {turn.question}</Typography>
-                    <Box sx={{ ...markdownSx, fontSize: 15 }}><ReactMarkdown>{turn.answer}</ReactMarkdown></Box>
-                    {turn.topics.length > 0 && (
-                      <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                        {turn.topics.map((s) => {
-                          const t = helpTopics.find((h) => h.slug === s);
-                          return t ? <Chip key={s} size="small" variant="outlined" label={t.title} onClick={() => choose(s)}
-                            sx={{ bgcolor: '#fff', color: '#c26a00', borderColor: '#ffcf8a' }} /> : null;
-                        })}
-                      </Stack>
-                    )}
-                  </Box>
-                ))}
-                <Link component="button" variant="caption" underline="hover" color="text.secondary" sx={{ alignSelf: 'flex-start' }} onClick={() => setTurns([])}>Clear conversation</Link>
-              </Stack>
-            )}
           </Paper>
 
           <Paper elevation={0} component="article" sx={{ px: 3, py: 2.5, borderRadius: 4 }}>

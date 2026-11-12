@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { getMe, type Me } from './api.js';
 import { TedmarksDataProvider } from './data/TedmarksData.js';
 import { PlaceActionsProvider } from './actions/PlaceActions.js';
+import { AskProvider } from './ask/AskTedmarks.js';
 import { HelpPage } from './help/HelpPage.js';
 import { HomePage } from './home/HomePage.js';
 import { PlacePage } from './place/PlacePage.js';
@@ -35,6 +36,7 @@ function SignedIn({ onSignedOut }: { onSignedOut: () => void }) {
   return (
     <TedmarksDataProvider>
       <PlaceActionsProvider>
+        <AskProvider>
         <Routes>
           <Route path="/place/:placeId" element={<PlacePage onSignedOut={onSignedOut} />} />
           <Route path="/places" element={<PlacesPage onSignedOut={onSignedOut} />} />
@@ -42,6 +44,7 @@ function SignedIn({ onSignedOut }: { onSignedOut: () => void }) {
           <Route path="/help" element={<HelpPage onSignedOut={onSignedOut} />} />
           <Route path="*" element={<HomePage onSignedOut={onSignedOut} />} />
         </Routes>
+        </AskProvider>
       </PlaceActionsProvider>
     </TedmarksDataProvider>
   );

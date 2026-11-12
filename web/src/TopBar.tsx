@@ -4,6 +4,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { getMe, signOut } from './api.js';
 import { loadGoogleMaps } from './googleMaps.js';
 import { SEARCH_WIDTH, SearchBox } from './home/SearchBox.js';
+import { AskButton } from './ask/AskTedmarks.js';
 
 /** Where the Tedmarks logo goes. The home screen is the map for now; it may become its own page. */
 const HOME = '/';
@@ -40,6 +41,7 @@ export function TopBar({ search, onSignedOut }: { search?: ReactNode; onSignedOu
         </Box>
         <Box sx={{ flex: 1 }} />
         {search === undefined ? <SiteSearch /> : search}
+        <AskButton />
         <AccountChip onSignedOut={onSignedOut} />
       </Toolbar>
     </AppBar>

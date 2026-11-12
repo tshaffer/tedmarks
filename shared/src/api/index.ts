@@ -3,3 +3,4 @@ export * from './sync.js';
 export * from './voice.js';
 export * from './menu.js';
 export * from './help.js';
+export * from './ask.js';

@@ -46,7 +46,15 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   const arrived = location.state as { placeId?: string; focus?: boolean; areas?: Area[]; areaIndex?: number; search?: SearchResult } | null;
   const [selection, setSelection] = useState<Selection>(() => (arrived?.placeId ? { kind: 'ours', placeId: arrived.placeId } : null));
   // From a Places row's 📍: center the map on that place (once the map is ready).
-  const [focusId] = useState(() => (arrived?.focus ? arrived.placeId ?? null : null));
+  const [focus, setFocus] = useState(() => (arrived?.focus && arrived.placeId ? { id: arrived.placeId } : null));
+  // Arriving again while the map is showing (a place chip in Ask Tedmarks): choose and center it.
+  useEffect(() => {
+    const next = location.state as typeof arrived;
+    if (!next?.placeId || !next.focus) return;
+    setSelection({ kind: 'ours', placeId: next.placeId });
+    setFocus({ id: next.placeId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
   // From "Show these on the map": the list's places, one area at a time ("Bend", then "Golden"…),
   // only those shown until you clear it.
   const [areas, setAreas] = useState<{ list: Area[]; index: number } | null>(() => (arrived?.areas?.length ? { list: arrived.areas, index: arrived.areaIndex ?? 0 } : null));
@@ -182,12 +190,12 @@ export function HomePage({ onSignedOut }: { onSignedOut: () => void }) {
   }, [map, arrivedSearch, onSearch]);
 
   useEffect(() => {
-    if (!map || !data || !focusId) return;
-    const place = data.places.get(focusId);
+    if (!map || !data || !focus) return;
+    const place = data.places.get(focus.id);
     if (!place) return;
     map.setCenter(latLngOf(place));
     if ((map.getZoom() ?? 0) < 15) map.setZoom(15);
-  }, [map, data, focusId]);
+  }, [map, data, focus]);
 
   useEffect(() => {
     if (!map || !data || !fitPlaceIds?.length) return;

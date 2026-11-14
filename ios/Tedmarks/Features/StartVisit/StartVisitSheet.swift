@@ -208,7 +208,9 @@ struct StartVisitSheet: View {
                     target: model.mapTarget,
                     onSelect: { model.selectedId = $0 },
                     onSelectGoogleIcon: { id in Task { await model.choose(googlePlaceId: id) } },
-                    onIdle: { mapCenter = $0; mapReach = $1; mapBounds = $2 }
+                    onIdle: { mapCenter = $0; mapReach = $1; mapBounds = $2 },
+                    // Tapping the map away from the pins puts the card away.
+                    onTapEmpty: { model.selectedId = nil }
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 if model.isBusy {
@@ -513,8 +515,9 @@ struct StartVisitSheet: View {
         .buttonStyle(.plain)
     }
 
-    /// The chosen place's card (Start, Directions, its page), near or far; with nothing chosen, a
-    /// nudge on the map or a disabled Start under the list.
+    /// The chosen place's card (Start, Directions, its page), near or far; with nothing chosen
+    /// (or the card closed with ✕ or a tap on the map), a nudge on the map or a disabled Start
+    /// under the list.
     @ViewBuilder
     private var bottomBar: some View {
         if let chosen {
@@ -541,6 +544,19 @@ struct StartVisitSheet: View {
                 }
                 Spacer(minLength: 8)
                 if let status = item.saved?.status { StatusBadge(status: status) }
+                if usesMap {
+                    // Put the card away for more map (tap a pin to bring one back).
+                    Button { model.selectedId = nil } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
+                }
             }
             if let why = whySaved(item.saved) {
                 Text(why).font(.subheadline).lineLimit(3)

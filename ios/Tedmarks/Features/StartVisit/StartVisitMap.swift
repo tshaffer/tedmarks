@@ -25,6 +25,8 @@ struct StartVisitMap: UIViewRepresentable {
     let onSelectGoogleIcon: (String) -> Void
     /// Where the map settled, how far it shows from there (meters, center to edge), and what's in view.
     let onIdle: (CLLocationCoordinate2D, Double, MapBounds) -> Void
+    /// A tap on the map away from any pin or Google icon.
+    var onTapEmpty: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -140,6 +142,10 @@ struct StartVisitMap: UIViewRepresentable {
         func mapView(_ mapView: GMSMapView, didTap marker: GMSMarker) -> Bool {
             if let id = marker.userData as? String { parent.onSelect(id) }
             return true   // no Google info window
+        }
+
+        func mapView(_ mapView: GMSMapView, didTapAt coordinate: CLLocationCoordinate2D) {
+            parent.onTapEmpty()
         }
 
         func mapView(_ mapView: GMSMapView, didTapPOIWithPlaceID placeID: String, name: String, location: CLLocationCoordinate2D) {

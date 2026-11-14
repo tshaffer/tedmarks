@@ -20,6 +20,7 @@ struct AddToOrderSheet: View {
     /// The order as it was on opening, for Cancel (each tap saves as you go).
     @State private var snapshot: DishCapture.OrderSnapshot?
     @State private var isConfirmingCancel = false
+    @State private var renaming: PlaceItem?
 
     var body: some View {
         NavigationStack {
@@ -101,6 +102,7 @@ struct AddToOrderSheet: View {
                 }
                 Button("Cancel", role: .cancel) { pendingRemoval = nil }
             }
+            .renameDishAlert($renaming)
             .onAppear {
                 if snapshot == nil { snapshot = DishCapture.snapshot(of: visit, in: context) }
                 // First visit with no menu: nothing to pick from, so go straight to typing.
@@ -119,11 +121,22 @@ struct AddToOrderSheet: View {
     }
 
     /// A dish with a stepper, like a shopping list: [+] at 0, [−] n [+] once ordered.
-    /// Long-press a dish we named to rename it.
+    /// A dish we named (not from the menu) in our order gets ✎ to fix its name; long-press works too.
     private func row(_ name: String, dish: PlaceItem?, detail: String?, count: Int, onAdd: @escaping () -> Void, onRemove: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(name).font(.body.weight(count > 0 ? .semibold : .regular))
+                HStack(spacing: 6) {
+                    Text(name).font(.body.weight(count > 0 ? .semibold : .regular))
+                    if count > 0, let dish, dish.canRename {
+                        Button { renaming = dish } label: {
+                            Image(systemName: "pencil").font(.footnote.weight(.semibold))
+                                .frame(width: 30, height: 30).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Rename \(name)")
+                    }
+                }
                 if let detail, !detail.isEmpty {
                     Text(detail).font(.caption).foregroundStyle(.secondary)
                 }

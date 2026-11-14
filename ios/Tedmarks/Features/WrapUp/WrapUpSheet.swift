@@ -3,9 +3,16 @@ import SwiftUI
 import TedmarksKit
 
 /// Figma 05 · Wrap up: our order with ratings, the visit verdict, end the visit.
-/// Also opened for past visits to review or fix ratings.
+/// Also opened for past visits to review or fix ratings. "All" shows everyone's ratings at
+/// once (joint unless we disagree), read-only; Us / Ted / Lori are for tapping ratings.
 struct WrapUpSheet: View {
     let visit: Visit
+
+    init(visit: Visit) {
+        self.visit = visit
+        // A past visit opens on everyone's ratings; one in progress on tapping them for us.
+        _viewing = State(initialValue: visit.status == .inProgress ? .us : nil)
+    }
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -15,7 +22,8 @@ struct WrapUpSheet: View {
     // Re-render when notes change.
     @Query(filter: #Predicate<Note> { $0.deletedAt == nil }) private var allNotes: [Note]
 
-    @State private var rateFor: RateFor = .us
+    /// nil = All (read-only); otherwise whose ratings taps record.
+    @State private var viewing: RateFor?
     @State private var isAddingDish = false
     @State private var errorMessage: String?
     @State private var newNote = ""
@@ -29,9 +37,18 @@ struct WrapUpSheet: View {
             List {
                 if raters.count > 1 {
                     Section {
-                        RateForPicker(selection: $rateFor, raters: raters)
+                        Picker("Ratings", selection: $viewing) {
+                            Text("All").tag(RateFor?.none)
+                            Text("Us").tag(RateFor?.some(.us))
+                            ForEach(raters) { person in
+                                Text(person.displayName).tag(RateFor?.some(.person(person.id)))
+                            }
+                        }
+                        .pickerStyle(.segmented)
                     } footer: {
-                        Text("Ratings you tap now are for \(rateForLabel).")
+                        Text(isShowingAll
+                             ? "Everyone's ratings. Choose Us or a name to change them."
+                             : "Ratings you tap now are for \(rateForLabel).")
                     }
                 }
 
@@ -53,9 +70,10 @@ struct WrapUpSheet: View {
                 }
 
                 Section {
-                    RatingButtons(values: VerdictValue.buttonOrder, selected: recordedVerdict) { value in
+                    RatingButtons(values: VerdictValue.buttonOrder, selected: isShowingAll ? jointValue(verdictDisplay) : recordedVerdict) { value in
                         setVerdict(value)
                     }
+                    .allowsHitTesting(!isShowingAll)
                     .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
                     if case .split = verdictDisplay, let text = displayText(verdictDisplay, names: names) {
                         Label(text, systemImage: "person.2").font(.subheadline).foregroundStyle(.purple)
@@ -156,15 +174,23 @@ struct WrapUpSheet: View {
                 case .none:
                     Text("Not rated yet").font(.caption.weight(.semibold)).foregroundStyle(.orange)
                 case .split:
-                    Text("We disagree: \(displayText(display, names: names) ?? "")")
-                        .font(.caption.weight(.semibold)).foregroundStyle(.purple)
+                    if isShowingAll {
+                        Label("We disagree", systemImage: "person.2").font(.caption.weight(.semibold)).foregroundStyle(.purple)
+                    } else {
+                        Text("We disagree: \(displayText(display, names: names) ?? "")")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.purple)
+                    }
                 case .joint:
                     EmptyView()
                 }
             }
             Spacer(minLength: 4)
-            RatingButtons(values: ItemRatingValue.buttonOrder, selected: recorded, compact: true) { value in
-                rate(item, value)
+            if isShowingAll {
+                EveryonesRating(display: display, names: names)
+            } else {
+                RatingButtons(values: ItemRatingValue.buttonOrder, selected: recorded, compact: true) { value in
+                    rate(item, value)
+                }
             }
         }
         .padding(.vertical, 2)
@@ -173,6 +199,13 @@ struct WrapUpSheet: View {
     // MARK: - Logic
 
     private var isInProgress: Bool { visit.status == .inProgress }
+    private var isShowingAll: Bool { viewing == nil && raters.count > 1 }
+    /// Whose ratings taps record (Us when showing All, though taps are off then).
+    private var rateFor: RateFor { viewing ?? .us }
+
+    private func jointValue<V>(_ display: RatingDisplay<V>) -> V? {
+        if case .joint(let value) = display { value } else { nil }
+    }
     private var orderItems: [VisitItem] { _ = allRatings.count; return DishCapture.orderItems(for: visit) }
     private var householdIds: [UUID] { DishCapture.household(for: visit, people: people) }
     private var raters: [Person] { DishCapture.raters(for: visit, people: people).compactMap { id in people.first { $0.id == id } } }
@@ -240,5 +273,42 @@ struct WrapUpSheet: View {
 
     private func perform(_ action: () throws -> Void) {
         do { try action() } catch { errorMessage = error.localizedDescription }
+    }
+}
+
+/// A dish's rating for everyone, read-only: one chip when we agree, one per person when we
+/// don't (outlined in purple), nothing when it isn't rated.
+private struct EveryonesRating: View {
+    let display: RatingDisplay<ItemRatingValue>
+    let names: [String: String]
+
+    var body: some View {
+        switch display {
+        case .none:
+            EmptyView()
+        case .joint(let value):
+            chip(value.emoji, color: value.color)
+                .accessibilityLabel(value.label)
+        case .split(let people):
+            HStack(spacing: 6) {
+                ForEach(people, id: \.personId) { person in
+                    chip("\(initial(person.personId)) \(person.value.emoji)", color: person.value.color, disagree: true)
+                        .accessibilityLabel("\(names[person.personId] ?? "Guest"): \(person.value.label)")
+                }
+            }
+        }
+    }
+
+    private func initial(_ personId: String) -> String {
+        String((names[personId] ?? "?").prefix(1))
+    }
+
+    private func chip(_ text: String, color: Color, disagree: Bool = false) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .background(color.opacity(0.18), in: Capsule())
+            .overlay { if disagree { Capsule().strokeBorder(Color.purple, lineWidth: 1.5) } }
     }
 }

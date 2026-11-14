@@ -513,13 +513,13 @@ struct StartVisitSheet: View {
         .buttonStyle(.plain)
     }
 
-    /// With the map: Start when you're near the chosen place, a card when it's far away (you're
-    /// planning), or a nudge when nothing's chosen.
+    /// The chosen place's card (Start, Directions, its page), near or far; with nothing chosen, a
+    /// nudge on the map or a disabled Start under the list.
     @ViewBuilder
     private var bottomBar: some View {
-        if usesMap, let chosen, !model.isWithinReach(chosen.place) {
+        if let chosen {
             placeCard(chosen)
-        } else if usesMap, chosen == nil {
+        } else if usesMap {
             Text("Tap a pin to see the place")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -531,7 +531,7 @@ struct StartVisitSheet: View {
         }
     }
 
-    /// A far-away place: why it's saved, how to get there, and its page.
+    /// The chosen place: why it's saved, then Start, how to get there, and its page.
     private func placeCard(_ item: MapPlace) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 8) {
@@ -545,13 +545,20 @@ struct StartVisitSheet: View {
             if let why = whySaved(item.saved) {
                 Text(why).font(.subheadline).lineLimit(3)
             }
+            Button {
+                startVisit()
+            } label: {
+                Text("Start visit here").font(.headline).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             HStack(spacing: 10) {
                 Button {
                     openURL(GoogleMapsLink.directions(name: item.place.name, googlePlaceId: item.saved?.googlePlaceId ?? item.place.googlePlaceId))
                 } label: {
-                    Text("Directions").frame(maxWidth: .infinity)
+                    Label("Directions", systemImage: "arrow.triangle.turn.up.right.diamond").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 if let saved = item.saved {
                     Button {
                         openPlace = saved

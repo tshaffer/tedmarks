@@ -201,7 +201,8 @@ struct AddToOrderSheet: View {
     }
 }
 
-/// [−] n [+], or just [+] at 0.
+/// [−] n [+], or just [+] at 0. Each button is tappable across its whole frame (a plain button
+/// otherwise only responds on its glyph — for "−", a sliver).
 private struct OrderStepper: View {
     let count: Int
     let name: String
@@ -211,11 +212,11 @@ private struct OrderStepper: View {
     var body: some View {
         HStack(spacing: 0) {
             if count > 0 {
-                Button(action: onRemove) { Image(systemName: "minus").frame(width: 34, height: 30) }
+                Button(action: onRemove) { Image(systemName: "minus").frame(width: 34, height: 30).contentShape(Rectangle()) }
                     .accessibilityLabel("One less \(name)")
                 Text("\(count)").font(.subheadline.weight(.bold)).monospacedDigit().frame(minWidth: 16)
             }
-            Button(action: onAdd) { Image(systemName: "plus").frame(width: 34, height: 30) }
+            Button(action: onAdd) { Image(systemName: "plus").frame(width: 34, height: 30).contentShape(Rectangle()) }
                 .accessibilityLabel("Add \(name)")
         }
         .font(.subheadline.weight(.bold))

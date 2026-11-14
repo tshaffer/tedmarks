@@ -86,6 +86,69 @@ public enum DishCapture {
         try context.save()
     }
 
+    /// Our order as it stood (for What did you order?'s Cancel, which puts it back).
+    public struct OrderSnapshot: Sendable {
+        /// Each dish in the order, and how many.
+        let quantities: [UUID: Int?]
+        /// Their ratings (a dish removed meanwhile takes its ratings with it).
+        let ratingIds: Set<UUID>
+        /// The place's dishes (typing a new name adds one).
+        let placeItemIds: Set<UUID>
+    }
+
+    public static func snapshot(of visit: Visit, in context: ModelContext) -> OrderSnapshot {
+        let items = orderItems(for: visit)
+        let ratingIds = items.flatMap { (try? ratings(for: $0.id, in: context)) ?? [] }.map(\.id)
+        return OrderSnapshot(
+            quantities: Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0.quantity) }),
+            ratingIds: Set(ratingIds),
+            placeItemIds: Set((visit.place?.items ?? []).map(\.id))
+        )
+    }
+
+    /// Whether our order differs from the snapshot.
+    public static func hasChanged(_ visit: Visit, since snapshot: OrderSnapshot) -> Bool {
+        let items = orderItems(for: visit)
+        return items.count != snapshot.quantities.count
+            || items.contains { item in snapshot.quantities[item.id].map { $0 != item.quantity } ?? true }
+    }
+
+    /// Puts our order back as it was: dishes added since go, dishes removed come back with their
+    /// ratings, counts are restored, and dishes typed in for the first time are dropped.
+    public static func restore(_ visit: Visit, to snapshot: OrderSnapshot, in context: ModelContext, now: Date = .now) throws {
+        for item in visit.items {
+            if let quantity = snapshot.quantities[item.id] {
+                guard item.deletedAt != nil || item.quantity != quantity else { continue }
+                item.deletedAt = nil
+                item.quantity = quantity
+                item.modifiedAt = now
+            } else if item.deletedAt == nil {
+                item.deletedAt = now
+                item.modifiedAt = now
+                for rating in try ratings(for: item.id, in: context) {
+                    rating.deletedAt = now
+                    rating.modifiedAt = now
+                }
+            }
+        }
+        let ratingIds = Array(snapshot.ratingIds)
+        for rating in try context.fetch(FetchDescriptor<Rating>(predicate: #Predicate { ratingIds.contains($0.id) && $0.deletedAt != nil })) {
+            rating.deletedAt = nil
+            rating.modifiedAt = now
+        }
+        for placeItem in visit.place?.items ?? [] where placeItem.deletedAt == nil && !snapshot.placeItemIds.contains(placeItem.id) {
+            // New since the snapshot, so only this visit can have ordered it.
+            let stillOrdered = orderItems(for: visit).contains { $0.placeItem?.id == placeItem.id }
+            if !stillOrdered {
+                placeItem.deletedAt = now
+                placeItem.modifiedAt = now
+            }
+        }
+        visit.modifiedAt = now
+        try context.save()
+        VisitSideEffects.reconcile(in: context)
+    }
+
     /// Adds "Dish N" for a dish we'll name later (receipt, voice, or editing).
     @discardableResult
     public static func addUnnamedItem(to visit: Visit, in context: ModelContext, now: Date = .now) throws -> VisitItem {

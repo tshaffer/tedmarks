@@ -3,7 +3,8 @@ import SwiftUI
 import TedmarksKit
 
 /// Figma 02b/02c · What did you order? Add dishes as they're ordered (rate them later from
-/// the visit card or the Lock Screen). Stays open so several dishes go in quickly.
+/// the visit card or the Lock Screen). Stays open so several dishes go in quickly. Each tap saves;
+/// Cancel puts the order back as it was on opening.
 struct AddToOrderSheet: View {
     let visit: Visit
 
@@ -16,6 +17,9 @@ struct AddToOrderSheet: View {
     @FocusState private var isTypingName: Bool
     @State private var errorMessage: String?
     @State private var pendingRemoval: VisitItem?
+    /// The order as it was on opening, for Cancel (each tap saves as you go).
+    @State private var snapshot: DishCapture.OrderSnapshot?
+    @State private var isConfirmingCancel = false
 
     var body: some View {
         NavigationStack {
@@ -72,6 +76,15 @@ struct AddToOrderSheet: View {
                         Text("What did you order?").font(.headline)
                     }
                 }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { cancel() }
+                        .confirmationDialog("Discard changes to your order?", isPresented: $isConfirmingCancel, titleVisibility: .visible) {
+                            Button("Discard Changes", role: .destructive) { discardChanges() }
+                            Button("Keep Editing", role: .cancel) {}
+                        } message: {
+                            Text("Your order goes back to how it was when you opened this.")
+                        }
+                }
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
             .alert("Couldn't save", isPresented: .constant(errorMessage != nil)) {
@@ -89,6 +102,7 @@ struct AddToOrderSheet: View {
                 Button("Cancel", role: .cancel) { pendingRemoval = nil }
             }
             .onAppear {
+                if snapshot == nil { snapshot = DishCapture.snapshot(of: visit, in: context) }
                 // First visit with no menu: nothing to pick from, so go straight to typing.
                 if suggestions.isEmpty && (visit.place?.latestMenuId == nil) { isTypingName = true }
             }
@@ -190,6 +204,25 @@ struct AddToOrderSheet: View {
         let last = visits.filter { !$0.dateUnknown }.map(\.startedAt).max()
             .map { (visits.count > 1 ? "last " : "") + $0.formatted(date: .abbreviated, time: .omitted) }
         return [times, last, placeItem.price].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// Closes, asking first if the order changed.
+    private func cancel() {
+        if let snapshot, DishCapture.hasChanged(visit, since: snapshot) {
+            isConfirmingCancel = true
+        } else {
+            dismiss()
+        }
+    }
+
+    private func discardChanges() {
+        guard let snapshot else { return dismiss() }
+        do {
+            try DishCapture.restore(visit, to: snapshot, in: context)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func perform(_ action: () throws -> Void) {

@@ -121,3 +121,31 @@ private struct Fixture {
     #expect(!salad.canRename)
     #expect(throws: DishRenameError.fromTheMenu) { try DishCapture.rename(salad, to: "Green salad", in: f.context) }
 }
+
+@MainActor
+@Test func cancellingWhatDidYouOrderPutsTheOrderBackAsItWas() throws {
+    let f = try Fixture()
+    let cappuccino = try #require(try DishCapture.addOne(named: "Cappuccino", to: f.visit, addedVia: .order, in: f.context))
+    let croissant = try #require(try DishCapture.addOne(named: "Almond croissant", to: f.visit, addedVia: .order, in: f.context))
+    try DishCapture.rate(croissant, .loved, for: .us, enteredBy: f.ted.id, in: f.context)
+
+    let snapshot = DishCapture.snapshot(of: f.visit, in: f.context)
+    #expect(!DishCapture.hasChanged(f.visit, since: snapshot))
+
+    // Two more cappuccinos, the rated croissant removed, and a dish typed for the first time.
+    try DishCapture.addOne(cappuccino.placeItem!, to: f.visit, addedVia: .order, in: f.context)
+    try DishCapture.addOne(cappuccino.placeItem!, to: f.visit, addedVia: .order, in: f.context)
+    try DishCapture.removeItem(croissant, in: f.context)
+    let cote = try #require(try DishCapture.addOne(named: "Cote Est", to: f.visit, addedVia: .order, in: f.context))
+    #expect(DishCapture.hasChanged(f.visit, since: snapshot))
+
+    try DishCapture.restore(f.visit, to: snapshot, in: f.context)
+
+    #expect(DishCapture.orderItems(for: f.visit).map(\.displayName) == ["Cappuccino", "Almond croissant"])
+    #expect(cappuccino.count == 1)
+    #expect(croissant.deletedAt == nil)
+    #expect(try DishCapture.ratings(for: croissant.id, in: f.context).count == 1)
+    #expect(cote.deletedAt != nil)
+    #expect(cote.placeItem?.deletedAt != nil)
+    #expect(!DishCapture.hasChanged(f.visit, since: snapshot))
+}

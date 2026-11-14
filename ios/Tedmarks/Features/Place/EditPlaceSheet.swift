@@ -98,11 +98,14 @@ struct EditPlaceSheet: View {
             if !suggestions.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(suggestions, id: \.self) { tag in
-                        Button("+ \(tag)") { addTag(tag) }
-                            .font(.subheadline)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .overlay(Capsule().strokeBorder(Color(.separator)))
-                            .buttonStyle(.plain)
+                        Button { addTag(tag) } label: {
+                            Text("+ \(tag)")
+                                .font(.subheadline)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .overlay(Capsule().strokeBorder(Color(.separator)))
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.vertical, 4)

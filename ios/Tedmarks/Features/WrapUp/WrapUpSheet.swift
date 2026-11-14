@@ -144,6 +144,7 @@ struct WrapUpSheet: View {
                         Image(systemName: dishNotes.isEmpty ? "square.and.pencil" : "note.text")
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Notes about this dish")

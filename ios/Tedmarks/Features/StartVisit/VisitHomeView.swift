@@ -163,6 +163,7 @@ struct VisitHomeView: View {
                                     Capsule().fill(Color(.secondarySystemFill))
                                 }
                             }
+                            .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
                         .renamesDish(item.placeItem)

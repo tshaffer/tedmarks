@@ -144,6 +144,7 @@ struct RateDishSheet: View {
                     Capsule().strokeBorder(Color.secondary.opacity(0.35))
                 }
             }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }

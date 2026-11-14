@@ -178,6 +178,7 @@ struct StartVisitSheet: View {
                 if !model.searchText.isEmpty {
                     Button { model.searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                            .frame(width: 30, height: 30).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Clear search")
@@ -721,6 +722,7 @@ struct Chip: View {
                 Capsule().fill(isOn ? Color.accentColor : Color(.secondarySystemFill))
             }
         }
+        .contentShape(Capsule())
     }
 }
 
@@ -748,6 +750,7 @@ private struct MapFilterChip: View {
                         Capsule().strokeBorder(Color.secondary.opacity(0.4))
                     }
                 }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityValue(isOn ? "On" : "Off")
